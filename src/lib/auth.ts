@@ -16,16 +16,34 @@ export function isValidIitbEmail(email: string | null | undefined): boolean {
 }
 
 /**
- * Sanitizes redirect target URLs to prevent open redirect vulnerabilities.
+ * Sanitizes redirect target URLs to prevent open redirect vulnerabilities
+ * and infinite redirect loops.
  * Only internal relative paths starting with a single '/' are permitted.
+ * Backslashes, protocol-relative slashes, and auth loop destinations (/login, /auth)
+ * are rejected, falling back to "/".
  */
 export function sanitizeRedirectUrl(nextUrl: string | null | undefined): string {
   if (!nextUrl || typeof nextUrl !== "string") return "/";
   const trimmed = nextUrl.trim();
-  if (trimmed.startsWith("/") && !trimmed.startsWith("//")) {
-    return trimmed;
+  // Reject protocol-relative '//', backslash escapes '/\', or any backslash
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//") || trimmed.includes("\\")) {
+    return "/";
   }
-  return "/";
+  // Reject redirects back to auth/login endpoints to prevent infinite redirect loops
+  if (
+    trimmed === "/login" ||
+    trimmed.startsWith("/login?") ||
+    trimmed.startsWith("/login/") ||
+    trimmed === "/auth" ||
+    trimmed.startsWith("/auth?") ||
+    trimmed.startsWith("/auth/") ||
+    trimmed === "/verify-email" ||
+    trimmed.startsWith("/verify-email?") ||
+    trimmed.startsWith("/verify-email/")
+  ) {
+    return "/";
+  }
+  return trimmed;
 }
 
 /**

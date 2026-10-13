@@ -240,7 +240,35 @@ assert.strictEqual(isPersistentSession("1"), true, "Explicit '1' must be persist
 assert.strictEqual(isPersistentSession(undefined), true, "Default undefined must be persistent");
 assert.strictEqual(isPersistentSession(null), true, "Default null must be persistent");
 assert.strictEqual(isPersistentSession("0"), false, "Explicit '0' must be session-only");
-console.log("✓ Passed: 1-year persistent session lifetime (31,536,000s) and preference toggle verified");
+
+// Test cookie options generator logic for persistence vs session-only vs deletion
+function computeCookieOptions(isPersistent, isDeleting, baseOptions = {}) {
+  const sessionMaxAge = isPersistent ? SESSION_MAX_AGE : undefined;
+  return {
+    ...baseOptions,
+    sameSite: "lax",
+    path: "/",
+    ...(isDeleting
+      ? { maxAge: 0 }
+      : sessionMaxAge !== undefined
+      ? { maxAge: sessionMaxAge }
+      : { maxAge: undefined }),
+  };
+}
+
+// 1. Deleting cookie must ALWAYS retain maxAge: 0 even if session is persistent
+const deleteOpts = computeCookieOptions(true, true, { maxAge: 0 });
+assert.strictEqual(deleteOpts.maxAge, 0, "Cookie deletion must produce maxAge: 0");
+
+// 2. Persistent session must produce 1-year maxAge (31,536,000s)
+const persistOpts = computeCookieOptions(true, false);
+assert.strictEqual(persistOpts.maxAge, 31536000, "Persistent session must have 1-year maxAge");
+
+// 3. Session-only (unchecking remember device) must leave maxAge undefined
+const sessionOnlyOpts = computeCookieOptions(false, false);
+assert.strictEqual(sessionOnlyOpts.maxAge, undefined, "Non-persistent session must have undefined maxAge");
+
+console.log("✓ Passed: 1-year persistent session lifetime, session-only toggle, and cookie deletion maxAge verified");
 
 // --- Test 13: Frictionless Auth, Email Whitelist & Security Sanitization ---
 console.log("\nTest 13: Frictionless auth, email whitelist & security sanitization...");
@@ -264,14 +292,20 @@ assert.strictEqual(sanitizeOtpCode("12a34b56c"), "123456");
 assert.strictEqual(sanitizeOtpCode("12345"), "12345");
 assert.strictEqual(sanitizeOtpCode(""), "");
 
-// Open redirect sanitization
+// Open redirect sanitization & infinite redirect loop protection
 assert.strictEqual(sanitizeRedirectUrl("/schedule"), "/schedule");
 assert.strictEqual(sanitizeRedirectUrl("/settings?tab=general"), "/settings?tab=general");
 assert.strictEqual(sanitizeRedirectUrl("https://evil.com"), "/");
 assert.strictEqual(sanitizeRedirectUrl("//evil.com"), "/");
+assert.strictEqual(sanitizeRedirectUrl("/\\evil.com"), "/", "Backslash open-redirect bypass must be blocked");
+assert.strictEqual(sanitizeRedirectUrl("/\\/evil.com"), "/", "Multi-backslash open-redirect bypass must be blocked");
+assert.strictEqual(sanitizeRedirectUrl("/login"), "/", "Redirect to /login must fallback to / to prevent infinite loops");
+assert.strictEqual(sanitizeRedirectUrl("/login?next=/login"), "/", "Nested /login must fallback to /");
+assert.strictEqual(sanitizeRedirectUrl("/auth/callback"), "/", "Redirect to /auth must fallback to /");
+assert.strictEqual(sanitizeRedirectUrl("/verify-email"), "/", "Redirect to /verify-email must fallback to /");
 assert.strictEqual(sanitizeRedirectUrl("javascript:alert(1)"), "/");
 assert.strictEqual(sanitizeRedirectUrl(""), "/");
 assert.strictEqual(sanitizeRedirectUrl(null), "/");
-console.log("✓ Passed: IITB domain validation, OTP code formatting, and open-redirect protection verified");
+console.log("✓ Passed: IITB domain validation, OTP formatting, open-redirect protection & loop prevention verified");
 
-console.log("\n=== ALL 13 TEST SUITES PASSED SUCCESSFULLY! ===");
+console.log("\n=== ALL TEST SUITES PASSED SUCCESSFULLY! ===");

@@ -28,16 +28,34 @@ export async function updateSession(req: NextRequest) {
           return req.cookies.getAll();
         },
         setAll(cookiesToSet: Array<{ name: string; value: string; options?: any }>) {
-          cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value));
+          cookiesToSet.forEach(({ name, value, options }) => {
+            const isDeleting =
+              options?.maxAge === 0 ||
+              value === "" ||
+              (options?.maxAge !== undefined && options.maxAge <= 0);
+
+            if (isDeleting) {
+              req.cookies.delete(name);
+            } else {
+              req.cookies.set(name, value);
+            }
+          });
           res = NextResponse.next({
             request: req,
           });
           cookiesToSet.forEach(({ name, value, options }) => {
+            const isDeleting =
+              options?.maxAge === 0 ||
+              value === "" ||
+              (options?.maxAge !== undefined && options.maxAge <= 0);
+
             const finalOptions = {
               ...options,
               sameSite: "lax" as const,
               path: "/",
-              ...(sessionMaxAge !== undefined
+              ...(isDeleting
+                ? { maxAge: 0 }
+                : sessionMaxAge !== undefined
                 ? { maxAge: sessionMaxAge }
                 : { maxAge: undefined }),
             };

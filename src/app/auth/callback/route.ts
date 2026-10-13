@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 import {
   SESSION_MAX_AGE,
+  isValidIitbEmail,
   sanitizeRedirectUrl,
   isPersistentSession,
 } from "@/lib/auth";
@@ -29,11 +30,18 @@ export async function GET(req: NextRequest) {
         getAll: () => req.cookies.getAll(),
         setAll: (cookiesToSet: Array<{ name: string; value: string; options?: any }>) => {
           cookiesToSet.forEach(({ name, value, options }) => {
+            const isDeleting =
+              options?.maxAge === 0 ||
+              value === "" ||
+              (options?.maxAge !== undefined && options.maxAge <= 0);
+
             const finalOptions = {
               ...options,
               sameSite: "lax" as const,
               path: "/",
-              ...(sessionMaxAge !== undefined
+              ...(isDeleting
+                ? { maxAge: 0 }
+                : sessionMaxAge !== undefined
                 ? { maxAge: sessionMaxAge }
                 : { maxAge: undefined }),
             };
@@ -49,20 +57,36 @@ export async function GET(req: NextRequest) {
     }
   );
 
+  function redirectWithCookies(targetUrl: URL) {
+    const redirectRes = NextResponse.redirect(targetUrl);
+    res.cookies.getAll().forEach((c) => {
+      redirectRes.cookies.set(c.name, c.value, c);
+    });
+    return redirectRes;
+  }
+
   if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    if (!error && data?.user) {
+      if (!isValidIitbEmail(data.user.email)) {
+        await supabase.auth.signOut();
+        return redirectWithCookies(new URL("/login?e=iitb", origin));
+      }
       return res;
     }
   } else if (token_hash && type) {
-    const { error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.verifyOtp({
       type: type as any,
       token_hash,
     });
-    if (!error) {
+    if (!error && data?.user) {
+      if (!isValidIitbEmail(data.user.email)) {
+        await supabase.auth.signOut();
+        return redirectWithCookies(new URL("/login?e=iitb", origin));
+      }
       return res;
     }
   }
 
-  return NextResponse.redirect(new URL("/login?e=auth", origin));
+  return redirectWithCookies(new URL("/login?e=auth", origin));
 }

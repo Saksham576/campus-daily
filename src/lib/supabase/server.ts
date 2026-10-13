@@ -21,11 +21,18 @@ export async function createClient() {
         setAll(cookiesToSet: Array<{ name: string; value: string; options?: any }>) {
           try {
             cookiesToSet.forEach(({ name, value, options }) => {
+              const isDeleting =
+                options?.maxAge === 0 ||
+                value === "" ||
+                (options?.maxAge !== undefined && options.maxAge <= 0);
+
               const cookieOpts = {
                 ...options,
                 sameSite: "lax" as const,
                 path: "/",
-                ...(sessionMaxAge !== undefined
+                ...(isDeleting
+                  ? { maxAge: 0 }
+                  : sessionMaxAge !== undefined
                   ? { maxAge: sessionMaxAge }
                   : { maxAge: undefined }),
               };

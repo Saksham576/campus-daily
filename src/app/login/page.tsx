@@ -28,9 +28,37 @@ function LoginForm() {
   const rawNext = searchParams.get("next");
   const safeNext = sanitizeRedirectUrl(rawNext);
 
-  // 1. Initial Mount: Check if user is already logged in for instant auto-redirect
+  // 1. Initial Mount: Check if user is already logged in for instant auto-redirect,
+  // or display error banner if redirected from an auth failure.
   useEffect(() => {
     let isMounted = true;
+
+    // Check saved remember preference
+    if (typeof window !== "undefined") {
+      const savedPref = localStorage.getItem("campus_remember_device");
+      if (savedPref !== null) {
+        const persistent = isPersistentSession(savedPref);
+        setRememberDevice(persistent);
+        const cookieVal = persistent ? "1" : "0";
+        document.cookie = `campus_remember_device=${cookieVal}; path=/; max-age=31536000; SameSite=Lax`;
+      }
+    }
+
+    // Check error query parameter
+    const errCode = searchParams.get("e");
+    if (errCode === "iitb") {
+      setStatus("error");
+      setErrorMsg(
+        "Campus Daily is exclusively for IITB students. Sign in with your @iitb.ac.in address."
+      );
+      return;
+    } else if (errCode === "auth") {
+      setStatus("error");
+      setErrorMsg(
+        "The sign-in link expired or is invalid. Please request a new verification code below."
+      );
+      return;
+    }
 
     async function checkExistingSession() {
       try {
@@ -54,28 +82,6 @@ function LoginForm() {
     }
 
     checkExistingSession();
-
-    // Check saved remember preference
-    if (typeof window !== "undefined") {
-      const savedPref = localStorage.getItem("campus_remember_device");
-      if (savedPref !== null) {
-        setRememberDevice(isPersistentSession(savedPref));
-      }
-    }
-
-    // Check error query parameter
-    const errCode = searchParams.get("e");
-    if (errCode === "iitb") {
-      setStatus("error");
-      setErrorMsg(
-        "Campus Daily is exclusively for IITB students. Sign in with your @iitb.ac.in address."
-      );
-    } else if (errCode === "auth") {
-      setStatus("error");
-      setErrorMsg(
-        "The sign-in link expired or is invalid. Please request a new verification code below."
-      );
-    }
 
     return () => {
       isMounted = false;
@@ -101,15 +107,9 @@ function LoginForm() {
   function handleRememberChange(checked: boolean) {
     setRememberDevice(checked);
     if (typeof document !== "undefined") {
-      if (checked) {
-        document.cookie =
-          "campus_remember_device=1; path=/; max-age=31536000; SameSite=Lax";
-        localStorage.setItem("campus_remember_device", "1");
-      } else {
-        document.cookie =
-          "campus_remember_device=0; path=/; SameSite=Lax";
-        localStorage.setItem("campus_remember_device", "0");
-      }
+      const cookieVal = checked ? "1" : "0";
+      document.cookie = `campus_remember_device=${cookieVal}; path=/; max-age=31536000; SameSite=Lax`;
+      localStorage.setItem("campus_remember_device", cookieVal);
     }
   }
 
