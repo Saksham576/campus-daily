@@ -8,7 +8,7 @@ export type TimetableSlot = {
   slot_type: "lecture" | "lab" | "quiz" | "exam" | "deadline" | "event" | "custom";
 };
 
-// IIT Bombay First Year Standard Academic Slots
+// IIT Bombay First Year Standard Division Slots (D1–D4)
 export const DIVISION_SLOTS: Record<string, TimetableSlot[]> = {
   D1: [
     { day_of_week: 1, start_time: "08:30", end_time: "09:25", course_code: "MA 105", title: "Calculus", location: "LA 201", slot_type: "lecture" },
@@ -47,12 +47,50 @@ export const DIVISION_SLOTS: Record<string, TimetableSlot[]> = {
   ],
 };
 
-// Generates actual Date instances for slots in a given week
+// Standard IIT Bombay First Year HASMED Elective Slot Allocations
+export const HASMED_SLOTS: Record<string, TimetableSlot[]> = {
+  Entrepreneurship: [
+    { day_of_week: 2, start_time: "14:00", end_time: "15:25", course_code: "ENT 101", title: "Innovation & Entrepreneurship", location: "LT 201", slot_type: "lecture" },
+    { day_of_week: 5, start_time: "14:00", end_time: "15:25", course_code: "ENT 101", title: "Innovation & Entrepreneurship", location: "LT 201", slot_type: "lecture" },
+  ],
+  Sociology: [
+    { day_of_week: 2, start_time: "14:00", end_time: "15:25", course_code: "HS 101", title: "Introduction to Sociology", location: "LA 001", slot_type: "lecture" },
+    { day_of_week: 5, start_time: "14:00", end_time: "15:25", course_code: "HS 101", title: "Introduction to Sociology", location: "LA 001", slot_type: "lecture" },
+  ],
+  Philosophy: [
+    { day_of_week: 2, start_time: "14:00", end_time: "15:25", course_code: "HS 103", title: "Introduction to Philosophy", location: "LA 002", slot_type: "lecture" },
+    { day_of_week: 5, start_time: "14:00", end_time: "15:25", course_code: "HS 103", title: "Introduction to Philosophy", location: "LA 002", slot_type: "lecture" },
+  ],
+  Psychology: [
+    { day_of_week: 2, start_time: "14:00", end_time: "15:25", course_code: "HS 105", title: "General Psychology", location: "LT 102", slot_type: "lecture" },
+    { day_of_week: 5, start_time: "14:00", end_time: "15:25", course_code: "HS 105", title: "General Psychology", location: "LT 102", slot_type: "lecture" },
+  ],
+  Literature: [
+    { day_of_week: 2, start_time: "14:00", end_time: "15:25", course_code: "HS 107", title: "Introduction to Literature", location: "LA 101", slot_type: "lecture" },
+    { day_of_week: 5, start_time: "14:00", end_time: "15:25", course_code: "HS 107", title: "Introduction to Literature", location: "LA 101", slot_type: "lecture" },
+  ],
+  Ecology: [
+    { day_of_week: 2, start_time: "14:00", end_time: "15:25", course_code: "ES 101", title: "Environmental Studies & Ecology", location: "LT 103", slot_type: "lecture" },
+    { day_of_week: 5, start_time: "14:00", end_time: "15:25", course_code: "ES 101", title: "Environmental Studies & Ecology", location: "LT 103", slot_type: "lecture" },
+  ],
+  "NCC/NSO/NSS": [
+    { day_of_week: 2, start_time: "17:15", end_time: "18:45", course_code: "NSO 101", title: "Physical Training / Activity", location: "Gymkhana Grounds", slot_type: "custom" },
+    { day_of_week: 4, start_time: "17:15", end_time: "18:45", course_code: "NSO 101", title: "Physical Training / Activity", location: "Gymkhana Grounds", slot_type: "custom" },
+  ],
+};
+
+// Generates actual Date instances for slots in a given week, combining division & HASMED elective
 export function getSlotsForWeek(
   division: string = "D1",
-  mondayDate: Date = new Date()
+  mondayDate: Date = new Date(),
+  hasmedElective?: string
 ): Array<TimetableSlot & { start_datetime: string; end_datetime: string }> {
-  const baseSlots = DIVISION_SLOTS[division] || DIVISION_SLOTS.D1;
+  const baseSlots = [...(DIVISION_SLOTS[division] || DIVISION_SLOTS.D1)];
+
+  if (hasmedElective && HASMED_SLOTS[hasmedElective]) {
+    baseSlots.push(...HASMED_SLOTS[hasmedElective]);
+  }
+
   const monday = new Date(mondayDate);
   const day = monday.getDay();
   const diff = monday.getDate() - day + (day === 0 ? -6 : 1);

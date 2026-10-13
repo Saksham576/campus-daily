@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { generateIcs } from "@/lib/events";
-import { DIVISION_SLOTS, type TimetableSlot } from "@/lib/timetable/first_year_slots";
+import { generateMultiEventIcs } from "@/lib/events";
+import {
+  DIVISION_SLOTS,
+  HASMED_SLOTS,
+  getSlotsForWeek,
+} from "@/lib/timetable/first_year_slots";
 
 export type ScheduleItem = {
   id: string;
@@ -27,8 +31,12 @@ export default function SchedulePage() {
   const [selectedDay, setSelectedDay] = useState<number>(0); // 0 = Mon, 4 = Fri
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
   const [userDivision, setUserDivision] = useState<string>("D1");
+  const [userHasmed, setUserHasmed] = useState<string | null>(null);
+  const [hasMoodleUrl, setHasMoodleUrl] = useState<boolean>(false);
+  const [syncingMoodle, setSyncingMoodle] = useState(false);
+  const [statusNotification, setStatusNotification] = useState<string | null>(null);
+
   const [showAddModal, setShowAddModal] = useState(false);
-  const [isPending, startTransition] = useTransition();
 
   // Form state for adding custom slot
   const [newTitle, setNewTitle] = useState("");
@@ -50,53 +58,44 @@ export default function SchedulePage() {
         return;
       }
 
-      // Fetch user division
+      // Fetch user profile metadata (division, HASMED elective, Moodle URL)
       const { data: sub } = await supabase
         .from("subscribers")
-        .select("division")
+        .select("division, hasmed, moodle_ical_url")
         .eq("email", user.email)
         .single();
 
       if (sub?.division) {
         setUserDivision(sub.division);
       }
+      if (sub?.hasmed) {
+        setUserHasmed(sub.hasmed);
+      }
+      if (sub?.moodle_ical_url) {
+        setHasMoodleUrl(true);
+      }
 
-      // Fetch saved user schedules
-      const { data: dbSchedules, error } = await supabase
+      // Fetch saved user schedules from database
+      const { data: dbSchedules } = await supabase
         .from("user_schedules")
         .select("*")
         .order("start_time", { ascending: true });
 
-      if (dbSchedules) {
+      if (dbSchedules && dbSchedules.length > 0) {
         setSchedules(dbSchedules as ScheduleItem[]);
-      }
-
-      // If user has zero custom schedules, auto-populate baseline division slots
-      if ((!dbSchedules || dbSchedules.length === 0) && sub?.division) {
-        const divSlots = DIVISION_SLOTS[sub.division] || DIVISION_SLOTS.D1;
-        const baseline = divSlots.map((s, idx) => {
-          const now = new Date();
-          const dayDiff = s.day_of_week - (now.getDay() || 7);
-          const d = new Date(now);
-          d.setDate(now.getDate() + dayDiff);
-          const [sh, sm] = s.start_time.split(":").map(Number);
-          const [eh, em] = s.end_time.split(":").map(Number);
-          const start = new Date(d);
-          start.setHours(sh, sm, 0, 0);
-          const end = new Date(d);
-          end.setHours(eh, em, 0, 0);
-
-          return {
-            id: `baseline-${idx}`,
-            user_id: user.id,
-            title: `${s.course_code}: ${s.title}`,
-            location: s.location,
-            start_time: start.toISOString(),
-            end_time: end.toISOString(),
-            slot_type: s.slot_type,
-            is_cancelled: false,
-          } as ScheduleItem;
-        });
+      } else if (sub?.division) {
+        // Auto-populate standard baseline slots including division & HASMED elective
+        const weekSlots = getSlotsForWeek(sub.division, new Date(), sub.hasmed || undefined);
+        const baseline = weekSlots.map((s, idx) => ({
+          id: `baseline-${idx}`,
+          user_id: user.id,
+          title: `${s.course_code}: ${s.title}`,
+          location: s.location,
+          start_time: s.start_datetime,
+          end_time: s.end_datetime,
+          slot_type: s.slot_type,
+          is_cancelled: false,
+        })) as ScheduleItem[];
         setSchedules(baseline);
       }
 
@@ -116,7 +115,7 @@ export default function SchedulePage() {
 
     if (!user) return;
 
-    // Calculate next occurrence of chosen day
+    // Calculate occurrence of chosen day in the current week
     const now = new Date();
     const currentDay = now.getDay() || 7;
     const diff = newDay - currentDay;
@@ -126,18 +125,20 @@ export default function SchedulePage() {
     const [sh, sm] = newStartTime.split(":").map(Number);
     const [eh, em] = newEndTime.split(":").map(Number);
 
-    const start = new Date(targetDate);
-    start.setHours(sh, sm, 0, 0);
-
-    const end = new Date(targetDate);
-    end.setHours(eh, em, 0, 0);
+    const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+    const startIso = `${targetDate.getFullYear()}-${pad(targetDate.getMonth() + 1)}-${pad(
+      targetDate.getDate()
+    )}T${pad(sh)}:${pad(sm)}:00+05:30`;
+    const endIso = `${targetDate.getFullYear()}-${pad(targetDate.getMonth() + 1)}-${pad(
+      targetDate.getDate()
+    )}T${pad(eh)}:${pad(em)}:00+05:30`;
 
     const newSlot: Partial<ScheduleItem> = {
       user_id: user.id,
       title: newTitle,
       location: newLocation || "IIT Bombay",
-      start_time: start.toISOString(),
-      end_time: end.toISOString(),
+      start_time: new Date(startIso).toISOString(),
+      end_time: new Date(endIso).toISOString(),
       slot_type: newSlotType,
       is_cancelled: false,
     };
@@ -151,7 +152,6 @@ export default function SchedulePage() {
     if (!error && data) {
       setSchedules((prev) => [...prev, data as ScheduleItem]);
     } else {
-      // Optimistic addition
       setSchedules((prev) => [
         ...prev,
         { ...newSlot, id: `custom-${Date.now()}` } as ScheduleItem,
@@ -161,6 +161,8 @@ export default function SchedulePage() {
     setNewTitle("");
     setNewLocation("");
     setShowAddModal(false);
+    setStatusNotification("Custom slot added successfully!");
+    setTimeout(() => setStatusNotification(null), 4000);
   }
 
   async function handleToggleCancellation(slotId: string, currentStatus?: boolean) {
@@ -179,65 +181,60 @@ export default function SchedulePage() {
     }
   }
 
+  async function handleSyncMoodle() {
+    setSyncingMoodle(true);
+    setStatusNotification("Syncing assignments and quizzes from Moodle…");
+
+    try {
+      const res = await fetch("/api/sync/moodle", { method: "POST" });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setStatusNotification(`Sync error: ${data.error || "Failed to reach Moodle"}`);
+      } else {
+        setStatusNotification(data.message || `Synced ${data.synced} events from Moodle!`);
+        // Refresh schedules from DB
+        const supabase = createClient();
+        const { data: dbSchedules } = await supabase
+          .from("user_schedules")
+          .select("*")
+          .order("start_time", { ascending: true });
+
+        if (dbSchedules) {
+          setSchedules(dbSchedules as ScheduleItem[]);
+        }
+      }
+    } catch (err: any) {
+      setStatusNotification(`Sync error: ${err.message}`);
+    } finally {
+      setSyncingMoodle(false);
+      setTimeout(() => setStatusNotification(null), 5000);
+    }
+  }
+
   function handleExportWeekIcs() {
     if (schedules.length === 0) {
       alert("No slots to export.");
       return;
     }
 
-    // Combine all events into one multi-event .ics file
-    const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-    const formatIcsDate = (dateStr: string) => {
-      const d = new Date(dateStr);
-      return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(
-        d.getUTCDate()
-      )}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(
-        d.getUTCSeconds()
-      )}Z`;
-    };
-
-    const dtStamp = formatIcsDate(new Date().toISOString());
-
-    const eventsIcs = schedules
-      .map((s, idx) => {
-        const uid = `schedule-${s.id || idx}@campusdaily.iitb`;
-        const dtStart = formatIcsDate(s.start_time);
-        const dtEnd = s.end_time
-          ? formatIcsDate(s.end_time)
-          : formatIcsDate(
-              new Date(new Date(s.start_time).getTime() + 3600000).toISOString()
-            );
-
-        return [
-          "BEGIN:VEVENT",
-          `UID:${uid}`,
-          `DTSTAMP:${dtStamp}`,
-          `DTSTART:${dtStart}`,
-          `DTEND:${dtEnd}`,
-          `SUMMARY:${s.is_cancelled ? "[CANCELLED] " : ""}${s.title.replace(/[,;]/g, " ")}`,
-          s.location ? `LOCATION:${s.location.replace(/[,;]/g, " ")}` : "",
-          `DESCRIPTION:Campus Daily Schedule Slot (${s.slot_type})`,
-          "STATUS:CONFIRMED",
-          "END:VEVENT",
-        ].join("\r\n");
-      })
-      .join("\r\n");
-
-    const fullIcs = [
-      "BEGIN:VCALENDAR",
-      "VERSION:2.0",
-      "PRODID:-//Campus Daily//IIT Bombay Timetable//EN",
-      "CALSCALE:GREGORIAN",
-      "METHOD:PUBLISH",
-      eventsIcs,
-      "END:VCALENDAR",
-    ].join("\r\n");
+    // Weekly classes repeat weekly throughout the semester
+    const fullIcs = generateMultiEventIcs(
+      schedules.map((s) => ({
+        title: `${s.is_cancelled ? "[CANCELLED] " : ""}${s.title}`,
+        description: `Campus Daily IIT Bombay (${s.slot_type})`,
+        location: s.location || "IIT Bombay",
+        start_time: s.start_time,
+        end_time: s.end_time || undefined,
+        rrule: s.slot_type === "lecture" || s.slot_type === "lab" ? "FREQ=WEEKLY;UNTIL=20261205T183000Z" : undefined,
+      }))
+    );
 
     const blob = new Blob([fullIcs], { type: "text/calendar;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `campus-daily-week-timetable.ics`);
+    link.setAttribute("download", `campus-daily-timetable.ics`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -270,13 +267,23 @@ export default function SchedulePage() {
         <div>
           <p className="eyebrow">Academic Timetable</p>
           <h1>Your Schedule</h1>
-          <p className="muted">Division: <b>{userDivision}</b> · Auto-updated from notices</p>
+          <p className="muted">
+            Division: <b>{userDivision}</b>
+            {userHasmed ? <span> · HASMED: <b>{userHasmed}</b></span> : null}
+            <span> · Auto-updated from notices</span>
+          </p>
         </div>
         <div className="nav-links">
           <Link href="/" className="navlink">Feed</Link>
           <Link href="/settings" className="navlink">Settings</Link>
         </div>
       </header>
+
+      {statusNotification && (
+        <p className="note" style={{ borderColor: "var(--accent)", marginBottom: 16 }}>
+          {statusNotification}
+        </p>
+      )}
 
       {/* Weekday Selector Tabs */}
       <div className="schedule-tabs">
@@ -291,11 +298,19 @@ export default function SchedulePage() {
         ))}
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
         <h3 style={{ fontSize: 18, fontFamily: "Georgia, serif" }}>
           {DAYS[selectedDay]} Classes & Deadlines
         </h3>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            onClick={handleSyncMoodle}
+            disabled={syncingMoodle}
+            className="small"
+            title="Pull quiz and assignment deadlines from your Moodle iCal URL"
+          >
+            {syncingMoodle ? "Syncing…" : "🔄 Sync Moodle"}
+          </button>
           <button
             onClick={() => setShowAddModal(!showAddModal)}
             className="small"
@@ -305,7 +320,7 @@ export default function SchedulePage() {
           <button
             onClick={handleExportWeekIcs}
             className="small accent"
-            title="Download complete week as .ics calendar file"
+            title="Download full semester recurring .ics calendar file"
           >
             📥 Export All (.ics)
           </button>

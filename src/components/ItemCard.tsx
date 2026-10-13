@@ -66,9 +66,32 @@ export function ItemCard({
   const itemId = item.id || item.item_id || "";
   const event = extractEventDetails(item.subject, item.body || item.summary || "");
 
+  // Silently logs notice interactions for Phase 2 ML relevance feedback
+  async function logInteraction(action: "view" | "add_to_calendar" | "dismiss" | "keep" | "dislike") {
+    try {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user && itemId) {
+        await supabase.from("notice_interactions").insert({
+          user_id: user.id,
+          notice_id: itemId,
+          action,
+        });
+      }
+    } catch {
+      // Telemetry errors should never degrade UI experience
+    }
+  }
+
   async function updateItemStatus(newStatus: "new" | "kept" | "removed") {
     setStatus(newStatus);
     onStatusChange?.(itemId, newStatus);
+
+    if (newStatus === "kept") logInteraction("keep");
+    else if (newStatus === "removed") logInteraction("dismiss");
 
     try {
       const supabase = createClient();
@@ -76,7 +99,7 @@ export function ItemCard({
         data: { user },
       } = await supabase.auth.getUser();
 
-      if (user) {
+      if (user && itemId) {
         await supabase.from("user_items").upsert(
           {
             user_id: user.id,
@@ -105,9 +128,10 @@ export function ItemCard({
         return;
       }
 
+      // Foreign key requires null instead of empty string if notice_id is unassigned
       const { error } = await supabase.from("user_schedules").insert({
         user_id: user.id,
-        notice_id: itemId,
+        notice_id: itemId ? itemId : null,
         title: ev.title,
         location: ev.location || "IIT Bombay",
         start_time: ev.start_time,
@@ -120,6 +144,7 @@ export function ItemCard({
         alert(`Error adding to timetable: ${error.message}`);
       } else {
         setTimetableAdded(true);
+        logInteraction("add_to_calendar");
       }
     } catch (err: any) {
       alert(`Could not add to timetable: ${err.message}`);
@@ -149,6 +174,8 @@ export function ItemCard({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+
+    logInteraction("add_to_calendar");
   }
 
   if (status === "removed") {
@@ -235,6 +262,7 @@ export function ItemCard({
               })}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => logInteraction("add_to_calendar")}
               className="navlink small"
               style={{ alignSelf: "center", textDecoration: "none" }}
             >

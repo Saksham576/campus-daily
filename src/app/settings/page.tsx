@@ -280,6 +280,33 @@ function SettingsContent() {
             <span className="muted small">
               Paste your private Moodle iCal URL to sync assignment and quiz deadlines directly into your timetable without storing credentials.
             </span>
+            {form.moodle_ical_url && (
+              <div style={{ marginTop: 8 }}>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const res = await fetch("/api/sync/moodle", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ url: form.moodle_ical_url }),
+                      });
+                      const d = await res.json();
+                      if (res.ok) {
+                        alert(d.message || "Synced successfully!");
+                      } else {
+                        alert(d.error || "Failed to sync");
+                      }
+                    } catch (e: any) {
+                      alert(e.message || "Could not reach sync endpoint");
+                    }
+                  }}
+                  className="small"
+                >
+                  🔄 Test & Sync Deadlines Now
+                </button>
+              </div>
+            )}
           </label>
         </fieldset>
 

@@ -8,19 +8,24 @@ create table if not exists public.user_schedules (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null,
   notice_id text references public.items(id) on delete set null,
+  moodle_uid text,
   title text not null,
   location text,
   start_time timestamptz not null,
   end_time timestamptz,
   slot_type text check (slot_type in ('lecture', 'lab', 'quiz', 'exam', 'deadline', 'event', 'custom')) not null,
   is_cancelled boolean default false,
+  rrule text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
 
--- Index for fast user schedule retrieval
+-- Indexes for fast retrieval & deduplication
 create index if not exists idx_user_schedules_user_time
   on public.user_schedules(user_id, start_time);
+
+create index if not exists idx_user_schedules_dedup
+  on public.user_schedules(user_id, title, start_time);
 
 -- 2. Create notice_interactions table for feedback & machine learning tuning
 create table if not exists public.notice_interactions (
