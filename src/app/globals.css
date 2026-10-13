@@ -216,23 +216,126 @@ button.accent:hover {
 .login {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   margin-top: 20px;
 }
 
-.login input {
+.login input[type="email"],
+.login input[type="text"] {
   font: inherit;
   padding: 11px 12px;
   border: 1px solid var(--ink);
   border-radius: 4px;
   background: var(--card);
   color: var(--ink);
+  width: 100%;
 }
 
 .login button {
   background: var(--ink);
   color: var(--paper);
-  padding: 11px;
+  padding: 12px;
+  font-weight: 500;
+}
+
+.login button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.login-remember {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 4px 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.login-remember input[type="checkbox"] {
+  margin-top: 3px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ink);
+  cursor: pointer;
+}
+
+.login-remember-text {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.login-remember-text small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.otp-box {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.otp-input-wrap {
+  margin: 16px 0;
+}
+
+.otp-code-input {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace !important;
+  font-size: 26px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.35em !important;
+  text-align: center;
+  padding: 12px 16px !important;
+}
+
+.otp-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  font-size: 13px;
+}
+
+.login-redirect-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 24px;
+  margin-top: 24px;
+  text-align: center;
+}
+
+.login-loading-bar {
+  height: 4px;
+  width: 100%;
+  background: var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 16px;
+  position: relative;
+}
+
+.login-loading-bar::after {
+  content: "";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 40%;
+  background: var(--accent);
+  animation: login-indeterminate 1.2s infinite ease-in-out;
+  border-radius: 2px;
+}
+
+@keyframes login-indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
 }
 
 .note {

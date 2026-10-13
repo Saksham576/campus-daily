@@ -19,6 +19,13 @@ import {
   HASMED,
   CATEGORIES,
 } from "./src/lib/constants.ts";
+import {
+  SESSION_MAX_AGE,
+  isValidIitbEmail,
+  sanitizeRedirectUrl,
+  sanitizeOtpCode,
+  isPersistentSession,
+} from "./src/lib/auth.ts";
 
 console.log("=== RUNNING ENHANCED CAMPUS DAILY TEST SUITE ===\n");
 
@@ -221,4 +228,50 @@ assert(HASMED.includes("Entrepreneurship"), "Entrepreneurship HASMED missing");
 assert(CATEGORIES.includes("Academics"), "Academics category missing");
 console.log("✓ Passed: IITB metadata structures fully verified");
 
-console.log("\n=== ALL 11 TEST SUITES PASSED SUCCESSFULLY! ===");
+// --- Test 12: Session Persistence & Cookie MaxAge Verification ---
+console.log("\nTest 12: Session persistence & cookie maxAge verification...");
+assert.strictEqual(
+  SESSION_MAX_AGE,
+  365 * 24 * 60 * 60,
+  "SESSION_MAX_AGE must be 1 year (31,536,000 seconds)"
+);
+// Test isPersistentSession behavior
+assert.strictEqual(isPersistentSession("1"), true, "Explicit '1' must be persistent");
+assert.strictEqual(isPersistentSession(undefined), true, "Default undefined must be persistent");
+assert.strictEqual(isPersistentSession(null), true, "Default null must be persistent");
+assert.strictEqual(isPersistentSession("0"), false, "Explicit '0' must be session-only");
+console.log("✓ Passed: 1-year persistent session lifetime (31,536,000s) and preference toggle verified");
+
+// --- Test 13: Frictionless Auth, Email Whitelist & Security Sanitization ---
+console.log("\nTest 13: Frictionless auth, email whitelist & security sanitization...");
+// Valid IITB email domains & subdomains
+assert.strictEqual(isValidIitbEmail("210050001@iitb.ac.in"), true);
+assert.strictEqual(isValidIitbEmail("john.doe@cse.iitb.ac.in"), true);
+assert.strictEqual(isValidIitbEmail("prof.smith@ee.iitb.ac.in"), true);
+assert.strictEqual(isValidIitbEmail("student@mems.iitb.ac.in"), true);
+// Rejected non-IITB or malformed emails
+assert.strictEqual(isValidIitbEmail("hacker@gmail.com"), false);
+assert.strictEqual(isValidIitbEmail("student@iitd.ac.in"), false);
+assert.strictEqual(isValidIitbEmail("fakeiitb.ac.in@other.com"), false);
+assert.strictEqual(isValidIitbEmail(""), false);
+assert.strictEqual(isValidIitbEmail(null), false);
+
+// OTP sanitization (extract digits, trim to 6)
+assert.strictEqual(sanitizeOtpCode("123456"), "123456");
+assert.strictEqual(sanitizeOtpCode("123-456"), "123456");
+assert.strictEqual(sanitizeOtpCode("  987654  "), "987654");
+assert.strictEqual(sanitizeOtpCode("12a34b56c"), "123456");
+assert.strictEqual(sanitizeOtpCode("12345"), "12345");
+assert.strictEqual(sanitizeOtpCode(""), "");
+
+// Open redirect sanitization
+assert.strictEqual(sanitizeRedirectUrl("/schedule"), "/schedule");
+assert.strictEqual(sanitizeRedirectUrl("/settings?tab=general"), "/settings?tab=general");
+assert.strictEqual(sanitizeRedirectUrl("https://evil.com"), "/");
+assert.strictEqual(sanitizeRedirectUrl("//evil.com"), "/");
+assert.strictEqual(sanitizeRedirectUrl("javascript:alert(1)"), "/");
+assert.strictEqual(sanitizeRedirectUrl(""), "/");
+assert.strictEqual(sanitizeRedirectUrl(null), "/");
+console.log("✓ Passed: IITB domain validation, OTP code formatting, and open-redirect protection verified");
+
+console.log("\n=== ALL 13 TEST SUITES PASSED SUCCESSFULLY! ===");

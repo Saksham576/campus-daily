@@ -1,31 +1,143 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import {
+  isValidIitbEmail,
+  sanitizeRedirectUrl,
+  sanitizeOtpCode,
+  isPersistentSession,
+} from "@/lib/auth";
 
-export default function LoginPage() {
+function LoginForm() {
+  const searchParams = useSearchParams();
+
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">(
-    "idle"
-  );
+  const [otpCode, setOtpCode] = useState("");
+  const [step, setStep] = useState<"email" | "otp">("email");
+  const [status, setStatus] = useState<
+    "idle" | "checking" | "sending" | "verifying" | "verified" | "error"
+  >("checking");
   const [errorMsg, setErrorMsg] = useState("");
+  const [rememberDevice, setRememberDevice] = useState(true);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!/@([a-z0-9-]+\.)*iitb\.ac\.in$/i.test(email.trim())) {
+  const otpInputRef = useRef<HTMLInputElement>(null);
+
+  const rawNext = searchParams.get("next");
+  const safeNext = sanitizeRedirectUrl(rawNext);
+
+  // 1. Initial Mount: Check if user is already logged in for instant auto-redirect
+  useEffect(() => {
+    let isMounted = true;
+
+    async function checkExistingSession() {
+      try {
+        const supabase = createClient();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (session?.user && isValidIitbEmail(session.user.email)) {
+          setStatus("verified");
+          window.location.href = safeNext;
+          return;
+        }
+      } catch {
+        // Not authenticated; proceed to login form
+      }
+
+      if (isMounted) {
+        setStatus("idle");
+      }
+    }
+
+    checkExistingSession();
+
+    // Check saved remember preference
+    if (typeof window !== "undefined") {
+      const savedPref = localStorage.getItem("campus_remember_device");
+      if (savedPref !== null) {
+        setRememberDevice(isPersistentSession(savedPref));
+      }
+    }
+
+    // Check error query parameter
+    const errCode = searchParams.get("e");
+    if (errCode === "iitb") {
       setStatus("error");
       setErrorMsg(
-        "Use your IITB email (…@iitb.ac.in). You can add your personal Gmail for the digest after signing in."
+        "Campus Daily is exclusively for IITB students. Sign in with your @iitb.ac.in address."
+      );
+    } else if (errCode === "auth") {
+      setStatus("error");
+      setErrorMsg(
+        "The sign-in link expired or is invalid. Please request a new verification code below."
+      );
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [safeNext, searchParams]);
+
+  // Resend cooldown timer
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  // Focus OTP input when switching to OTP step
+  useEffect(() => {
+    if (step === "otp" && otpInputRef.current) {
+      otpInputRef.current.focus();
+    }
+  }, [step]);
+
+  function handleRememberChange(checked: boolean) {
+    setRememberDevice(checked);
+    if (typeof document !== "undefined") {
+      if (checked) {
+        document.cookie =
+          "campus_remember_device=1; path=/; max-age=31536000; SameSite=Lax";
+        localStorage.setItem("campus_remember_device", "1");
+      } else {
+        document.cookie =
+          "campus_remember_device=0; path=/; SameSite=Lax";
+        localStorage.setItem("campus_remember_device", "0");
+      }
+    }
+  }
+
+  async function handleSendCode(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!isValidIitbEmail(cleanEmail)) {
+      setStatus("error");
+      setErrorMsg(
+        "Use your IITB email (…@iitb.ac.in). You can add your personal Gmail for digests after signing in."
       );
       return;
     }
 
     setStatus("sending");
+    setErrorMsg("");
+
+    // Persist remember preference
+    handleRememberChange(rememberDevice);
+
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim().toLowerCase(),
+      email: cleanEmail,
       options: {
-        emailRedirectTo: `${location.origin}/auth/callback`,
+        emailRedirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(
+          safeNext
+        )}`,
         shouldCreateUser: true,
       },
     });
@@ -34,46 +146,212 @@ export default function LoginPage() {
       setStatus("error");
       setErrorMsg(error.message);
     } else {
-      setStatus("sent");
+      setStep("otp");
+      setStatus("idle");
+      setResendCooldown(30);
+      setOtpCode("");
     }
   }
 
-  useEffect(() => {
-    if (new URLSearchParams(location.search).get("e") === "iitb") {
+  async function handleVerifyOtp(codeToVerify?: string) {
+    const token = sanitizeOtpCode(codeToVerify ?? otpCode);
+    if (token.length !== 6) {
+      setStatus("error");
+      setErrorMsg("Please enter the complete 6-digit verification code sent to your email.");
+      return;
+    }
+
+    setStatus("verifying");
+    setErrorMsg("");
+
+    // Ensure remember preference cookie is active
+    handleRememberChange(rememberDevice);
+
+    const supabase = createClient();
+    const cleanEmail = email.trim().toLowerCase();
+
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: cleanEmail,
+      token,
+      type: "email",
+    });
+
+    if (error) {
       setStatus("error");
       setErrorMsg(
-        "Campus Daily is for IITB students. Sign in with your @iitb.ac.in address."
+        error.message || "Invalid or expired verification code. Please check your email or resend."
       );
+    } else if (data.session) {
+      setStatus("verified");
+      // Full redirect ensures cookies are attached and middleware validates session
+      window.location.href = safeNext;
+    } else {
+      setStatus("error");
+      setErrorMsg("Could not verify session. Please try again.");
     }
-  }, []);
+  }
+
+  function handleOtpInputChange(val: string) {
+    const cleaned = sanitizeOtpCode(val);
+    setOtpCode(cleaned);
+    if (cleaned.length === 6) {
+      handleVerifyOtp(cleaned);
+    }
+  }
+
+  if (status === "checking" || status === "verified") {
+    return (
+      <main className="wrap narrow">
+        <p className="eyebrow">Campus Daily</p>
+        <h1>Welcome to Campus Daily</h1>
+        <div className="login-redirect-card">
+          <p className="muted">
+            {status === "verified"
+              ? "Signed in! Taking you to your campus feed…"
+              : "Checking your session…"}
+          </p>
+          <div className="login-loading-bar" />
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="wrap narrow">
       <p className="eyebrow">Campus Daily</p>
       <h1>Your campus, in one feed.</h1>
       <p className="muted">
-        Sign in with your IITB email. We send you a one-tap sign-in link — no password.
+        Sign in with your IITB email (@iitb.ac.in). We’ll send an instant 6-digit
+        verification code and a one-tap magic link.
       </p>
 
-      {status === "sent" ? (
-        <p className="note">
-          Check <b>{email}</b> for a sign-in link. It can take a minute.
-        </p>
-      ) : (
-        <form onSubmit={handleSubmit} className="login">
+      {step === "email" ? (
+        <form onSubmit={handleSendCode} className="login">
+          <label htmlFor="iitb-email" className="muted small">
+            IIT Bombay Email Address
+          </label>
           <input
+            id="iitb-email"
             type="email"
             required
-            placeholder="you@iitb.ac.in"
+            autoComplete="email"
+            autoFocus
+            placeholder="rollnumber@iitb.ac.in"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
-          <button disabled={status === "sending"}>
-            {status === "sending" ? "Sending…" : "Send sign-in link"}
+
+          <label className="login-remember">
+            <input
+              type="checkbox"
+              checked={rememberDevice}
+              onChange={(e) => handleRememberChange(e.target.checked)}
+            />
+            <span className="login-remember-text">
+              <strong>Remember this device</strong> (stay signed in for 1 year)
+              <small>
+                Keep checked on your phone/laptop. Uncheck if on a shared or lab PC.
+              </small>
+            </span>
+          </label>
+
+          <button type="submit" disabled={status === "sending"}>
+            {status === "sending" ? "Sending code…" : "Continue with IITB Email"}
           </button>
+
           {status === "error" && <p className="err">{errorMsg}</p>}
         </form>
+      ) : (
+        <div className="otp-box">
+          <p className="muted small" style={{ marginBottom: "8px" }}>
+            Code sent to <b>{email}</b>
+          </p>
+          <h3>Enter 6-digit verification code</h3>
+          <p className="muted small">
+            Check your IITB Webmail inbox (or spam folder). You don’t need to leave
+            this tab.
+          </p>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleVerifyOtp();
+            }}
+            className="login"
+            style={{ marginTop: "12px" }}
+          >
+            <div className="otp-input-wrap">
+              <input
+                ref={otpInputRef}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="one-time-code"
+                maxLength={6}
+                placeholder="······"
+                value={otpCode}
+                onChange={(e) => handleOtpInputChange(e.target.value)}
+                className="otp-code-input"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={status === "verifying" || otpCode.length !== 6}
+            >
+              {status === "verifying" ? "Verifying code…" : "Verify & Enter"}
+            </button>
+
+            {status === "error" && <p className="err">{errorMsg}</p>}
+          </form>
+
+          <div className="note small" style={{ marginTop: "16px" }}>
+            💡 <strong>Prefer magic link?</strong> You can also tap the sign-in link
+            in the email on this device.
+          </div>
+
+          <div className="otp-actions">
+            <button
+              type="button"
+              className="link"
+              disabled={resendCooldown > 0 || status === "sending"}
+              onClick={() => handleSendCode()}
+            >
+              {resendCooldown > 0
+                ? `Resend code (${resendCooldown}s)`
+                : "Resend code"}
+            </button>
+
+            <button
+              type="button"
+              className="link"
+              onClick={() => {
+                setStep("email");
+                setErrorMsg("");
+                setStatus("idle");
+              }}
+            >
+              Change email
+            </button>
+          </div>
+        </div>
       )}
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="wrap narrow">
+          <p className="eyebrow">Campus Daily</p>
+          <h1>Your campus, in one feed.</h1>
+          <p className="muted">Loading sign-in…</p>
+        </main>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

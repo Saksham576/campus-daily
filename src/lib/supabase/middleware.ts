@@ -1,12 +1,23 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  SESSION_MAX_AGE,
+  isValidIitbEmail,
+  sanitizeRedirectUrl,
+  isPersistentSession,
+} from "@/lib/auth";
+
+export { SESSION_MAX_AGE };
 
 export async function updateSession(req: NextRequest) {
   let res = NextResponse.next({
-    request: {
-      headers: req.headers,
-    },
+    request: req,
   });
+
+  const rememberCookie = req.cookies.get("campus_remember_device")?.value;
+  // Default to persistent session (1 year) unless user explicitly chose not to remember
+  const isPersistent = isPersistentSession(rememberCookie);
+  const sessionMaxAge = isPersistent ? SESSION_MAX_AGE : undefined;
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || "https://bcqzlxftcsgjmgaddqjz.supabase.co",
@@ -19,14 +30,25 @@ export async function updateSession(req: NextRequest) {
         setAll(cookiesToSet: Array<{ name: string; value: string; options?: any }>) {
           cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value));
           res = NextResponse.next({
-            request: {
-              headers: req.headers,
-            },
+            request: req,
           });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            res.cookies.set(name, value, options)
-          );
+          cookiesToSet.forEach(({ name, value, options }) => {
+            const finalOptions = {
+              ...options,
+              sameSite: "lax" as const,
+              path: "/",
+              ...(sessionMaxAge !== undefined
+                ? { maxAge: sessionMaxAge }
+                : { maxAge: undefined }),
+            };
+            res.cookies.set(name, value, finalOptions);
+          });
         },
+      },
+      cookieOptions: {
+        sameSite: "lax",
+        path: "/",
+        ...(sessionMaxAge !== undefined ? { maxAge: sessionMaxAge } : {}),
       },
     }
   );
@@ -41,14 +63,36 @@ export async function updateSession(req: NextRequest) {
     path.startsWith("/auth") ||
     path.startsWith("/verify-email");
 
-  if (!user && !isAuth) {
-    return NextResponse.redirect(new URL("/login", req.url));
+  // Helper to attach all current cookies to any redirect response
+  function redirectWithCookies(targetUrl: URL) {
+    const redirectRes = NextResponse.redirect(targetUrl);
+    res.cookies.getAll().forEach((c) => {
+      redirectRes.cookies.set(c.name, c.value, c);
+    });
+    return redirectRes;
   }
 
-  // Campus Daily is currently IITB students: other addresses are logged out
-  if (user && !/@([a-z0-9-]+\.)*iitb\.ac\.in$/i.test(user.email || "")) {
+  // 1. If user is already authenticated with a valid IITB email and visits /login, auto-redirect to / or ?next=
+  if (user && isValidIitbEmail(user.email) && path.startsWith("/login")) {
+    const nextParam = req.nextUrl.searchParams.get("next");
+    const safeNext = sanitizeRedirectUrl(nextParam);
+    const targetUrl = new URL(safeNext, req.url);
+    return redirectWithCookies(targetUrl);
+  }
+
+  // 2. Campus Daily is currently for IITB students: other addresses are logged out
+  if (user && !isValidIitbEmail(user.email)) {
     await supabase.auth.signOut();
-    return NextResponse.redirect(new URL("/login?e=iitb", req.url));
+    return redirectWithCookies(new URL("/login?e=iitb", req.url));
+  }
+
+  // 3. Protected route: redirect unauthenticated user to /login
+  if (!user && !isAuth) {
+    const loginUrl = new URL("/login", req.url);
+    if (path !== "/" && path !== "") {
+      loginUrl.searchParams.set("next", path);
+    }
+    return redirectWithCookies(loginUrl);
   }
 
   return res;
