@@ -409,11 +409,10 @@ if (fs.existsSync(".env.local")) {
   const sbKeyMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY=(.*)/);
   const serviceKeyMatch = envContent.match(/SUPABASE_ACCESS_TOKEN=(.*)/);
 
-  if (sbUrlMatch && sbKeyMatch) {
+  if (sbUrlMatch && sbKeyMatch && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     const sbUrl = sbUrlMatch[1].trim();
     const sbAnonKey = sbKeyMatch[1].trim();
-    const serviceRoleKey =
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjcXpseGZ0Y3Nnam1nYWRkcWp6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MTcyNjIyOSwiZXhwIjoyMTA3MzAyMjI5fQ.1d-EIib0dsiZ2EXumC6wn1Z6qKEuLluBOX34Vsd_ktE";
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     const admin = createSupabaseClient(sbUrl, serviceRoleKey);
     const testEmail = "test_subscribers_suite@iitb.ac.in";
