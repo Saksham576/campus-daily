@@ -1,4 +1,4 @@
-import { timingSafeEqual, createHash } from "node:crypto";
+import { timingSafeEqual, createHash, createHmac } from "node:crypto";
 import { CATEGORIES } from "./constants.ts";
 
 export type InboundEmail = {
@@ -27,6 +27,35 @@ export function isAuthorizedIngest(provided: string | null, secret: string | und
   const a = createHash("sha256").update(provided).digest();
   const b = createHash("sha256").update(secret).digest();
   return timingSafeEqual(a, b);
+}
+
+/** Forward Email webhook signature: hex HMAC-SHA256 of the raw body with the domain's verification key. */
+export function isValidForwardEmailSignature(rawBody: string, signature: string | null, key: string | undefined): boolean {
+  if (!key || !signature) return false;
+  const expected = createHmac("sha256", key).update(rawBody).digest("hex");
+  const a = Buffer.from(expected);
+  const b = Buffer.from(signature.trim().toLowerCase());
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** Map a Forward Email (mailparser) webhook payload to parseInboundEmail's input. */
+export function fromForwardEmailPayload(p: any): Record<string, unknown> | null {
+  if (!p || typeof p !== "object") return null;
+  const header = (name: string): string => {
+    const lines: { key?: string; line?: string }[] = Array.isArray(p.headerLines) ? p.headerLines : [];
+    const hit = lines.find((h) => (h.key || "").toLowerCase() === name);
+    if (hit?.line) return hit.line.replace(/^[^:]+:\s*/, "");
+    const h = p.headers && typeof p.headers === "object" ? p.headers[name] : undefined;
+    return typeof h === "string" ? h : "";
+  };
+  return {
+    messageId: typeof p.messageId === "string" ? p.messageId : header("message-id"),
+    subject: typeof p.subject === "string" ? p.subject : header("subject"),
+    from: typeof p.from?.text === "string" ? p.from.text : header("from"),
+    date: typeof p.date === "string" ? p.date : header("date"),
+    text: typeof p.text === "string" ? p.text : "",
+    html: typeof p.html === "string" ? p.html : "",
+  };
 }
 
 export function stripHtml(html: string): string {

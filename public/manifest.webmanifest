@@ -1,0 +1,12 @@
+{
+  "name": "Campus Daily",
+  "short_name": "Campus Daily",
+  "description": "IIT Bombay notices and a self-updating timetable.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#16181A",
+  "theme_color": "#16181A",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

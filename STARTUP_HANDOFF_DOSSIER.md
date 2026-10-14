@@ -211,41 +211,27 @@ node test_suite.mjs
 
 ---
 
-## 6. What Is Left (Complete Unimplemented Backlog)
+## 6. October 15, 2026 Update — Backlog Built
 
-The following items are prioritized for subsequent development phases:
+**Live-schema fixes (important).** The live database differs from migrations 0001–0003. Scores are per student in `user_items(email, item_id, score, state)`. `items` uses `sender`, `venue`, `deadline_at`, `source` and jsonb `tags`. `me_feed` never existed live, so the web feed was failing. Migration `0005` creates `me_feed` for the live schema. Keep/Remove and data export now use `user_items.email/state`.
 
-### Priority 1: Automated Cloud Ingestion (Phase 3 Roadmap)
-- [ ] **Decouple from Personal Gmail**:
-  - Current notice ingestion relies on Google Apps Script running on `anywayfun5@gmail.com`.
-  - **Target Architecture**:
-    1. Set up Cloudflare Email Routing on `ingest@campusdaily.nexuspulsetech.com`.
-    2. Write a lightweight Cloudflare Worker or Next.js route (`/api/ingest/email`) protected by `INGEST_SECRET_KEY`.
-    3. Call the **Gemini 2.5 Flash Lite** API to score notices, extract structured events, and insert directly into Supabase `items`.
-- [ ] **Multi-Department Student Forwarders**:
-  - Create student volunteer forwarders from EE, ME, CS, Civil, and Chemical so the feed covers all campus notices without relying on a single inbox.
+| Backlog item | Status | Where |
+|---|---|---|
+| Cloud email ingestion (no personal Gmail) | Built. Forward Email webhook (Enhanced plan, signed) → `/api/ingest/forwardemail` | `src/lib/server/ingestPipeline.ts` |
+| Self-updating timetable (core USP) | Built. Notices create `course_updates`, applied on `/schedule` for every student in the course | `src/lib/timetable/updates.ts`, migration 0004 |
+| WhatsApp group notices | Built. PC bridge on a spare number | `whatsapp-bridge/` |
+| Offline PWA | Built. Service worker caches `/`, `/schedule` and timetable data | `public/sw.js` |
+| Web push for urgent notices / cancellations | Built. Score ≥ 8, or a timetable change for your course | `src/lib/server/push.ts`, `/settings` toggle |
+| 3-day inactivity reminder | Built, as **email** (Resend) at 08:00 IST via Vercel Cron | `/api/cron/reminders`, `vercel.json` |
+| Professor/TA verified broadcast | Built. `/broadcast`, admin approval on `/admin`, gold Verified badge | `src/lib/broadcast.ts` |
+| DPDP export/delete + privacy policy | Built | `/api/account/*`, `/privacy` |
+| Sponsored Today Card | Built. Position 3 in feed, views/clicks counted, managed on `/admin` | `sponsored_cards`, migration 0006 |
+| Multi-department volunteer forwarders | Human task. Each volunteer sets an IITB webmail auto-forward rule to `ingest@in.campusdaily.nexuspulsetech.com` | — |
 
-### Priority 2: Mobile Experience & Offline PWA (Phase 4 Roadmap)
-- [ ] **Progressive Web App (PWA) Offline Support**:
-  - Configure `next-pwa` service worker to cache the `/schedule` route and recent feed items.
-  - IIT Bombay lecture halls (LC/LA complexes) often have spotty cell reception; the timetable must be 100% readable offline.
-- [ ] **Web Push Notifications (FCM / Web Push API)**:
-  - Add push notification subscription in `/settings`.
-  - Dispatch instant push alerts exclusively for `score >= 8` emergency notices (e.g., class cancelled within 2 hours or immediate venue shift).
-- [ ] **Inactivity WhatsApp Retention Trigger**:
-  - Implement the fallback rule from the pitch deck: if an active student does not open Campus Daily for 3 consecutive days, send an automated WhatsApp summary at 8:00 AM with their day's timetable.
-
-### Priority 3: Professor & TA Broadcast Portal (Phase 5 Roadmap)
-- [ ] **Verified Instructor Broadcast (`/broadcast`)**:
-  - Create a lightweight authenticated portal for professors and Teaching Assistants.
-  - Allows verified faculty to post direct notices (e.g., *"Quiz shifted to Friday"*) that instantly override timetable slots with a verified gold badge, bypassing email scraping delays.
-
-### Priority 4: Commercial Polish & Eureka! Pitch Prep
-- [ ] **Student Data Privacy & DPDP Compliance**:
-  - Implement a 1-tap "Export All My Data" (JSON) and "Delete My Account" button in `/settings`.
-  - Publish a concise India DPDP Act compliant privacy policy.
-- [ ] **Sponsored "Today Card" Ad Unit**:
-  - Build a non-intrusive card component rendered at position #3 in the feed for local student businesses, mess caterers, and campus fests.
+**Environment variables (Vercel, Production):** see `.env.example`.
+**Migrations to apply in order:** `0004_course_updates`, `0005_me_feed_live`, `0006_launch_features`.
+**Tests:** `npm test` (core suite + ingest + timetable + launch features). The WhatsApp bridge has its own tests: `cd whatsapp-bridge && npm test`.
+**Retire the Apps Script** once Forward Email delivery is confirmed, so notices aren't stored twice.
 
 ---
 
