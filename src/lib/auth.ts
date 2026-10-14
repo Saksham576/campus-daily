@@ -12,7 +12,7 @@ export const SESSION_MAX_AGE = 365 * 24 * 60 * 60;
  */
 export function isValidIitbEmail(email: string | null | undefined): boolean {
   if (!email || typeof email !== "string") return false;
-  return /@([a-z0-9-]+\.)*iitb\.ac\.in$/i.test(email.trim());
+  return /^[a-zA-Z0-9._%+-]+@([a-zA-Z0-9-]+\.)*iitb\.ac\.in$/i.test(email.trim());
 }
 
 /**
@@ -25,24 +25,38 @@ export function isValidIitbEmail(email: string | null | undefined): boolean {
 export function sanitizeRedirectUrl(nextUrl: string | null | undefined): string {
   if (!nextUrl || typeof nextUrl !== "string") return "/";
   const trimmed = nextUrl.trim();
-  // Reject protocol-relative '//', backslash escapes '/\', or any backslash
-  if (!trimmed.startsWith("/") || trimmed.startsWith("//") || trimmed.includes("\\")) {
+
+  // Decode URI components safely to catch encoded bypasses (e.g. /%5cevil.com, /%2f/evil.com)
+  let decoded = trimmed;
+  try {
+    decoded = decodeURIComponent(trimmed);
+  } catch {
     return "/";
   }
-  // Reject redirects back to auth/login endpoints or API routes to prevent loops or API exposure
+
+  // Reject protocol-relative '//', backslash escapes '/\', or any backslash in raw or decoded
   if (
-    trimmed === "/login" ||
-    trimmed.startsWith("/login?") ||
-    trimmed.startsWith("/login/") ||
-    trimmed === "/auth" ||
-    trimmed.startsWith("/auth?") ||
-    trimmed.startsWith("/auth/") ||
-    trimmed === "/verify-email" ||
-    trimmed.startsWith("/verify-email?") ||
-    trimmed.startsWith("/verify-email/") ||
-    trimmed === "/api" ||
-    trimmed.startsWith("/api?") ||
-    trimmed.startsWith("/api/")
+    !trimmed.startsWith("/") ||
+    trimmed.startsWith("//") ||
+    trimmed.includes("\\") ||
+    !decoded.startsWith("/") ||
+    decoded.startsWith("//") ||
+    decoded.includes("\\")
+  ) {
+    return "/";
+  }
+
+  // Extract clean pathname (lowercased, without query params or hash fragments)
+  const pathname = trimmed.toLowerCase().split(/[?#]/)[0];
+  if (
+    pathname === "/login" ||
+    pathname.startsWith("/login/") ||
+    pathname === "/auth" ||
+    pathname.startsWith("/auth/") ||
+    pathname === "/verify-email" ||
+    pathname.startsWith("/verify-email/") ||
+    pathname === "/api" ||
+    pathname.startsWith("/api/")
   ) {
     return "/";
   }

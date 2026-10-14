@@ -98,10 +98,31 @@ assert.notStrictEqual(monthFirstNotice.course_code, "LA 201", "LA 201 must not b
 const mfDate = new Date(monthFirstNotice.start_time);
 assert.strictEqual(mfDate.getUTCDate(), 23, "Day must be 23");
 assert.strictEqual(mfDate.getUTCMonth(), 9, "Month must be October");
-console.log("✓ Passed: Month-first date and venue disambiguation verified");
 
-// --- Test 5: Time Range Parsing (Exam Duration) ---
-console.log("\nTest 5: Time range parsing (9:30 AM to 12:30 PM)...");
+// Verify numeric DD/MM/YYYY date and ISO YYYY-MM-DD date parsing
+const numericDateNotice = extractEventDetails(
+  "Orientation Session",
+  "Held on 23/10/2026 at 10:00 AM in Convocation Hall."
+);
+assert(numericDateNotice !== null, "Expected numeric date event to be detected");
+assert.strictEqual(numericDateNotice.location, "Convocation Hall");
+const numDate = new Date(numericDateNotice.start_time);
+assert.strictEqual(numDate.getUTCDate(), 23);
+assert.strictEqual(numDate.getUTCMonth(), 9);
+
+const isoDateNotice = extractEventDetails(
+  "Guest Workshop",
+  "Held on 2026-11-15 at 3:00 PM in F.C. Kohli."
+);
+assert(isoDateNotice !== null, "Expected ISO date event to be detected");
+assert.strictEqual(isoDateNotice.location, "F.C. Kohli");
+const isoDate = new Date(isoDateNotice.start_time);
+assert.strictEqual(isoDate.getUTCDate(), 15);
+assert.strictEqual(isoDate.getUTCMonth(), 10);
+console.log("✓ Passed: Month-first, numeric DD/MM/YYYY, and ISO YYYY-MM-DD dates verified");
+
+// --- Test 5: Time Range Parsing (Exam Duration & Afternoon Propagation) ---
+console.log("\nTest 5: Time range parsing (9:30 AM to 12:30 PM & 2 to 5 PM)...");
 const examNotice = extractEventDetails(
   "PH 107 Midsem Exam",
   "Midsem exam will take place on November 5 from 9:30 AM to 12:30 PM in Convocation Hall."
@@ -114,7 +135,20 @@ const exStart = new Date(examNotice.start_time);
 const exEnd = new Date(examNotice.end_time);
 assert.strictEqual(exStart.getUTCHours(), 4, "Start 04:00 UTC (9:30 AM IST)");
 assert.strictEqual(exEnd.getUTCHours(), 7, "End 07:00 UTC (12:30 PM IST)");
-console.log("✓ Passed: PH 107 EXAM 3-hour duration range correctly extracted");
+
+// Verify afternoon range without start meridian (2 to 5 PM -> 14:00 to 17:00 IST)
+const labAfternoon = extractEventDetails(
+  "Physics Lab Session",
+  "Lab will be held on November 6 from 2 to 5 PM in Central Workshop."
+);
+assert(labAfternoon !== null, "Expected afternoon lab notice to be detected");
+const labStart = new Date(labAfternoon.start_time);
+const labEnd = new Date(labAfternoon.end_time);
+assert.strictEqual(labStart.getUTCHours(), 8, "Start 08:30 UTC (2:00 PM IST)");
+assert.strictEqual(labStart.getUTCMinutes(), 30, "Start 08:30 UTC minute should be 30");
+assert.strictEqual(labEnd.getUTCHours(), 11, "End 11:30 UTC (5:00 PM IST)");
+assert.strictEqual(labEnd.getUTCMinutes(), 30, "End 11:30 UTC minute should be 30");
+console.log("✓ Passed: PH 107 EXAM 3-hour duration range and 2 to 5 PM afternoon range correctly extracted");
 
 // --- Test 6: RFC 5545 Escaping & .ics Generation ---
 console.log("\nTest 6: RFC 5545 .ics generation & special character escaping...");
@@ -281,6 +315,8 @@ assert.strictEqual(isValidIitbEmail("student@mems.iitb.ac.in"), true);
 assert.strictEqual(isValidIitbEmail("hacker@gmail.com"), false);
 assert.strictEqual(isValidIitbEmail("student@iitd.ac.in"), false);
 assert.strictEqual(isValidIitbEmail("fakeiitb.ac.in@other.com"), false);
+assert.strictEqual(isValidIitbEmail("attacker@evil.com@iitb.ac.in"), false, "Multiple @ symbols must be rejected");
+assert.strictEqual(isValidIitbEmail("bad email@iitb.ac.in"), false, "Spaces in email must be rejected");
 assert.strictEqual(isValidIitbEmail(""), false);
 assert.strictEqual(isValidIitbEmail(null), false);
 
@@ -299,10 +335,17 @@ assert.strictEqual(sanitizeRedirectUrl("https://evil.com"), "/");
 assert.strictEqual(sanitizeRedirectUrl("//evil.com"), "/");
 assert.strictEqual(sanitizeRedirectUrl("/\\evil.com"), "/", "Backslash open-redirect bypass must be blocked");
 assert.strictEqual(sanitizeRedirectUrl("/\\/evil.com"), "/", "Multi-backslash open-redirect bypass must be blocked");
+assert.strictEqual(sanitizeRedirectUrl("/%5cevil.com"), "/", "Encoded backslash open-redirect bypass must be blocked");
+assert.strictEqual(sanitizeRedirectUrl("/%2f/evil.com"), "/", "Encoded double-slash open-redirect bypass must be blocked");
 assert.strictEqual(sanitizeRedirectUrl("/login"), "/", "Redirect to /login must fallback to / to prevent infinite loops");
+assert.strictEqual(sanitizeRedirectUrl("/LOGIN"), "/", "Case-insensitive /LOGIN must fallback to /");
+assert.strictEqual(sanitizeRedirectUrl("/login#section"), "/", "Redirect to /login#hash must fallback to /");
 assert.strictEqual(sanitizeRedirectUrl("/login?next=/login"), "/", "Nested /login must fallback to /");
 assert.strictEqual(sanitizeRedirectUrl("/auth/callback"), "/", "Redirect to /auth must fallback to /");
 assert.strictEqual(sanitizeRedirectUrl("/verify-email"), "/", "Redirect to /verify-email must fallback to /");
+assert.strictEqual(sanitizeRedirectUrl("/api"), "/", "Redirect to /api must fallback to /");
+assert.strictEqual(sanitizeRedirectUrl("/api/sync/moodle"), "/", "Redirect to /api/* must fallback to /");
+assert.strictEqual(sanitizeRedirectUrl("/api#secret"), "/", "Redirect to /api#hash must fallback to /");
 assert.strictEqual(sanitizeRedirectUrl("javascript:alert(1)"), "/");
 assert.strictEqual(sanitizeRedirectUrl(""), "/");
 assert.strictEqual(sanitizeRedirectUrl(null), "/");

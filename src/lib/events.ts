@@ -45,19 +45,41 @@ export function extractTimeFromText(text: string): {
   endHour?: number;
   endMinute?: number;
 } | null {
-  // Check for time ranges: "9:30 AM to 12:30 PM", "14:00 - 17:00", "2:00 PM - 3:30 PM"
+  // Check for time ranges: "9:30 AM to 12:30 PM", "14:00 - 17:00", "2:00 PM - 3:30 PM", "2 to 5 PM"
   const rangeMatch = text.match(
     /\b(?:from\s+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*(?:to|-|–)\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\b/i
   );
   if (rangeMatch) {
-    const s = parseHourMinute(rangeMatch[1]);
-    const e = parseHourMinute(rangeMatch[2]);
-    if (s) {
+    const sStr = rangeMatch[1].trim();
+    const eStr = rangeMatch[2].trim();
+    const sHasMeridian = /am|pm/i.test(sStr);
+    const eHasMeridian = /am|pm/i.test(eStr);
+    const s = parseHourMinute(sStr);
+    const e = parseHourMinute(eStr);
+    if (s && e) {
+      let startHour = s.hour;
+      const startMinute = s.minute;
+      let endHour = e.hour;
+      const endMinute = e.minute;
+
+      // Propagate PM meridian to start when start time omitted meridian (e.g. "from 2 to 5 PM")
+      if (eHasMeridian && /pm/i.test(eStr) && !sHasMeridian && startHour < 12) {
+        const end12 = endHour % 12 || 12;
+        if (startHour <= end12) {
+          startHour += 12;
+        }
+      }
+
+      return {
+        startHour,
+        startMinute,
+        endHour,
+        endMinute,
+      };
+    } else if (s) {
       return {
         startHour: s.hour,
         startMinute: s.minute,
-        endHour: e?.hour,
-        endMinute: e?.minute,
       };
     }
   }
@@ -70,6 +92,7 @@ export function extractTimeFromText(text: string): {
     const meridian = colonTime[3]?.toLowerCase();
     if (meridian === "pm" && hour < 12) hour += 12;
     if (meridian === "am" && hour === 12) hour = 0;
+    if (!meridian && hour >= 1 && hour <= 6) hour += 12;
     return { startHour: hour, startMinute: minute };
   }
 
@@ -83,7 +106,7 @@ export function extractTimeFromText(text: string): {
     return { startHour: hour, startMinute: 0 };
   }
 
-  // Check for "at <number>": "at 2", "at 4"
+  // Check for "at <number>": "at 2", "at 4", "at 9:30"
   const atTime = text.match(/\bat\s+([01]?\d|2[0-3])(?::([0-5]\d))?\s*(am|pm)?\b/i);
   if (atTime) {
     let hour = parseInt(atTime[1], 10);
@@ -91,6 +114,7 @@ export function extractTimeFromText(text: string): {
     const meridian = atTime[3]?.toLowerCase();
     if (meridian === "pm" && hour < 12) hour += 12;
     if (meridian === "am" && hour === 12) hour = 0;
+    if (!meridian && hour >= 1 && hour <= 6) hour += 12;
     return { startHour: hour, startMinute: minute };
   }
 
@@ -167,6 +191,9 @@ export function extractEventDetails(
     /\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i.test(
       text
     ) ||
+    /\b\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}\b/.test(text) ||
+    /\b\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?\b/.test(text) ||
+    /\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/i.test(text) ||
     lower.includes("tomorrow") ||
     lower.includes("today");
 
@@ -200,8 +227,15 @@ export function extractEventDetails(
     /\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?\b/i
   );
 
-  // 3. Numeric format: "23/10/2026", "23-10-2026"
+  // 3. ISO format: "2026-10-23", "2026/10/23"
+  const isoDateMatch = text.match(/\b(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\b/);
+
+  // 4. Numeric format: "23/10/2026", "23-10-2026"
   const numericMatch = text.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/);
+
+  // 5. Day of week format: "Friday", "this Monday"
+  const weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  const dayMatch = text.match(/\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/i);
 
   if (dayMonthMatch) {
     targetDay = parseInt(dayMonthMatch[1], 10);
@@ -217,6 +251,10 @@ export function extractEventDetails(
     );
     if (mIdx !== -1) targetMonth = mIdx;
     if (monthDayMatch[3]) targetYear = parseInt(monthDayMatch[3], 10);
+  } else if (isoDateMatch) {
+    targetYear = parseInt(isoDateMatch[1], 10);
+    targetMonth = parseInt(isoDateMatch[2], 10) - 1;
+    targetDay = parseInt(isoDateMatch[3], 10);
   } else if (numericMatch) {
     targetDay = parseInt(numericMatch[1], 10);
     targetMonth = parseInt(numericMatch[2], 10) - 1;
@@ -229,6 +267,15 @@ export function extractEventDetails(
     targetYear = tomorrow.getFullYear();
     targetMonth = tomorrow.getMonth();
     targetDay = tomorrow.getDate();
+  } else if (dayMatch) {
+    const targetDayOfWeek = weekdays.indexOf(dayMatch[1].toLowerCase());
+    const currentDayOfWeek = now.getDay();
+    let diff = targetDayOfWeek - currentDayOfWeek;
+    if (diff <= 0) diff += 7;
+    const targetDate = new Date(now.getTime() + diff * 86400000);
+    targetYear = targetDate.getFullYear();
+    targetMonth = targetDate.getMonth();
+    targetDay = targetDate.getDate();
   }
 
   // Parse Time
@@ -257,6 +304,8 @@ export function extractEventDetails(
 
   const cleanTitle = course_code
     ? `${course_code} ${slot_type.toUpperCase()}${is_cancelled ? " (CANCELLED)" : ""}`
+    : is_cancelled && !subject.toUpperCase().includes("CANCELLED")
+    ? `${subject.length > 40 ? subject.slice(0, 37) + "…" : subject} (CANCELLED)`
     : subject.length > 50
     ? subject.slice(0, 47) + "…"
     : subject;
