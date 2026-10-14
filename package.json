@@ -8,19 +8,21 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node test_suite.mjs && node test_ingest.mjs && node test_timetable.mjs"
+    "test": "node test_suite.mjs && node test_ingest.mjs && node test_timetable.mjs && node test_launch.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.10",
     "next": "^16.4.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.1",
+    "@types/web-push": "^3.6.4",
     "typescript": "^5.7.2"
   },
   "overrides": {
