@@ -27,6 +27,7 @@ export const HASMED = [
   "Psychology",
   "Literature",
   "Ecology",
+  "Management",
   "NCC/NSO/NSS",
 ];
 
@@ -48,6 +49,110 @@ export const CATEGORIES = [
 
 export type DeliveryPreference = "app" | "email" | "both";
 
+/**
+ * Maps any legacy category string or broken token to modern canonical CATEGORIES.
+ */
+export function normalizeCategory(token: string): string | null {
+  const t = token.trim().toLowerCase();
+  if (!t || t === "etc.)" || t === "etc" || t === "sessions") return null;
+
+  if (
+    t.includes("acad") ||
+    t.includes("course") ||
+    t.includes("excel") ||
+    t.includes("exam") ||
+    t.includes("deadline") ||
+    t.includes("scholarship") ||
+    t.includes("fellowship") ||
+    t.includes("fee") ||
+    t.includes("research")
+  ) {
+    return "Academics";
+  }
+  if (t.includes("placement") || t.includes("intern")) {
+    return "Placements / Internships";
+  }
+  if (
+    t.includes("hackathon") ||
+    t.includes("compet") ||
+    t.includes("startup") ||
+    t.includes("entrepreneur")
+  ) {
+    return "Competitions / Hackathons";
+  }
+  if (
+    t.includes("fest") ||
+    t.includes("cultur") ||
+    t.includes("club") ||
+    t.includes("society")
+  ) {
+    return "Fests & Cultural";
+  }
+  if (t.includes("sport") || t.includes("gymkhana")) {
+    return "Sports";
+  }
+  if (
+    t.includes("talk") ||
+    t.includes("seminar") ||
+    t.includes("workshop") ||
+    t.includes("lecture")
+  ) {
+    return "Talks & Seminars";
+  }
+  if (
+    t.includes("hostel") ||
+    t.includes("mess") ||
+    t.includes("campus life") ||
+    t.includes("admin") ||
+    t.includes("institute-wide")
+  ) {
+    return "Hostel / Campus Life";
+  }
+  return null;
+}
+
+/**
+ * Normalizes an array or comma-separated string of categories into a deduplicated
+ * array of canonical CATEGORIES. Falls back to all CATEGORIES if none match or empty.
+ */
+export function normalizeCategories(raw: string[] | string | null | undefined): string[] {
+  if (!raw) return [...CATEGORIES];
+  const items = Array.isArray(raw)
+    ? raw
+    : typeof raw === "string"
+    ? raw.split(",")
+    : [];
+
+  const matched = new Set<string>();
+  for (const item of items) {
+    const norm = normalizeCategory(item);
+    if (norm && CATEGORIES.includes(norm)) {
+      matched.add(norm);
+    }
+  }
+
+  return matched.size > 0 ? Array.from(matched) : [...CATEGORIES];
+}
+
+/**
+ * Normalizes delivery preference, mapping between modern and legacy formats.
+ */
+export function normalizeDeliveryPreference(
+  deliveryPref: string | null | undefined,
+  legacyDelivery: string | null | undefined
+): DeliveryPreference {
+  if (deliveryPref === "app" || deliveryPref === "email" || deliveryPref === "both") {
+    return deliveryPref;
+  }
+  if (legacyDelivery === "app_email") {
+    return "both";
+  }
+  if (legacyDelivery === "app" || legacyDelivery === "email") {
+    return legacyDelivery;
+  }
+  return "app";
+}
+
 export type Profile = {
   department: string;
   year: string;
@@ -60,3 +165,4 @@ export type Profile = {
   delivery_preference: DeliveryPreference;
   moodle_ical_url?: string;
 };
+

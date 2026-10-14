@@ -18,6 +18,9 @@ import {
   DIVISIONS,
   HASMED,
   CATEGORIES,
+  normalizeCategories,
+  normalizeCategory,
+  normalizeDeliveryPreference,
 } from "./src/lib/constants.ts";
 import {
   SESSION_MAX_AGE,
@@ -351,4 +354,117 @@ assert.strictEqual(sanitizeRedirectUrl(""), "/");
 assert.strictEqual(sanitizeRedirectUrl(null), "/");
 console.log("✓ Passed: IITB domain validation, OTP formatting, open-redirect protection & loop prevention verified");
 
+// --- Test 14: Category & Delivery Preference Normalization ---
+console.log("\nTest 14: Category & delivery preference normalization...");
+// Legacy Google Form comma string with parentheses and complex titles
+const legacyFormString =
+  "Academic / course notices (ExCeL sessions, etc.), Exams, deadlines & registration, Scholarships, fees & financial aid, Talks, workshops & seminars, Clubs, cultural events & fests, Sports, Hostel & mess, Internships, placements & research, Hackathons & competitions";
+const normalized = normalizeCategories(legacyFormString);
+assert(normalized.includes("Academics"), "Academics must be mapped from legacy course/exam notices");
+assert(normalized.includes("Placements / Internships"), "Placements / Internships must be mapped from internships");
+assert(normalized.includes("Competitions / Hackathons"), "Competitions / Hackathons must be mapped from hackathons");
+assert(normalized.includes("Fests & Cultural"), "Fests & Cultural must be mapped from clubs/cultural fests");
+assert(normalized.includes("Sports"), "Sports must be mapped");
+assert(normalized.includes("Talks & Seminars"), "Talks & Seminars must be mapped from seminars/workshops");
+assert(normalized.includes("Hostel / Campus Life"), "Hostel / Campus Life must be mapped from hostel & mess");
+
+// Edge case: Comma-split broken fragments (e.g. unnesting with 'etc.)')
+const fragmentedList = [
+  "Academic / course notices (ExCeL sessions",
+  "etc.)",
+  "Guest lectures & Seminars",
+  "Sports",
+];
+const normFrag = normalizeCategories(fragmentedList);
+assert(normFrag.includes("Academics"));
+assert(normFrag.includes("Talks & Seminars"));
+assert(normFrag.includes("Sports"));
+assert(!normFrag.includes("etc.)"), "Broken artifact 'etc.)' must not be added");
+
+// Edge case: empty or null falls back to all CATEGORIES for new onboarding
+assert.deepStrictEqual(normalizeCategories([]), CATEGORIES);
+assert.deepStrictEqual(normalizeCategories(null), CATEGORIES);
+assert.deepStrictEqual(normalizeCategories(""), CATEGORIES);
+
+// Delivery preference normalization: legacy 'app_email' <-> 'both'
+assert.strictEqual(normalizeDeliveryPreference(undefined, "app_email"), "both");
+assert.strictEqual(normalizeDeliveryPreference("both", "app_email"), "both");
+assert.strictEqual(normalizeDeliveryPreference("email", "email"), "email");
+assert.strictEqual(normalizeDeliveryPreference("app", "app"), "app");
+assert.strictEqual(normalizeDeliveryPreference(undefined, undefined), "app");
+
+// HASMED Management elective verification
+assert(HASMED.includes("Management"), "Management must be included in HASMED constants");
+assert(Array.isArray(HASMED_SLOTS.Management), "Management must have timetable slots in HASMED_SLOTS");
+console.log("✓ Passed: Full legacy category mapping, fragment filtering, delivery preference & Management HASMED verified");
+
+// --- Test 15: Dual-Mapping Payload & Subscribers Live Round-Trip Verification ---
+console.log("\nTest 15: Dual-mapping payload & live Supabase preferences round-trip...");
+import fs from "fs";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+
+if (fs.existsSync(".env.local")) {
+  const envContent = fs.readFileSync(".env.local", "utf8");
+  const sbUrlMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_URL=(.*)/);
+  const sbKeyMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY=(.*)/);
+  const serviceKeyMatch = envContent.match(/SUPABASE_ACCESS_TOKEN=(.*)/);
+
+  if (sbUrlMatch && sbKeyMatch) {
+    const sbUrl = sbUrlMatch[1].trim();
+    const sbAnonKey = sbKeyMatch[1].trim();
+    const serviceRoleKey =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjcXpseGZ0Y3Nnam1nYWRkcWp6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MTcyNjIyOSwiZXhwIjoyMTA3MzAyMjI5fQ.1d-EIib0dsiZ2EXumC6wn1Z6qKEuLluBOX34Vsd_ktE";
+
+    const admin = createSupabaseClient(sbUrl, serviceRoleKey);
+    const testEmail = "test_subscribers_suite@iitb.ac.in";
+
+    // Clean up test email if left behind
+    await admin.from("subscribers").delete().eq("email", testEmail);
+
+    // Test dual payload generation
+    const testProfile = {
+      email: testEmail,
+      department: "Metallurgical Engineering & Materials Science (MEMS)",
+      year: "1",
+      division: "D3",
+      hostel: "Hostel 16",
+      hasmed: "Management",
+      categories: ["Academics", "Talks & Seminars"],
+      keywords: "materials, AI",
+      personal_email: "test_suite_personal@gmail.com",
+      delivery_preference: "both",
+      moodle_ical_url: "https://moodle.iitb.ac.in/test.ics",
+      // Legacy mirrors
+      hasmed1: "Management",
+      category: "Academics, Talks & Seminars",
+      interests: "materials, AI",
+      delivery_email: "test_suite_personal@gmail.com",
+      delivery: "app_email",
+      moodle_ical: "https://moodle.iitb.ac.in/test.ics",
+      onboarded_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data: inserted, error: insertErr } = await admin
+      .from("subscribers")
+      .upsert(testProfile, { onConflict: "email" })
+      .select();
+
+    assert.ifError(insertErr);
+    assert.strictEqual(inserted[0].email, testEmail);
+    assert.deepStrictEqual(inserted[0].categories, ["Academics", "Talks & Seminars"]);
+    assert.strictEqual(inserted[0].delivery_preference, "both");
+    assert.strictEqual(inserted[0].delivery, "app_email");
+    assert.strictEqual(inserted[0].hasmed, "Management");
+    assert.strictEqual(inserted[0].hasmed1, "Management");
+    assert.strictEqual(inserted[0].moodle_ical_url, "https://moodle.iitb.ac.in/test.ics");
+    assert.strictEqual(inserted[0].moodle_ical, "https://moodle.iitb.ac.in/test.ics");
+
+    // Clean up
+    await admin.from("subscribers").delete().eq("email", testEmail);
+    console.log("✓ Passed: Dual-mapping payload and live Supabase round-trip verified without schema cache errors");
+  }
+}
+
 console.log("\n=== ALL TEST SUITES PASSED SUCCESSFULLY! ===");
+

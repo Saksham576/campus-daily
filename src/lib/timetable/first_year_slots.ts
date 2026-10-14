@@ -77,6 +77,10 @@ export const HASMED_SLOTS: Record<string, TimetableSlot[]> = {
     { day_of_week: 2, start_time: "17:15", end_time: "18:45", course_code: "NSO 101", title: "Physical Training / Activity", location: "Gymkhana Grounds", slot_type: "custom" },
     { day_of_week: 4, start_time: "17:15", end_time: "18:45", course_code: "NSO 101", title: "Physical Training / Activity", location: "Gymkhana Grounds", slot_type: "custom" },
   ],
+  Management: [
+    { day_of_week: 2, start_time: "14:00", end_time: "15:25", course_code: "MG 101", title: "Introduction to Management", location: "SJMSOM 101", slot_type: "lecture" },
+    { day_of_week: 5, start_time: "14:00", end_time: "15:25", course_code: "MG 101", title: "Introduction to Management", location: "SJMSOM 101", slot_type: "lecture" },
+  ],
 };
 
 // Generates actual Date instances for slots in a given week, combining division & HASMED elective

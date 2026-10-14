@@ -11,6 +11,8 @@ import {
   HASMED,
   HOSTELS,
   CATEGORIES,
+  normalizeCategories,
+  normalizeDeliveryPreference,
   type Profile,
   type DeliveryPreference,
 } from "@/lib/constants";
@@ -52,47 +54,37 @@ function SettingsContent() {
       }
       setUserEmail(user.email || "");
 
+      const emailLower = (user.email || "").toLowerCase().trim();
       const { data: sub } = await supabase
         .from("subscribers")
         .select("*")
-        .eq("email", user.email)
-        .single();
+        .or(`email.eq.${user.email},email.ilike.${emailLower}`)
+        .maybeSingle();
 
       if (sub) {
-        // Robust categories resolution: prefer categories array, fallback to legacy comma-separated string
-        let resolvedCategories: string[] = [...CATEGORIES];
-        if (Array.isArray(sub.categories) && sub.categories.length > 0) {
-          resolvedCategories = sub.categories;
-        } else if (typeof sub.category === "string" && sub.category.trim()) {
-          const parsed = sub.category
-            .split(",")
-            .map((c: string) => c.trim())
-            .filter(Boolean);
-          if (parsed.length > 0) {
-            resolvedCategories = parsed;
-          }
-        }
+        // Robust categories resolution: map any modern or legacy tokens to canonical CATEGORIES
+        const resolvedCategories = normalizeCategories(
+          Array.isArray(sub.categories) && sub.categories.length > 0
+            ? sub.categories
+            : sub.category
+        );
 
-        // Robust delivery preference resolution: prefer delivery_preference, fallback to legacy delivery
-        let resolvedDelivery: DeliveryPreference = "app";
-        if (
-          sub.delivery_preference === "app" ||
-          sub.delivery_preference === "email" ||
-          sub.delivery_preference === "both"
-        ) {
-          resolvedDelivery = sub.delivery_preference;
-        } else if (sub.delivery === "app_email") {
-          resolvedDelivery = "both";
-        } else if (sub.delivery === "email" || sub.delivery === "app") {
-          resolvedDelivery = sub.delivery;
-        }
+        // Robust delivery preference resolution
+        const resolvedDelivery = normalizeDeliveryPreference(
+          sub.delivery_preference,
+          sub.delivery
+        );
+
+        // Robust HASMED elective resolution (including Management)
+        const rawHasmed = sub.hasmed || sub.hasmed1 || HASMED[0];
+        const resolvedHasmed = HASMED.includes(rawHasmed) ? rawHasmed : HASMED[0];
 
         setForm({
           department: sub.department || DEPARTMENTS[0],
           year: sub.year ? String(sub.year) : "1",
           division: sub.division || "D1",
           hostel: sub.hostel || "Hostel 16",
-          hasmed: sub.hasmed || sub.hasmed1 || HASMED[0],
+          hasmed: resolvedHasmed,
           categories: resolvedCategories,
           keywords: sub.keywords || sub.interests || "",
           personal_email: sub.personal_email || sub.delivery_email || "",
@@ -123,8 +115,24 @@ function SettingsContent() {
 
     try {
       const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      const activeEmail = (user?.email || userEmail).trim().toLowerCase();
+      if (!activeEmail) {
+        setErrorMsg("Your session has expired. Please sign in again.");
+        router.push("/login");
+        return;
+      }
+
+      const activeUserId = user?.id || null;
+      const cleanPersonalEmail = form.personal_email?.trim().toLowerCase() || null;
+      const cleanKeywords = form.keywords?.trim() || null;
+      const cleanMoodleUrl = form.moodle_ical_url?.trim() || null;
+
       const payload: Record<string, any> = {
-        email: userEmail,
+        email: activeEmail,
         department: form.department,
         year: form.year,
         division: form.year === "1" ? form.division : null,
@@ -132,20 +140,24 @@ function SettingsContent() {
         // Modern columns
         hasmed: form.year === "1" ? form.hasmed : null,
         categories: form.categories,
-        keywords: form.keywords || null,
-        personal_email: form.personal_email?.trim() || null,
+        keywords: cleanKeywords,
+        personal_email: cleanPersonalEmail,
         delivery_preference: form.delivery_preference,
-        moodle_ical_url: form.moodle_ical_url?.trim() || null,
+        moodle_ical_url: cleanMoodleUrl,
         // Legacy columns synchronization for zero data loss
         hasmed1: form.year === "1" ? form.hasmed : null,
         category: form.categories.join(", "),
-        interests: form.keywords || null,
-        delivery_email: form.personal_email?.trim() || null,
+        interests: cleanKeywords,
+        delivery_email: cleanPersonalEmail,
         delivery: form.delivery_preference === "both" ? "app_email" : form.delivery_preference,
-        moodle_ical: form.moodle_ical_url?.trim() || null,
+        moodle_ical: cleanMoodleUrl,
         onboarded_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
+
+      if (activeUserId) {
+        payload.user_id = activeUserId;
+      }
 
       const { error } = await supabase.from("subscribers").upsert(
         payload,
@@ -157,6 +169,7 @@ function SettingsContent() {
       } else {
         setSuccessMsg("Preferences saved successfully!");
         if (isOnboarding) {
+          router.refresh();
           router.push("/");
         }
       }
