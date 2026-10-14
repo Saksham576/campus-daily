@@ -79,6 +79,7 @@ export async function updateSession(req: NextRequest) {
   const isAuth =
     path.startsWith("/login") ||
     path.startsWith("/auth") ||
+    path.startsWith("/privacy") ||
     path.startsWith("/verify-email");
 
   // Helper to attach all current cookies to any redirect response
