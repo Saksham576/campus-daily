@@ -59,17 +59,45 @@ function SettingsContent() {
         .single();
 
       if (sub) {
+        // Robust categories resolution: prefer categories array, fallback to legacy comma-separated string
+        let resolvedCategories: string[] = [...CATEGORIES];
+        if (Array.isArray(sub.categories) && sub.categories.length > 0) {
+          resolvedCategories = sub.categories;
+        } else if (typeof sub.category === "string" && sub.category.trim()) {
+          const parsed = sub.category
+            .split(",")
+            .map((c: string) => c.trim())
+            .filter(Boolean);
+          if (parsed.length > 0) {
+            resolvedCategories = parsed;
+          }
+        }
+
+        // Robust delivery preference resolution: prefer delivery_preference, fallback to legacy delivery
+        let resolvedDelivery: DeliveryPreference = "app";
+        if (
+          sub.delivery_preference === "app" ||
+          sub.delivery_preference === "email" ||
+          sub.delivery_preference === "both"
+        ) {
+          resolvedDelivery = sub.delivery_preference;
+        } else if (sub.delivery === "app_email") {
+          resolvedDelivery = "both";
+        } else if (sub.delivery === "email" || sub.delivery === "app") {
+          resolvedDelivery = sub.delivery;
+        }
+
         setForm({
           department: sub.department || DEPARTMENTS[0],
-          year: sub.year || "1",
+          year: sub.year ? String(sub.year) : "1",
           division: sub.division || "D1",
           hostel: sub.hostel || "Hostel 16",
-          hasmed: sub.hasmed || HASMED[0],
-          categories: Array.isArray(sub.categories) ? sub.categories : [...CATEGORIES],
-          keywords: sub.keywords || "",
-          personal_email: sub.personal_email || "",
-          delivery_preference: (sub.delivery_preference as DeliveryPreference) || "app",
-          moodle_ical_url: sub.moodle_ical_url || "",
+          hasmed: sub.hasmed || sub.hasmed1 || HASMED[0],
+          categories: resolvedCategories,
+          keywords: sub.keywords || sub.interests || "",
+          personal_email: sub.personal_email || sub.delivery_email || "",
+          delivery_preference: resolvedDelivery,
+          moodle_ical_url: sub.moodle_ical_url || sub.moodle_ical || "",
         });
       }
       setLoading(false);
@@ -95,22 +123,32 @@ function SettingsContent() {
 
     try {
       const supabase = createClient();
+      const payload: Record<string, any> = {
+        email: userEmail,
+        department: form.department,
+        year: form.year,
+        division: form.year === "1" ? form.division : null,
+        hostel: form.hostel,
+        // Modern columns
+        hasmed: form.year === "1" ? form.hasmed : null,
+        categories: form.categories,
+        keywords: form.keywords || null,
+        personal_email: form.personal_email?.trim() || null,
+        delivery_preference: form.delivery_preference,
+        moodle_ical_url: form.moodle_ical_url?.trim() || null,
+        // Legacy columns synchronization for zero data loss
+        hasmed1: form.year === "1" ? form.hasmed : null,
+        category: form.categories.join(", "),
+        interests: form.keywords || null,
+        delivery_email: form.personal_email?.trim() || null,
+        delivery: form.delivery_preference === "both" ? "app_email" : form.delivery_preference,
+        moodle_ical: form.moodle_ical_url?.trim() || null,
+        onboarded_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
       const { error } = await supabase.from("subscribers").upsert(
-        {
-          email: userEmail,
-          department: form.department,
-          year: form.year,
-          division: form.year === "1" ? form.division : null,
-          hostel: form.hostel,
-          hasmed: form.year === "1" ? form.hasmed : null,
-          categories: form.categories,
-          keywords: form.keywords,
-          personal_email: form.personal_email || null,
-          delivery_preference: form.delivery_preference,
-          moodle_ical_url: form.moodle_ical_url || null,
-          onboarded_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
+        payload,
         { onConflict: "email" }
       );
 
