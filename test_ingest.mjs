@@ -8,6 +8,7 @@ import {
   stripHtml,
   buildScoringPrompt,
   scoreWithGemini,
+  personalizeScore,
 } from "./src/lib/ingest.ts";
 
 console.log("Ingest tests: auth, parsing, scoring validation, row building...");
@@ -45,10 +46,21 @@ assert.strictEqual(parseScoredNotice("not json"), null);
 assert.strictEqual(parseScoredNotice('{"score":"abc"}'), null);
 assert.strictEqual(parseScoredNotice('{"score":0}').score, 1);
 
-const row = buildItemRow(em, good);
+const row = buildItemRow(em, good, { source: "whatsapp", venue: "LA 201" });
 assert.strictEqual(row.id, itemIdFor("<abc@iitb.ac.in>"));
 assert.deepStrictEqual(row.links, ["https://moodle.iitb.ac.in/x"]);
 assert.strictEqual(row.received_at, "2026-10-14T03:00:00.000Z");
+assert.strictEqual(row.sender, "ugacademic@iitb.ac.in");
+assert.strictEqual(row.source, "whatsapp");
+assert.strictEqual(row.venue, "LA 201");
+assert.strictEqual("score" in row || "from_address" in row, false, "only live items columns");
+
+// Personalised scores
+const targeted = { ...good, score: 8, target_departments: ["Computer Science"], target_years: [], target_hostels: [] };
+assert.strictEqual(personalizeScore(targeted, { email: "a", department: "Computer Science & Engineering" }), 8);
+assert.strictEqual(personalizeScore(targeted, { email: "b", department: "Mechanical Engineering" }), 5);
+assert.strictEqual(personalizeScore({ ...targeted, score: 2 }, { email: "c", department: null }), 1);
+assert.strictEqual(personalizeScore({ ...good, target_departments: [], target_years: [], target_hostels: [] }, { email: "d" }), 10);
 
 const fakeFetch = async (url, init) => {
   assert(String(url).includes("gemini-2.5-flash-lite"));
