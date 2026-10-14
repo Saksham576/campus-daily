@@ -40,7 +40,8 @@ export async function POST(req: NextRequest) {
   let scored;
   try {
     scored = await scoreWithGemini(email, geminiKey);
-  } catch {
+  } catch (err) {
+    console.error("ingest: scoring failed", err instanceof Error ? err.message : "unknown");
     // Let the Worker retry later rather than storing an unscored notice.
     return NextResponse.json({ error: "Scoring unavailable" }, { status: 502 });
   }
