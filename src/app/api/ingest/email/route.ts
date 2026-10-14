@@ -6,6 +6,7 @@ import {
   scoreWithGemini,
   buildItemRow,
 } from "@/lib/ingest";
+import { updateFromNotice } from "@/lib/timetable/updates";
 
 export const runtime = "nodejs";
 
@@ -52,5 +53,12 @@ export async function POST(req: NextRequest) {
   const { error } = await admin.from("items").upsert(row, { onConflict: "id" });
   if (error) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
-  return NextResponse.json({ ok: true, id: row.id, score: row.score });
+  // Self-updating timetable: record course-level cancellations, moves and quizzes.
+  const update = updateFromNotice(email.subject, email.body, row.id);
+  if (update) {
+    const { error: upErr } = await admin.from("course_updates").upsert(update, { onConflict: "notice_id" });
+    if (upErr) console.error("ingest: course update failed", upErr.message);
+  }
+
+  return NextResponse.json({ ok: true, id: row.id, score: row.score, timetable_update: update?.kind ?? null });
 }

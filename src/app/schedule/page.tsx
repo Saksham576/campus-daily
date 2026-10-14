@@ -10,6 +10,7 @@ import {
   HASMED_SLOTS,
   getSlotsForWeek,
 } from "@/lib/timetable/first_year_slots";
+import { applyCourseUpdates, istDate, type CourseUpdate } from "@/lib/timetable/updates";
 
 export type ScheduleItem = {
   id: string;
@@ -24,6 +25,57 @@ export type ScheduleItem = {
 };
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+
+/**
+ * Baseline division/HASMED slots + the student's saved slots, with course-level
+ * updates (cancellations, venue/time changes, quizzes) from notices applied.
+ */
+async function loadMergedSchedule(
+  userId: string,
+  division?: string | null,
+  hasmed?: string | null
+): Promise<ScheduleItem[]> {
+  const supabase = createClient();
+  const { data: dbSchedules } = await supabase
+    .from("user_schedules")
+    .select("*")
+    .order("start_time", { ascending: true });
+  const saved = (dbSchedules || []) as ScheduleItem[];
+
+  const baseline = division
+    ? (getSlotsForWeek(division, new Date(), hasmed || undefined).map((s, idx) => ({
+        id: `baseline-${idx}`,
+        user_id: userId,
+        title: `${s.course_code}: ${s.title}`,
+        location: s.location,
+        start_time: s.start_datetime,
+        end_time: s.end_datetime,
+        slot_type: s.slot_type,
+        is_cancelled: false,
+      })) as ScheduleItem[])
+    : [];
+  const savedKeys = new Set(saved.map((s) => `${s.title}|${new Date(s.start_time).getTime()}`));
+  const merged = [
+    ...baseline.filter((b) => !savedKeys.has(`${b.title}|${new Date(b.start_time).getTime()}`)),
+    ...saved,
+  ];
+
+  // This week's course updates (Mon–Sun, IST dates)
+  const monday = new Date();
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const { data: updates } = await supabase
+    .from("course_updates")
+    .select("*")
+    .gte("on_date", istDate(monday.toISOString()))
+    .lte("on_date", istDate(sunday.toISOString()))
+    .order("created_at", { ascending: true });
+
+  return (applyCourseUpdates(merged, (updates || []) as CourseUpdate[]) as ScheduleItem[]).sort(
+    (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+  );
+}
 
 export default function SchedulePage() {
   const router = useRouter();
@@ -75,30 +127,7 @@ export default function SchedulePage() {
         setHasMoodleUrl(true);
       }
 
-      // Fetch saved user schedules from database
-      const { data: dbSchedules } = await supabase
-        .from("user_schedules")
-        .select("*")
-        .order("start_time", { ascending: true });
-
-      if (dbSchedules && dbSchedules.length > 0) {
-        setSchedules(dbSchedules as ScheduleItem[]);
-      } else if (sub?.division) {
-        // Auto-populate standard baseline slots including division & HASMED elective
-        const weekSlots = getSlotsForWeek(sub.division, new Date(), sub.hasmed || undefined);
-        const baseline = weekSlots.map((s, idx) => ({
-          id: `baseline-${idx}`,
-          user_id: user.id,
-          title: `${s.course_code}: ${s.title}`,
-          location: s.location,
-          start_time: s.start_datetime,
-          end_time: s.end_datetime,
-          slot_type: s.slot_type,
-          is_cancelled: false,
-        })) as ScheduleItem[];
-        setSchedules(baseline);
-      }
-
+      setSchedules(await loadMergedSchedule(user.id, sub?.division, sub?.hasmed));
       setLoading(false);
     }
     loadSchedule();
@@ -173,7 +202,7 @@ export default function SchedulePage() {
       prev.map((s) => (s.id === slotId ? { ...s, is_cancelled: nextStatus } : s))
     );
 
-    if (!slotId.startsWith("baseline-") && !slotId.startsWith("custom-")) {
+    if (!slotId.startsWith("baseline-") && !slotId.startsWith("custom-") && !slotId.startsWith("update-")) {
       await supabase
         .from("user_schedules")
         .update({ is_cancelled: nextStatus })
@@ -195,14 +224,10 @@ export default function SchedulePage() {
         setStatusNotification(data.message || `Synced ${data.synced} events from Moodle!`);
         // Refresh schedules from DB
         const supabase = createClient();
-        const { data: dbSchedules } = await supabase
-          .from("user_schedules")
-          .select("*")
-          .order("start_time", { ascending: true });
-
-        if (dbSchedules) {
-          setSchedules(dbSchedules as ScheduleItem[]);
-        }
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) setSchedules(await loadMergedSchedule(user.id, userDivision, userHasmed));
       }
     } catch (err: any) {
       setStatusNotification(`Sync error: ${err.message}`);
