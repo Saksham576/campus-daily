@@ -186,6 +186,24 @@ function SettingsContent() {
     window.location.href = "/login";
   }
 
+  async function handleDeleteAccount() {
+    const typed = window.prompt(
+      "This permanently deletes your account, profile and timetable. It cannot be undone.\n\nType DELETE to confirm."
+    );
+    if (typed !== "DELETE") return;
+    const res = await fetch("/api/account/delete", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ confirm: "DELETE" }),
+    });
+    if (res.ok) {
+      window.location.href = "/login";
+    } else {
+      const j = await res.json().catch(() => ({}));
+      setErrorMsg(j.error || "Could not delete your account. Please try again.");
+    }
+  }
+
   if (loading) {
     return (
       <main className="wrap narrow">
@@ -412,6 +430,22 @@ function SettingsContent() {
           {saving ? "Saving…" : "Save Preferences"}
         </button>
       </form>
+
+      <fieldset style={{ marginTop: 24 }}>
+        <legend>Your Data & Privacy</legend>
+        <p className="muted small">
+          Download everything we store about you, or permanently delete your account. See our{" "}
+          <Link href="/privacy">Privacy Policy</Link>.
+        </p>
+        <a href="/api/account/export" className="link" download>
+          Export all my data (JSON)
+        </a>
+        <div style={{ marginTop: 12 }}>
+          <button type="button" onClick={handleDeleteAccount} className="link" style={{ color: "crimson" }}>
+            Delete my account
+          </button>
+        </div>
+      </fieldset>
 
       <div className="signout">
         <button onClick={handleSignOut} className="link" style={{ color: "var(--accent)" }}>
