@@ -104,8 +104,11 @@ export async function updateSession(req: NextRequest) {
     return redirectWithCookies(new URL("/login?e=iitb", req.url));
   }
 
-  // 3. Protected route: redirect unauthenticated user to /login
+  // 3. Protected route: redirect unauthenticated user to /login (or return 401 for /api/)
   if (!user && !isAuth) {
+    if (path.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const loginUrl = new URL("/login", req.url);
     if (path !== "/" && path !== "") {
       loginUrl.searchParams.set("next", path);

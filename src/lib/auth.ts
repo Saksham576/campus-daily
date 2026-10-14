@@ -29,7 +29,7 @@ export function sanitizeRedirectUrl(nextUrl: string | null | undefined): string 
   if (!trimmed.startsWith("/") || trimmed.startsWith("//") || trimmed.includes("\\")) {
     return "/";
   }
-  // Reject redirects back to auth/login endpoints to prevent infinite redirect loops
+  // Reject redirects back to auth/login endpoints or API routes to prevent loops or API exposure
   if (
     trimmed === "/login" ||
     trimmed.startsWith("/login?") ||
@@ -39,7 +39,10 @@ export function sanitizeRedirectUrl(nextUrl: string | null | undefined): string 
     trimmed.startsWith("/auth/") ||
     trimmed === "/verify-email" ||
     trimmed.startsWith("/verify-email?") ||
-    trimmed.startsWith("/verify-email/")
+    trimmed.startsWith("/verify-email/") ||
+    trimmed === "/api" ||
+    trimmed.startsWith("/api?") ||
+    trimmed.startsWith("/api/")
   ) {
     return "/";
   }
