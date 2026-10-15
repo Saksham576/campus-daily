@@ -152,12 +152,12 @@ export function parseScoredNotice(text: string): ScoredNotice | null {
   };
 }
 
-/** Score via Gemini Flash Lite. Throws on transport errors; returns null on unparseable output. */
+/** Score via Gemini Flash-Lite (GEMINI_MODEL overrides). Throws on transport errors; returns null on unparseable output. */
 export async function scoreWithGemini(
   email: InboundEmail,
   apiKey: string,
   fetchImpl: typeof fetch = fetch,
-  model = "gemini-2.5-flash-lite"
+  model = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite"
 ): Promise<ScoredNotice | null> {
   const res = await fetchImpl(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
