@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getAdminClient } from "@/lib/server/admin";
 import { needsReminder, todaysClasses, reminderEmail, type ReminderSub } from "@/lib/reminder";
 import type { CourseUpdate } from "@/lib/timetable/updates";
+import type { UserCourse } from "@/lib/timetable/slots";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -22,7 +23,7 @@ export async function GET(req: NextRequest) {
   const now = new Date();
   const { data: subs, error } = await admin
     .from("subscribers")
-    .select("email, name, personal_email, division, hasmed, onboarded_at, last_seen_at, last_reminded_at")
+    .select("email, name, personal_email, division, hasmed, onboarded_at, last_seen_at, last_reminded_at, user_id")
     .is("merged_into", null)
     .not("onboarded_at", "is", null);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -48,7 +49,13 @@ export async function GET(req: NextRequest) {
       .filter((i: any) => i && new Date(i.received_at).getTime() >= since)
       .slice(0, 3);
 
-    const mail = reminderEmail(s, todaysClasses(s, (updates || []) as CourseUpdate[], now), notices);
+    const { data: courses } = s.user_id
+      ? await admin
+          .from("user_courses")
+          .select("course_code, title, division, lecture_slots, tutorial_slots, venue")
+          .eq("user_id", s.user_id)
+      : { data: [] };
+    const mail = reminderEmail(s, todaysClasses((courses || []) as UserCourse[], (updates || []) as CourseUpdate[], now), notices);
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { authorization: `Bearer ${resendKey}`, "content-type": "application/json" },

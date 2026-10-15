@@ -11,6 +11,8 @@ export type Sub = {
   division: string | null;
   hasmed: string | null;
   keywords: string | null;
+  user_id?: string | null;
+  courses?: string[];
 };
 
 export const URGENT_SCORE = 8;
@@ -30,10 +32,19 @@ export async function publishNotice(
 
   const { data, error: subErr } = await admin
     .from("subscribers")
-    .select("email, department, year, hostel, division, hasmed, keywords")
+    .select("email, department, year, hostel, division, hasmed, keywords, user_id")
     .is("merged_into", null);
   if (subErr) console.error("publish: subscribers read failed", subErr.message);
   const subs = (data || []) as Sub[];
+
+  // Attach each student's real courses (Settings → My courses) for course-targeted alerts.
+  const ids = subs.map((s) => s.user_id).filter(Boolean) as string[];
+  if (ids.length > 0) {
+    const { data: uc } = await admin.from("user_courses").select("user_id, course_code").in("user_id", ids);
+    const byUser = new Map<string, string[]>();
+    for (const r of uc || []) byUser.set(r.user_id, [...(byUser.get(r.user_id) || []), r.course_code]);
+    for (const s of subs) s.courses = s.user_id ? byUser.get(s.user_id) || [] : [];
+  }
 
   const scores = subs.map((s) => ({ sub: s, score: scoreFor(s) }));
   if (scores.length > 0) {

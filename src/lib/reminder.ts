@@ -1,4 +1,4 @@
-import { DIVISION_SLOTS, HASMED_SLOTS } from "./timetable/first_year_slots.ts";
+import { buildWeek, formatCourseCode, type UserCourse } from "./timetable/slots.ts";
 import type { CourseUpdate } from "./timetable/updates.ts";
 
 const DAY_MS = 86400000;
@@ -13,6 +13,7 @@ export type ReminderSub = {
   onboarded_at?: string | null;
   last_seen_at?: string | null;
   last_reminded_at?: string | null;
+  user_id?: string | null;
 };
 
 /** Inactive 3+ days and not reminded in the last 3 days. */
@@ -25,18 +26,20 @@ export function needsReminder(s: ReminderSub, now = new Date()): boolean {
 
 export type TodayClass = { time: string; course: string; title: string; location: string; note?: string };
 
-/** Today's classes (IST) from the baseline timetable with notice-based changes applied. */
-export function todaysClasses(s: ReminderSub, updates: CourseUpdate[], now = new Date()): TodayClass[] {
-  const ist = new Date(now.getTime() + IST_MS);
-  const dow = ist.getUTCDay(); // 0 Sun .. 6 Sat
-  const date = ist.toISOString().slice(0, 10);
-  const slots = [...(DIVISION_SLOTS[s.division || ""] || []), ...(HASMED_SLOTS[s.hasmed || ""] || [])].filter(
-    (x) => x.day_of_week === dow
-  );
+/** Today's classes (IST) from the student's courses + slot chart, with notice-based changes applied. */
+export function todaysClasses(courses: UserCourse[], updates: CourseUpdate[], now = new Date()): TodayClass[] {
+  const date = new Date(now.getTime() + IST_MS).toISOString().slice(0, 10);
+  const slots = buildWeek(courses, now).filter((x) => istDateOf(x.start_time) === date);
   const todays = updates.filter((u) => u.on_date === date);
   const out: TodayClass[] = slots.map((x) => {
-    const c: TodayClass = { time: x.start_time, course: x.course_code, title: x.title, location: x.location };
-    for (const u of todays.filter((u) => u.course_code === x.course_code)) {
+    const code = x.title.split(":")[0].replace(" (Tutorial)", "");
+    const c: TodayClass = {
+      time: istTimeOf(x.start_time),
+      course: code,
+      title: x.title.includes(":") ? x.title.split(": ").slice(1).join(": ") : "",
+      location: x.location || "",
+    };
+    for (const u of todays.filter((u) => u.course_code === code)) {
       if (u.kind === "cancelled") c.note = "Cancelled";
       if (u.kind === "moved" && u.new_location) {
         c.location = u.new_location;
@@ -45,15 +48,17 @@ export function todaysClasses(s: ReminderSub, updates: CourseUpdate[], now = new
     }
     return c;
   });
-  const mine = new Set(slots.map((x) => x.course_code));
+  const mine = new Set(courses.map((c) => formatCourseCode(c.course_code)));
   for (const u of todays) {
     if (u.kind === "added" && u.new_start && mine.has(u.course_code)) {
-      const t = new Date(new Date(u.new_start).getTime() + IST_MS).toISOString().slice(11, 16);
-      out.push({ time: t, course: u.course_code, title: (u.slot_type || "event").toUpperCase(), location: u.new_location || "", note: "New" });
+      out.push({ time: istTimeOf(u.new_start), course: u.course_code, title: (u.slot_type || "event").toUpperCase(), location: u.new_location || "", note: "New" });
     }
   }
   return out.sort((a, b) => a.time.localeCompare(b.time));
 }
+
+const istDateOf = (iso: string) => new Date(new Date(iso).getTime() + IST_MS).toISOString().slice(0, 10);
+const istTimeOf = (iso: string) => new Date(new Date(iso).getTime() + IST_MS).toISOString().slice(11, 16);
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
