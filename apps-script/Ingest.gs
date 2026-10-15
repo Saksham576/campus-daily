@@ -1,24 +1,22 @@
 /**
- * Campus Daily — free email ingestion (no paid services).
+ * Campus Daily — free email ingestion (no paid services, no shared secret).
  *
- * Runs on a dedicated free Gmail account (e.g. campusdaily.ingest@gmail.com) that receives
- * IITB mailing-list mail via a webmail auto-forward rule. Every 10 minutes it sends new
- * mail to Campus Daily, which scores it, updates timetables and alerts students.
+ * Runs on campusdaily.ingest@gmail.com, which receives IITB mailing-list mail via a webmail
+ * auto-forward rule. Every 10 minutes it sends new inbox mail to Campus Daily, which scores it,
+ * updates timetables and alerts students. It authenticates with this account's Google ID token;
+ * the server only accepts tokens for campusdaily.ingest@gmail.com.
  *
- * Setup (once):
- *  1. script.google.com → New project (signed in as the ingest Gmail) → paste this file.
- *  2. Project Settings → Script properties → add INGEST_SECRET_KEY (same value as in Vercel).
- *  3. Run installTrigger() once and allow the permissions.
+ * Setup (once): paste this file + appsscript.json, then run installTrigger() and allow access.
  */
 var INGEST_URL = "https://campusdaily.nexuspulsetech.com/api/ingest/email";
-var DONE_LABEL = "campus-daily/sent";
+var DONE_LABEL = "campus-daily-sent";
 
 function forwardNewMail() {
-  var secret = PropertiesService.getScriptProperties().getProperty("INGEST_SECRET_KEY");
-  if (!secret) throw new Error("Set INGEST_SECRET_KEY in Script properties.");
   var done = GmailApp.getUserLabelByName(DONE_LABEL) || GmailApp.createLabel(DONE_LABEL);
+  var token = ScriptApp.getIdentityToken();
 
-  var threads = GmailApp.search("in:inbox -label:" + DONE_LABEL.replace("/", "-") + " newer_than:3d", 0, 30);
+  // Skip Gmail's own system mail; only forwarded campus mail is wanted.
+  var threads = GmailApp.search("in:inbox -label:" + DONE_LABEL + " -from:google.com -from:accounts.google.com newer_than:3d", 0, 30);
   threads.forEach(function (thread) {
     var allOk = true;
     thread.getMessages().forEach(function (msg) {
@@ -32,7 +30,7 @@ function forwardNewMail() {
       var res = UrlFetchApp.fetch(INGEST_URL, {
         method: "post",
         contentType: "application/json",
-        headers: { "x-ingest-secret": secret },
+        headers: { Authorization: "Bearer " + token },
         payload: JSON.stringify(payload),
         muteHttpExceptions: true,
       });
@@ -52,4 +50,5 @@ function installTrigger() {
     if (t.getHandlerFunction() === "forwardNewMail") ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger("forwardNewMail").timeBased().everyMinutes(10).create();
+  forwardNewMail();
 }

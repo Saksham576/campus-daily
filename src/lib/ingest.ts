@@ -29,6 +29,34 @@ export function isAuthorizedIngest(provided: string | null, secret: string | und
   return timingSafeEqual(a, b);
 }
 
+/**
+ * Google ID token from Apps Script (ScriptApp.getIdentityToken()): valid only if Google
+ * confirms it belongs to the expected, verified ingest Gmail address. No shared secret needed.
+ */
+export async function isGoogleIngestIdentity(
+  authHeader: string | null,
+  expectedEmail: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<boolean> {
+  const m = authHeader?.match(/^Bearer\s+([A-Za-z0-9._-]+)$/);
+  if (!m || !expectedEmail) return false;
+  try {
+    const res = await fetchImpl(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(m[1])}`);
+    if (!res.ok) return false;
+    const info: any = await res.json();
+    const notExpired = Number(info.exp) * 1000 > Date.now();
+    const fromGoogle = info.iss === "https://accounts.google.com" || info.iss === "accounts.google.com";
+    return (
+      fromGoogle &&
+      notExpired &&
+      (info.email_verified === true || info.email_verified === "true") &&
+      String(info.email).toLowerCase() === expectedEmail.toLowerCase()
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** Forward Email webhook signature: hex HMAC-SHA256 of the raw body with the domain's verification key. */
 export function isValidForwardEmailSignature(rawBody: string, signature: string | null, key: string | undefined): boolean {
   if (!key || !signature) return false;
