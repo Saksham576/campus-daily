@@ -9,6 +9,8 @@ import {
   buildScoringPrompt,
   scoreWithGemini,
   personalizeScore,
+  fromForwardEmailPayload,
+  isValidForwardEmailSignature,
 } from "./src/lib/ingest.ts";
 
 console.log("Ingest tests: auth, parsing, scoring validation, row building...");
@@ -63,11 +65,31 @@ assert.strictEqual(personalizeScore({ ...targeted, score: 2 }, { email: "c", dep
 assert.strictEqual(personalizeScore({ ...good, target_departments: [], target_years: [], target_hostels: [] }, { email: "d" }), 10);
 
 const fakeFetch = async (url, init) => {
-  assert(String(url).includes("gemini-2.5-flash-lite"));
+  assert(String(url).includes("gemini-3.5-flash-lite"));
   assert.strictEqual(init.headers["x-goog-api-key"], "k");
   return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"score":8,"summary":"s"}' }] } }] }) };
 };
 assert.strictEqual((await scoreWithGemini(em, "k", fakeFetch)).score, 8);
 await assert.rejects(scoreWithGemini(em, "k", async () => ({ ok: false, status: 429 })));
+
+// Forward Email webhook
+import { createHmac } from "node:crypto";
+const fe = {
+  messageId: "<fe1@iitb.ac.in>",
+  from: { text: "UG Office <ugoffice@iitb.ac.in>" },
+  date: "2026-10-15T05:00:00.000Z",
+  text: "CS 101 lab on 16 October 2026 is cancelled.",
+  headerLines: [{ key: "subject", line: "Subject: CS 101 lab cancelled" }],
+};
+const feMapped = parseInboundEmail(fromForwardEmailPayload(fe));
+assert.strictEqual(feMapped.subject, "CS 101 lab cancelled");
+assert.strictEqual(feMapped.from, "UG Office <ugoffice@iitb.ac.in>");
+assert.strictEqual(feMapped.messageId, "<fe1@iitb.ac.in>");
+const rawBody = JSON.stringify(fe);
+const sig = createHmac("sha256", "k3y").update(rawBody).digest("hex");
+assert.strictEqual(isValidForwardEmailSignature(rawBody, sig, "k3y"), true);
+assert.strictEqual(isValidForwardEmailSignature(rawBody + " ", sig, "k3y"), false);
+assert.strictEqual(isValidForwardEmailSignature(rawBody, sig, undefined), false);
+assert.strictEqual(isValidForwardEmailSignature(rawBody, "short", "k3y"), false);
 
 console.log("✓ Passed: ingest auth, parsing, score validation, row mapping and Gemini call verified");

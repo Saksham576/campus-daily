@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { Fragment } from "react";
 import { ItemCard, type FeedItem } from "@/components/ItemCard";
+import { SponsoredCard, type Sponsored } from "@/components/SponsoredCard";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +22,7 @@ export default async function HomePage() {
   // Check if subscriber profile exists and has completed onboarding
   const { data: profile } = await supabase
     .from("subscribers")
-    .select("onboarded_at, delivery_preference, personal_email, department, year, division")
+    .select("onboarded_at, delivery_preference, personal_email, department, year, division, last_seen_at")
     .eq("email", user.email)
     .single();
 
@@ -43,6 +45,26 @@ export default async function HomePage() {
     else items = (rpcData || []) as FeedItem[];
   } catch (err: any) {
     fetchError = err.message;
+  }
+
+  // Sponsored Today Card (position 3)
+  const today = new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+  const { data: cards } = await supabase
+    .from("sponsored_cards")
+    .select("id, sponsor, title, body, link, ends_on")
+    .lte("starts_on", today)
+    .order("created_at", { ascending: false })
+    .limit(5);
+  const sponsored = ((cards || []) as (Sponsored & { ends_on: string | null })[]).find(
+    (c) => !c.ends_on || c.ends_on >= today
+  );
+
+  // Inactivity tracking for the reminder email (at most one write per hour)
+  if (!profile?.last_seen_at || Date.now() - new Date(profile.last_seen_at).getTime() > 3600 * 1000) {
+    await supabase
+      .from("subscribers")
+      .update({ last_seen_at: new Date().toISOString() })
+      .eq("email", (user.email || "").toLowerCase());
   }
 
   // Sort items: personal first, then score descending, then received_at descending
@@ -87,9 +109,13 @@ export default async function HomePage() {
         </p>
       ) : (
         <div style={{ marginTop: 20 }}>
-          {items.map((it) => (
-            <ItemCard key={it.id || it.item_id} item={it} />
+          {items.map((it, idx) => (
+            <Fragment key={it.id || it.item_id}>
+              {idx === 2 && sponsored && <SponsoredCard card={sponsored} />}
+              <ItemCard item={it} />
+            </Fragment>
           ))}
+          {items.length <= 2 && sponsored && <SponsoredCard card={sponsored} />}
         </div>
       )}
     </main>

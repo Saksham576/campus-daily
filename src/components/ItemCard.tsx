@@ -24,6 +24,7 @@ export type FeedItem = {
   status?: "new" | "kept" | "removed";
   venue?: string | null;
   source?: string | null;
+  is_verified?: boolean;
 };
 
 function formatHost(u: string): string {
@@ -206,6 +207,10 @@ export function ItemCard({
   return (
     <article className={`card ${status === "kept" ? "kept" : ""}`}>
       <div className="meta">
+        {item.is_verified && (
+          <span className="tag" style={{ borderColor: "#B8860B", color: "#B8860B" }}>✓ Verified Instructor</span>
+        )}
+        {item.source === "whatsapp" && <span className="tag">WhatsApp</span>}
         {item.score >= 8 && <span className="tag high">Top Notice ★</span>}
         {item.is_personal && <span className="tag personal">Direct / Action Req</span>}
         {event && (
