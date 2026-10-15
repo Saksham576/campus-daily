@@ -5,6 +5,7 @@ import {
   isValidIitbEmail,
   sanitizeRedirectUrl,
   isPersistentSession,
+  HAS_ACCOUNT_COOKIE,
 } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
@@ -72,6 +73,7 @@ export async function GET(req: NextRequest) {
         await supabase.auth.signOut();
         return redirectWithCookies(new URL("/login?e=iitb", origin));
       }
+      res.cookies.set(HAS_ACCOUNT_COOKIE, "1", { path: "/", maxAge: SESSION_MAX_AGE, sameSite: "lax" });
       return res;
     }
   } else if (token_hash && type) {
@@ -84,6 +86,7 @@ export async function GET(req: NextRequest) {
         await supabase.auth.signOut();
         return redirectWithCookies(new URL("/login?e=iitb", origin));
       }
+      res.cookies.set(HAS_ACCOUNT_COOKIE, "1", { path: "/", maxAge: SESSION_MAX_AGE, sameSite: "lax" });
       return res;
     }
   }

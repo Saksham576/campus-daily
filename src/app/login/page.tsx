@@ -8,7 +8,15 @@ import {
   sanitizeRedirectUrl,
   sanitizeOtpCode,
   isPersistentSession,
+  initialAuthMode,
+  isNoAccountError,
+  HAS_ACCOUNT_COOKIE,
+  type AuthMode,
 } from "@/lib/auth";
+
+function markHasAccount() {
+  document.cookie = `${HAS_ACCOUNT_COOKIE}=1; path=/; max-age=31536000; SameSite=Lax`;
+}
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -22,6 +30,7 @@ function LoginForm() {
   const [errorMsg, setErrorMsg] = useState("");
   const [rememberDevice, setRememberDevice] = useState(true);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [mode, setMode] = useState<AuthMode>("signup");
 
   const otpInputRef = useRef<HTMLInputElement>(null);
 
@@ -35,6 +44,7 @@ function LoginForm() {
 
     // Check saved remember preference
     if (typeof window !== "undefined") {
+      setMode(initialAuthMode(document.cookie));
       const savedPref = localStorage.getItem("campus_remember_device");
       if (savedPref !== null) {
         const persistent = isPersistentSession(savedPref);
@@ -138,11 +148,16 @@ function LoginForm() {
         emailRedirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(
           safeNext
         )}`,
-        shouldCreateUser: true,
+        // "Log in" never creates an account by accident.
+        shouldCreateUser: mode === "signup",
       },
     });
 
-    if (error) {
+    if (error && mode === "login" && isNoAccountError(error)) {
+      setMode("signup");
+      setStatus("error");
+      setErrorMsg("No Campus Daily account for this email yet. Tap Sign up to create one.");
+    } else if (error) {
       setStatus("error");
       setErrorMsg(error.message);
     } else {
@@ -182,6 +197,7 @@ function LoginForm() {
         error.message || "Invalid or expired verification code. Please check your email or resend."
       );
     } else if (data.session) {
+      markHasAccount();
       setStatus("verified");
       // Full redirect ensures cookies are attached and middleware validates session
       window.location.href = safeNext;
@@ -220,9 +236,30 @@ function LoginForm() {
     <main className="wrap narrow">
       <p className="eyebrow">Campus Daily</p>
       <h1>Your campus, in one feed.</h1>
+      <div className="auth-tabs" role="tablist" aria-label="Log in or sign up">
+        {(["login", "signup"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            role="tab"
+            aria-selected={mode === m}
+            className={`auth-tab ${mode === m ? "active" : ""}`}
+            onClick={() => {
+              setMode(m);
+              setStep("email");
+              setStatus("idle");
+              setErrorMsg("");
+            }}
+          >
+            {m === "login" ? "Log in" : "Sign up"}
+          </button>
+        ))}
+      </div>
+
       <p className="muted">
-        Sign in with your IITB email (@iitb.ac.in). We’ll email you a 6-digit
-        code and a one-tap sign-in link.
+        {mode === "login"
+          ? "Welcome back! Enter your IITB email and we’ll send a 6-digit code and a one-tap link."
+          : "New here? Create your account with your IITB email (@iitb.ac.in). We’ll send a 6-digit code and a one-tap link."}
       </p>
 
       {step === "email" ? (
@@ -256,7 +293,7 @@ function LoginForm() {
           </label>
 
           <button type="submit" disabled={status === "sending"}>
-            {status === "sending" ? "Sending…" : "Sign in"}
+            {status === "sending" ? "Sending…" : mode === "login" ? "Log in" : "Sign up"}
           </button>
 
           {status === "error" && <p className="err">{errorMsg}</p>}

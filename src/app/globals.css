@@ -574,3 +574,31 @@ button.primary {
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* Log in / Sign up switch on /login */
+.auth-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 16px 0 8px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.auth-tab {
+  flex: 1;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.auth-tab.active {
+  background: var(--ink);
+  color: var(--paper);
+}
