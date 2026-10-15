@@ -258,3 +258,24 @@ export function personalizeScore(scored: ScoredNotice, sub: SubscriberTarget): n
     matchesAny(sub.hostel, scored.target_hostels);
   return fits ? scored.score : Math.max(1, scored.score - 3);
 }
+
+/**
+ * The ingest Gmail receives a student's whole forwarded IITB inbox. Only campus mail may become
+ * a public notice: never sign-in/verification emails (they contain login codes) or non-IITB mail.
+ * WhatsApp-bridge posts are exempt (they come from chosen groups).
+ */
+export function privateMailReason(email: Pick<InboundEmail, "from" | "subject">): string | null {
+  if (email.from.startsWith("WhatsApp:")) return null;
+  if (/(supabase|signin@campusdaily|@campusdaily\.nexuspulsetech\.com|accounts\.google|no-?reply@google)/i.test(email.from)) {
+    return "auth sender";
+  }
+  if (
+    /(sign-?in (link|code)|log-?in code|verification code|verify your|confirm your (email|account)|one-?time (code|password)|\botp\b|password reset|reset your password|campus daily code|magic link)/i.test(
+      email.subject
+    )
+  ) {
+    return "auth subject";
+  }
+  if (!/iitb\.ac\.in/i.test(email.from)) return "not IITB";
+  return null;
+}

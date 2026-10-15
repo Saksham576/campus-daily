@@ -1,5 +1,5 @@
 import { getAdminClient } from "@/lib/server/admin";
-import { scoreWithGemini, buildItemRow, personalizeScore, type InboundEmail } from "@/lib/ingest";
+import { scoreWithGemini, buildItemRow, personalizeScore, privateMailReason, type InboundEmail } from "@/lib/ingest";
 import { extractEventDetails } from "@/lib/events";
 import { updateFromNotice } from "@/lib/timetable/updates";
 import { publishNotice } from "@/lib/server/publish";
@@ -9,6 +9,10 @@ export async function processInbound(email: InboundEmail): Promise<{ status: num
   const admin = getAdminClient();
   const geminiKey = process.env.GEMINI_API_KEY;
   if (!admin || !geminiKey) return { status: 500, body: { error: "Server not configured" } };
+
+  // Never publish login codes or personal (non-IITB) mail from the forwarded inbox.
+  const skip = privateMailReason(email);
+  if (skip) return { status: 200, body: { ok: true, skipped: skip } };
 
   let scored;
   try {

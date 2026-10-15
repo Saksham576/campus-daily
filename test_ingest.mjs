@@ -112,3 +112,13 @@ assert.strictEqual(await isGoogleIngestIdentity(null, "campusdaily.ingest@gmail.
 assert.strictEqual(await isGoogleIngestIdentity("Bearer x", "campusdaily.ingest@gmail.com", async () => ({ ok: false })), false);
 
 console.log("✓ Passed: ingest auth, parsing, score validation, row mapping and Gemini call verified");
+
+// Private mail from the forwarded inbox never becomes a public notice
+import { privateMailReason } from "./src/lib/ingest.ts";
+assert.strictEqual(privateMailReason({ from: "Campus Daily <signin@campusdaily.nexuspulsetech.com>", subject: "123456 is your Campus Daily code" }), "auth sender");
+assert.strictEqual(privateMailReason({ from: "Supabase Auth <noreply@mail.app.supabase.io>", subject: "Your sign-in link" }), "auth sender");
+assert.strictEqual(privateMailReason({ from: "it@iitb.ac.in", subject: "Your OTP for SSO" }), "auth subject");
+assert.strictEqual(privateMailReason({ from: "cbssbi.cas@alerts.sbi.co.in", subject: "E-account statement" }), "not IITB");
+assert.strictEqual(privateMailReason({ from: '"Bharat Adsul (via IITB Moodle)" <noreply@moodle.iitb.ac.in>', subject: "CS 105: Midsem solutions" }), null);
+assert.strictEqual(privateMailReason({ from: "WhatsApp: Hostel 16", subject: "[WhatsApp · Hostel 16] Mess timing change" }), null);
+console.log("✓ Passed: sign-in codes and personal mail are never published");
