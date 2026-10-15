@@ -83,3 +83,15 @@ assert.strictEqual(isNoAccountError({ message: "Signups not allowed for otp" }),
 assert.strictEqual(isNoAccountError({ message: "Email rate limit exceeded" }), false);
 assert.strictEqual(isNoAccountError(null), false);
 console.log("✓ Passed: log in / sign up mode selection");
+
+// --- App-sent sign-in email
+import { buildSigninEmail, rateLimitReason } from "./src/lib/signinEmail.ts";
+const se = buildSigninEmail("123456", "https://campusdaily.nexuspulsetech.com/auth/confirm?token_hash=abc&type=email&next=%2F");
+assert.strictEqual(se.subject, "123456 is your Campus Daily code");
+assert(se.html.includes(">123456<") && se.html.includes("/auth/confirm?token_hash=abc") && se.text.includes("123456"));
+const nowRL = new Date("2026-10-15T10:00:00Z");
+assert.strictEqual(rateLimitReason([], nowRL), null);
+assert(rateLimitReason(["2026-10-15T09:59:45Z"], nowRL).includes("30 seconds"));
+assert(rateLimitReason(["09:10", "09:20", "09:30", "09:40", "09:50"].map((m) => `2026-10-15T${m}:00Z`), nowRL).includes("hour"));
+assert.strictEqual(rateLimitReason(["2026-10-15T08:00:00Z"], nowRL), null);
+console.log("✓ Passed: sign-in email content and rate limits");
