@@ -48,7 +48,24 @@ assert.strictEqual(r[3].slot_type, "quiz");
 assert.strictEqual(applyCourseUpdates([slots[2]], [quiz]).length, 1, "CS-only student does not get MA quiz");
 assert.strictEqual(applyCourseUpdates(r, [quiz]).length, 4, "no duplicate on re-apply");
 
-// 5. Non-course notices produce nothing
+// 5. Follow-ups and past events never create timetable entries
+const received = new Date("2026-10-15T09:10:00Z");
+assert.strictEqual(
+  updateFromNotice(
+    "CS 105-2026-1-D3: Midsem solutions",
+    "Midsem solutions by Bharat Adsul - Thursday, 15 October 2026, 2:34 PM There is no claim these are the only solutions.",
+    "n5",
+    received
+  ),
+  null,
+  "Moodle posting timestamp is not an exam"
+);
+assert.strictEqual(updateFromNotice("MA 105 Quiz 2 results", "Quiz on 23 October 2026 at 2 PM — marks out.", "n6", received), null);
+assert.strictEqual(updateFromNotice("MA 105 Quiz 3", "Quiz 3 on 10 October 2026 at 2 PM in LA 201.", "n7", received), null, "past date");
+assert.strictEqual(updateFromNotice("MA 105 Quiz 3", "Quiz 3 on 23 October 2026 at 2 PM in LA 201.", "n8", received).kind, "added");
+assert.strictEqual(updateFromNotice("MA 105 lecture cancelled", "Today's MA 105 lecture on 15 October 2026 at 5 PM is cancelled.", "n9", received).kind, "cancelled");
+
+// 6. Non-course notices produce nothing
 assert.strictEqual(updateFromNotice("Lost umbrella near H16", "Please contact me."), null);
 assert.strictEqual(updateFromNotice("Cultural fest tonight", "Join us at SAC at 7 PM."), null);
 
