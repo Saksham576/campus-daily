@@ -231,7 +231,13 @@ export function extractEventDetails(
   const isoDateMatch = text.match(/\b(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\b/);
 
   // 4. Numeric format: "23/10/2026", "23-10-2026"
-  const numericMatch = text.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/);
+  // First plausible DD/MM — skips academic years ("2026-27"), ranges ("2-5", "45-4") and similar.
+  const numericMatch =
+    Array.from(text.matchAll(/(?<![\d\-\/])(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?(?![\d\-\/])/g)).find((m) => {
+      const d = parseInt(m[1], 10);
+      const mo = parseInt(m[2], 10);
+      return d >= 1 && d <= 31 && mo >= 1 && mo <= 12 && (Boolean(m[3]) || m[0].includes("/"));
+    }) || null;
 
   // 5. Day of week format: "Friday", "this Monday"
   const weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
@@ -300,7 +306,20 @@ export function extractEventDetails(
   )}:${pad(endMinute)}:00+05:30`;
 
   const startUtc = new Date(startIsoStr);
-  const endUtc = new Date(endIsoStr);
+  let endUtc = new Date(endIsoStr);
+
+  // Impossible dates/times in notice text (e.g. "31/02", "45th", "25:00") must never crash the feed.
+  const realDate = new Date(Date.UTC(targetYear, targetMonth, targetDay));
+  if (
+    isNaN(startUtc.getTime()) ||
+    realDate.getUTCMonth() !== targetMonth ||
+    realDate.getUTCDate() !== targetDay
+  ) {
+    return null;
+  }
+  if (isNaN(endUtc.getTime()) || endUtc.getTime() < startUtc.getTime()) {
+    endUtc = new Date(startUtc.getTime() + 3600 * 1000);
+  }
 
   const cleanTitle = course_code
     ? `${course_code} ${slot_type.toUpperCase()}${is_cancelled ? " (CANCELLED)" : ""}`

@@ -70,3 +70,18 @@ assert.strictEqual(updateFromNotice("Lost umbrella near H16", "Please contact me
 assert.strictEqual(updateFromNotice("Cultural fest tonight", "Join us at SAC at 7 PM."), null);
 
 console.log("✓ Passed: notice → course update detection and timetable application verified");
+
+// Impossible dates never throw (they crashed the live feed)
+import { extractEventDetails } from "./src/lib/events.ts";
+for (const t of ["MA 105 quiz on 31/02/2026 at 2 PM", "CS 101 lab on 45th October", "PH 107 exam at 25:00 on 23 October", "CH 107 quiz 2026-13-40 10 AM", "MA 105 tut 99/99 at 9 AM"]) {
+  const r = extractEventDetails("Notice", t);
+  if (r) assert(!isNaN(new Date(r.start_time).getTime()) && !isNaN(new Date(r.end_time).getTime()), t);
+}
+console.log("✓ Passed: impossible dates are skipped safely");
+// Academic years / ranges aren't dates; real DD/MM/YYYY still is
+assert.strictEqual(extractEventDetails("Registrations 2026-27 open", "Apply for the 2026-27 session at 5 PM in LH 101.")?.start_time?.slice(5, 10) !== "27-26", true);
+const real = extractEventDetails("MA 105 quiz", "MA 105 quiz on 23/10/2026 at 2 PM in LA 201.");
+assert.strictEqual(real.start_time, "2026-10-23T08:30:00.000Z");
+const rng = extractEventDetails("Makeup lab", "EE makeup lab 2-5 pm in Dept EE Lab, Oct 17.");
+assert.strictEqual(new Date(rng.start_time).getUTCMonth(), 9, "2-5 is a time range, Oct 17 is the date");
+console.log("✓ Passed: academic years and time ranges are not mistaken for dates");

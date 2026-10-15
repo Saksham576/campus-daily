@@ -67,7 +67,13 @@ export function ItemCard({
   const [timetableAdded, setTimetableAdded] = useState(false);
 
   const itemId = item.id || item.item_id || "";
-  const event = extractEventDetails(item.subject, item.body || item.summary || "");
+  // One unusual notice must never break the whole feed.
+  let event: ExtractedEvent | null = null;
+  try {
+    event = extractEventDetails(item.subject, item.body || item.summary || "");
+  } catch {
+    event = null;
+  }
 
   // Silently logs notice interactions for Phase 2 ML relevance feedback
   async function logInteraction(action: "view" | "add_to_calendar" | "dismiss" | "keep" | "dislike") {
