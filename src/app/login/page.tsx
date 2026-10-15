@@ -141,19 +141,23 @@ function LoginForm() {
     // Persist remember preference
     handleRememberChange(rememberDevice);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email: cleanEmail,
-      options: {
-        emailRedirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(
-          safeNext
-        )}`,
-        // "Log in" never creates an account by accident.
-        shouldCreateUser: mode === "signup",
-      },
-    });
+    // Campus Daily sends its own email (code + scanner-safe link); "Log in" never creates an account.
+    let error: { message: string } | null = null;
+    try {
+      const res = await fetch("/api/auth/send-code", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: cleanEmail, mode, next: safeNext }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        error = { message: j.error || "Could not send the code. Try again." };
+      }
+    } catch {
+      error = { message: "Network error. Check your connection and try again." };
+    }
 
-    if (error && mode === "login" && isNoAccountError(error)) {
+    if (error && mode === "login" && (error.message === "no_account" || isNoAccountError(error))) {
       setMode("signup");
       setStatus("error");
       setErrorMsg("No Campus Daily account for this email yet. Tap Sign up to create one.");
