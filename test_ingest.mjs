@@ -11,6 +11,7 @@ import {
   personalizeScore,
   fromForwardEmailPayload,
   isValidForwardEmailSignature,
+  isGoogleIngestIdentity,
 } from "./src/lib/ingest.ts";
 
 console.log("Ingest tests: auth, parsing, scoring validation, row building...");
@@ -91,5 +92,18 @@ assert.strictEqual(isValidForwardEmailSignature(rawBody, sig, "k3y"), true);
 assert.strictEqual(isValidForwardEmailSignature(rawBody + " ", sig, "k3y"), false);
 assert.strictEqual(isValidForwardEmailSignature(rawBody, sig, undefined), false);
 assert.strictEqual(isValidForwardEmailSignature(rawBody, "short", "k3y"), false);
+
+// Google identity (Apps Script) auth
+const future = Math.floor(Date.now() / 1000) + 600;
+const tokeninfo = (info) => async () => ({ ok: true, json: async () => info });
+const goodInfo = { iss: "https://accounts.google.com", exp: String(future), email: "CampusDaily.Ingest@gmail.com", email_verified: "true" };
+assert.strictEqual(await isGoogleIngestIdentity("Bearer abc.def.ghi", "campusdaily.ingest@gmail.com", tokeninfo(goodInfo)), true);
+assert.strictEqual(await isGoogleIngestIdentity("Bearer abc.def.ghi", "campusdaily.ingest@gmail.com", tokeninfo({ ...goodInfo, email: "someone@gmail.com" })), false);
+assert.strictEqual(await isGoogleIngestIdentity("Bearer abc.def.ghi", "campusdaily.ingest@gmail.com", tokeninfo({ ...goodInfo, email_verified: "false" })), false);
+assert.strictEqual(await isGoogleIngestIdentity("Bearer abc.def.ghi", "campusdaily.ingest@gmail.com", tokeninfo({ ...goodInfo, exp: "1" })), false);
+assert.strictEqual(await isGoogleIngestIdentity("Bearer abc.def.ghi", "campusdaily.ingest@gmail.com", tokeninfo({ ...goodInfo, iss: "evil.com" })), false);
+assert.strictEqual(await isGoogleIngestIdentity("Basic xyz", "campusdaily.ingest@gmail.com", tokeninfo(goodInfo)), false);
+assert.strictEqual(await isGoogleIngestIdentity(null, "campusdaily.ingest@gmail.com", tokeninfo(goodInfo)), false);
+assert.strictEqual(await isGoogleIngestIdentity("Bearer x", "campusdaily.ingest@gmail.com", async () => ({ ok: false })), false);
 
 console.log("✓ Passed: ingest auth, parsing, score validation, row mapping and Gemini call verified");
