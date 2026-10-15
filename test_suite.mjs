@@ -7,11 +7,7 @@ import {
   parseIcs,
   escapeIcsText,
 } from "./src/lib/events.ts";
-import {
-  DIVISION_SLOTS,
-  HASMED_SLOTS,
-  getSlotsForWeek,
-} from "./src/lib/timetable/first_year_slots.ts";
+import { slotTime, sessionsFor, buildWeek, weekDatesIST } from "./src/lib/timetable/slots.ts";
 import {
   DEPARTMENTS,
   HOSTELS,
@@ -240,19 +236,16 @@ assert(gcalUrl.includes("action=TEMPLATE"), "Missing action param");
 assert(gcalUrl.includes("dates=20261023T083000Z%2F20261023T092500Z") || gcalUrl.includes("dates=20261023T083000Z"), "Dates missing");
 console.log("✓ Passed: Google Calendar URL correctly formatted");
 
-// --- Test 10: Division & HASMED Elective Timetable Integration ---
-console.log("\nTest 10: First-year division slots with HASMED elective...");
-assert(Array.isArray(DIVISION_SLOTS.D1) && DIVISION_SLOTS.D1.length > 5, "D1 slots missing");
-assert(Array.isArray(HASMED_SLOTS.Entrepreneurship) && HASMED_SLOTS.Entrepreneurship.length === 2, "Entrepreneurship elective missing");
-
-const d1Only = getSlotsForWeek("D1", new Date());
-const d1WithHasmed = getSlotsForWeek("D1", new Date(), "Entrepreneurship");
-assert.strictEqual(
-  d1WithHasmed.length,
-  d1Only.length + HASMED_SLOTS.Entrepreneurship.length,
-  "Schedule with HASMED must include division slots + elective slots"
-);
-console.log(`✓ Passed: Verified D1 timetable (${d1Only.length} base slots) + Entrepreneurship HASMED (${d1WithHasmed.length} total slots)`);
+// --- Test 10: IITB slot chart (ResoBin, autumn 2026) ---
+console.log("\nTest 10: IITB slot chart and week building...");
+assert.deepStrictEqual(slotTime("2A"), { day: 1, start: "10:30", end: "11:30", isLab: false });
+assert.deepStrictEqual(slotTime("7b"), { day: 5, start: "11:00", end: "12:30", isLab: false });
+assert.deepStrictEqual(slotTime("L4"), { day: 5, start: "14:00", end: "17:00", isLab: true });
+assert.deepStrictEqual(slotTime("X1"), { day: 3, start: "14:00", end: "15:00", isLab: false });
+assert.strictEqual(slotTime("99Z"), null);
+assert.deepStrictEqual(sessionsFor(["1A", "2A", "3A"]), [{ day: 1, start: "09:30", end: "12:30", isLab: false }]);
+assert.deepStrictEqual(weekDatesIST(new Date("2026-10-15T10:00:00Z")), ["2026-10-12", "2026-10-13", "2026-10-14", "2026-10-15", "2026-10-16"]);
+console.log("✓ Passed: slot chart matches ResoBin; consecutive slots merge into one session");
 
 // --- Test 11: Constants & IITB Metadata Sanity ---
 console.log("\nTest 11: Constants & IITB metadata sanity...");
@@ -395,7 +388,6 @@ assert.strictEqual(normalizeDeliveryPreference(undefined, undefined), "app");
 
 // HASMED Management elective verification
 assert(HASMED.includes("Management"), "Management must be included in HASMED constants");
-assert(Array.isArray(HASMED_SLOTS.Management), "Management must have timetable slots in HASMED_SLOTS");
 console.log("✓ Passed: Full legacy category mapping, fragment filtering, delivery preference & Management HASMED verified");
 
 // --- Test 15: Dual-Mapping Payload & Subscribers Live Round-Trip Verification ---

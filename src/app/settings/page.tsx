@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { PushToggle } from "@/components/PushToggle";
+import { CoursesEditor } from "@/components/CoursesEditor";
 import {
   DEPARTMENTS,
   PROGRAM_YEARS,
@@ -431,6 +432,11 @@ function SettingsContent() {
           {saving ? "Saving…" : "Save Preferences"}
         </button>
       </form>
+
+      <fieldset style={{ marginTop: 24 }}>
+        <legend>My Courses (builds your timetable)</legend>
+        <CoursesEditor />
+      </fieldset>
 
       <fieldset style={{ marginTop: 24 }}>
         <legend>Phone Alerts</legend>

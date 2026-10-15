@@ -5,11 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { generateMultiEventIcs } from "@/lib/events";
-import {
-  DIVISION_SLOTS,
-  HASMED_SLOTS,
-  getSlotsForWeek,
-} from "@/lib/timetable/first_year_slots";
+import { buildWeek, type UserCourse } from "@/lib/timetable/slots";
 import { applyCourseUpdates, istDate, type CourseUpdate } from "@/lib/timetable/updates";
 
 export type ScheduleItem = {
@@ -27,7 +23,7 @@ export type ScheduleItem = {
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
 /**
- * Baseline division/HASMED slots + the student's saved slots, with course-level
+ * Weekly classes from the student's courses + the student's saved slots, with course-level
  * updates (cancellations, venue/time changes, quizzes) from notices applied.
  */
 async function loadMergedSchedule(
@@ -42,18 +38,15 @@ async function loadMergedSchedule(
     .order("start_time", { ascending: true });
   const saved = (dbSchedules || []) as ScheduleItem[];
 
-  const baseline = division
-    ? (getSlotsForWeek(division, new Date(), hasmed || undefined).map((s, idx) => ({
-        id: `baseline-${idx}`,
-        user_id: userId,
-        title: `${s.course_code}: ${s.title}`,
-        location: s.location,
-        start_time: s.start_datetime,
-        end_time: s.end_datetime,
-        slot_type: s.slot_type,
-        is_cancelled: false,
-      })) as ScheduleItem[])
-    : [];
+  // Weekly classes from the student's real courses (Settings → My courses) + the IITB slot chart.
+  const { data: courses } = await supabase
+    .from("user_courses")
+    .select("course_code, title, division, lecture_slots, tutorial_slots, venue");
+  const baseline = buildWeek((courses || []) as UserCourse[]).map((s) => ({
+    ...s,
+    user_id: userId,
+    is_cancelled: false,
+  })) as ScheduleItem[];
   const savedKeys = new Set(saved.map((s) => `${s.title}|${new Date(s.start_time).getTime()}`));
   const merged = [
     ...baseline.filter((b) => !savedKeys.has(`${b.title}|${new Date(b.start_time).getTime()}`)),
@@ -202,7 +195,7 @@ export default function SchedulePage() {
       prev.map((s) => (s.id === slotId ? { ...s, is_cancelled: nextStatus } : s))
     );
 
-    if (!slotId.startsWith("baseline-") && !slotId.startsWith("custom-") && !slotId.startsWith("update-")) {
+    if (!slotId.startsWith("course-") && !slotId.startsWith("custom-") && !slotId.startsWith("update-")) {
       await supabase
         .from("user_schedules")
         .update({ is_cancelled: nextStatus })
@@ -293,10 +286,15 @@ export default function SchedulePage() {
           <p className="eyebrow">Academic Timetable</p>
           <h1>Your Schedule</h1>
           <p className="muted">
-            Division: <b>{userDivision}</b>
-            {userHasmed ? <span> · HASMED: <b>{userHasmed}</b></span> : null}
-            <span> · Auto-updated from notices</span>
+            Built from your courses (slots as on ResoBin) · Auto-updated from notices ·{" "}
+            <Link href="/settings#courses">Edit my courses</Link>
           </p>
+          {!loading && schedules.length === 0 && (
+            <p className="note">
+              No classes yet. Add your courses in{" "}
+              <Link href="/settings#courses">Settings → My courses</Link> and your week will appear here.
+            </p>
+          )}
         </div>
         <div className="nav-links">
           <Link href="/" className="navlink">Feed</Link>

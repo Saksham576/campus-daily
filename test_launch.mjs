@@ -1,17 +1,37 @@
 import assert from "node:assert";
 import { buildBroadcast } from "./src/lib/broadcast.ts";
-import { takesCourse, baselineCourses } from "./src/lib/timetable/courses.ts";
+import { takesCourse } from "./src/lib/timetable/courses.ts";
+import { buildWeek } from "./src/lib/timetable/slots.ts";
 import { needsReminder, todaysClasses, reminderEmail } from "./src/lib/reminder.ts";
 import { applyCourseUpdates } from "./src/lib/timetable/updates.ts";
 
 console.log("Launch feature tests (broadcast, courses, reminders)...");
 
-// --- Courses
-assert(baselineCourses("D1").has("MA 105"));
-assert(baselineCourses("D2", "Management").size > 0);
-assert.strictEqual(takesCourse({ division: "D1" }, "cs 101"), true);
-assert.strictEqual(takesCourse({ division: "D3" }, "CS 101"), false);
-assert.strictEqual(takesCourse({ division: "D3", keywords: "robotics, CS101" }, "CS 101"), true);
+// --- Courses (from Settings -> My courses)
+assert.strictEqual(takesCourse({ courses: ["MA105", "CS101"] }, "cs 101"), true);
+assert.strictEqual(takesCourse({ courses: ["MA105"] }, "CS 101"), false);
+assert.strictEqual(takesCourse({ courses: [], keywords: "robotics, CS101" }, "CS 101"), true);
+
+// Saksham's real week (ResoBin, 12-16 Oct 2026)
+const saksham = [
+  { course_code: "CH111", title: "Chemistry", lecture_slots: ["3A", "3B", "3C"], tutorial_slots: [], venue: "LA 201" },
+  { course_code: "CS101", title: "Computer Programming and Utilization", lecture_slots: ["7A", "7B"], tutorial_slots: [], venue: "LA 201" },
+  { course_code: "DE109", title: "Introduction to Design", lecture_slots: ["12A", "12B", "12C"], tutorial_slots: [], venue: "LC 302" },
+  { course_code: "ENT101", title: "Introduction to Innovation & Entrepreneurship", lecture_slots: ["5A", "5B"], tutorial_slots: [], venue: "LH 301" },
+  { course_code: "MA105", title: "Calculus", lecture_slots: ["2A", "2B", "2C"], tutorial_slots: ["X1"], venue: "LT 204" },
+  { course_code: "PH117", title: "Physics Lab", lecture_slots: ["L4"], tutorial_slots: [], venue: null },
+];
+const wk = buildWeek(saksham, new Date("2026-10-15T10:00:00Z"));
+const ist = (iso) => new Date(new Date(iso).getTime() + 5.5 * 3600e3).toISOString().slice(5, 16).replace("T", " ");
+const mon = wk.filter((s) => ist(s.start_time).startsWith("10-12")).map((s) => `${ist(s.start_time).slice(6)} ${s.title.split(":")[0]}`);
+assert.deepStrictEqual(mon, ["10:30 MA 105", "11:30 CH 111", "17:00 DE 109"]);
+const wed = wk.filter((s) => ist(s.start_time).startsWith("10-14")).map((s) => `${ist(s.start_time).slice(6)} ${s.title.split(":")[0]}`);
+assert.deepStrictEqual(wed, ["08:00 ENT 101", "11:00 CS 101", "14:00 MA 105"]);
+assert(wk.some((s) => s.title === "MA 105: Calculus (Tutorial)"), "MA105 tutorial X1 on Wednesday");
+const fri = wk.filter((s) => ist(s.start_time).startsWith("10-16"));
+assert.deepStrictEqual(fri.map((s) => s.slot_type), ["lecture", "lecture", "lab"]);
+assert.strictEqual(wk.length, 15, "15 sessions, same as ResoBin's week view");
+assert(!wk.some((s) => /MS 101|CS 105/.test(s.title)), "no courses he isn't registered for");
 
 // --- Broadcast
 const who = { user_id: "u1", name: "Prof. Rao", role: "Professor", department: "Mathematics" };
@@ -61,9 +81,9 @@ assert.strictEqual(needsReminder({ ...base, last_seen_at: new Date(t - 1 * day).
 assert.strictEqual(needsReminder({ ...base, last_seen_at: new Date(t - 5 * day).toISOString(), last_reminded_at: new Date(t - day).toISOString() }, t), false);
 assert.strictEqual(needsReminder({ ...base, onboarded_at: null }, t), false);
 
-const classes = todaysClasses(base, [{ course_code: "CS 101", kind: "cancelled", on_date: "2026-10-23" }], t);
-assert.deepStrictEqual(classes.map((c) => c.course), ["CS 101", "CH 107"]); // D1 Friday
-assert.strictEqual(classes[0].note, "Cancelled");
+const classes = todaysClasses(saksham, [{ course_code: "CS 101", kind: "cancelled", on_date: "2026-10-23" }], t);
+assert.deepStrictEqual(classes.map((c) => `${c.time} ${c.course}`), ["08:00 ENT 101", "11:00 CS 101", "14:00 PH 117"]); // Friday
+assert.strictEqual(classes[1].note, "Cancelled");
 
 const mail = reminderEmail(base, classes, [{ subject: "Fee <deadline>", summary: "Pay by Monday" }]);
 assert(mail.subject.includes("changed"));
