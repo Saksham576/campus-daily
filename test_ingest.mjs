@@ -65,7 +65,7 @@ assert.strictEqual(personalizeScore({ ...targeted, score: 2 }, { email: "c", dep
 assert.strictEqual(personalizeScore({ ...good, target_departments: [], target_years: [], target_hostels: [] }, { email: "d" }), 10);
 
 const fakeFetch = async (url, init) => {
-  assert(String(url).includes("gemini-2.5-flash-lite"));
+  assert(String(url).includes("gemini-3.5-flash-lite"));
   assert.strictEqual(init.headers["x-goog-api-key"], "k");
   return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"score":8,"summary":"s"}' }] } }] }) };
 };
