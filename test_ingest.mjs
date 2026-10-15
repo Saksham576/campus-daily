@@ -12,6 +12,7 @@ import {
   fromForwardEmailPayload,
   isValidForwardEmailSignature,
   isGoogleIngestIdentity,
+  contentIdFor,
 } from "./src/lib/ingest.ts";
 
 console.log("Ingest tests: auth, parsing, scoring validation, row building...");
@@ -50,7 +51,11 @@ assert.strictEqual(parseScoredNotice('{"score":"abc"}'), null);
 assert.strictEqual(parseScoredNotice('{"score":0}').score, 1);
 
 const row = buildItemRow(em, good, { source: "whatsapp", venue: "LA 201" });
-assert.strictEqual(row.id, itemIdFor("<abc@iitb.ac.in>"));
+assert.strictEqual(row.id, contentIdFor(em));
+const dupA = parseInboundEmail({ messageId: "<1@x>", subject: "Quiz 2 solutions", from: "Bodhitree <n@b>", text: "Paper uploaded." });
+const dupB = parseInboundEmail({ messageId: "<2@x>", subject: "Quiz 2  solutions", from: "Bodhitree <n@b>", text: "Paper uploaded.\n" });
+assert.strictEqual(contentIdFor(dupA), contentIdFor(dupB), "identical copies merge");
+assert.notStrictEqual(contentIdFor(dupA), contentIdFor({ ...dupA, body: "Other text" }));
 assert.deepStrictEqual(row.links, ["https://moodle.iitb.ac.in/x"]);
 assert.strictEqual(row.received_at, "2026-10-14T03:00:00.000Z");
 assert.strictEqual(row.sender, "ugacademic@iitb.ac.in");

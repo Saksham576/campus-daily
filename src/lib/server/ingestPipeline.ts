@@ -26,7 +26,7 @@ export async function processInbound(email: InboundEmail): Promise<{ status: num
     venue: ev?.location ?? null,
     deadline_at: ev && ev.slot_type === "deadline" ? ev.start_time : null,
   });
-  const update = updateFromNotice(email.subject, email.body, row.id);
+  const update = updateFromNotice(email.subject, email.body, row.id, new Date(email.date));
 
   try {
     const result = await publishNotice(admin, row, (s) => personalizeScore(scored, s), update);

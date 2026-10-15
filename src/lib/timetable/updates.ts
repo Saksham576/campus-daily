@@ -41,17 +41,33 @@ export function courseCodeOf(title: string): string | null {
 
 const MOVE_RE = /\b(shifted|moved|rescheduled|preponed|venue\s+(?:changed|change)|changed\s+to|will\s+now\s+be|now\s+(?:at|in))\b/i;
 
+// Moodle/Bodhitree forum mails carry a "by Name - Thursday, 15 October 2026, 2:34 PM" posting line.
+const POSTED_LINE_RE =
+  /\bby\s[^\n]{0,80}?\s[-–]\s(?:mon|tues|wednes|thurs|fri|satur|sun)day,?\s+\d{1,2}\s+[a-z]+\s+\d{4},?\s+\d{1,2}:\d{2}\s*(?:am|pm)?/gi;
+// Follow-ups about a past assessment, not a new event.
+const AFTERMATH_RE = /\b(solutions?|answer\s*key|results?|marks|grades?|graded|uploaded|released|feedback|re-?evaluation)\b/i;
+
 /** Turn a notice into a course-level timetable change, or null if it isn't one. */
-export function updateFromNotice(subject: string, body: string, noticeId?: string): CourseUpdate | null {
+export function updateFromNotice(
+  subject: string,
+  rawBody: string,
+  noticeId?: string,
+  receivedAt: Date = new Date()
+): CourseUpdate | null {
+  const body = rawBody.replace(POSTED_LINE_RE, " ");
   const ev = extractEventDetails(subject, body);
   if (!ev || !ev.course_code) return null;
   const text = `${subject}\n${body}`;
   const hasTime = extractTimeFromText(text) !== null;
   const base = { course_code: ev.course_code, on_date: istDate(ev.start_time), notice_id: noticeId ?? null };
+  const startsLater = new Date(ev.start_time).getTime() > receivedAt.getTime();
 
   if (ev.is_cancelled) {
+    // A cancellation can be for later today, so compare calendar days.
+    if (base.on_date < istDate(receivedAt.toISOString())) return null;
     return { ...base, kind: "cancelled", match_start: hasTime ? ev.start_time : null };
   }
+  if (AFTERMATH_RE.test(subject) || !startsLater) return null;
   if (ev.slot_type === "quiz" || ev.slot_type === "exam" || ev.slot_type === "deadline") {
     return {
       ...base,

@@ -134,6 +134,15 @@ export function itemIdFor(messageId: string): string {
   return "em_" + createHash("sha256").update(messageId.trim().toLowerCase()).digest("hex").slice(0, 24);
 }
 
+/**
+ * Content-based id: the same sender + subject + text always maps to one notice, even when a
+ * system (e.g. Bodhitree) sends identical copies with different Message-IDs.
+ */
+export function contentIdFor(email: Pick<InboundEmail, "from" | "subject" | "body">): string {
+  const n = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+  return "em_" + createHash("sha256").update(`${n(email.from)}|${n(email.subject)}|${n(email.body)}`).digest("hex").slice(0, 24);
+}
+
 export function buildScoringPrompt(email: InboundEmail): string {
   return [
     "You triage official IIT Bombay mailing-list emails for undergraduate students.",
@@ -212,7 +221,7 @@ export function buildItemRow(
 ) {
   const links = Array.from(new Set(email.body.match(/https?:\/\/[^\s<>")\]]+/g) ?? [])).slice(0, 10);
   return {
-    id: itemIdFor(email.messageId),
+    id: contentIdFor(email),
     source: extras.source ?? "ingest",
     subject: email.subject.slice(0, 500),
     sender: email.from.slice(0, 300),
