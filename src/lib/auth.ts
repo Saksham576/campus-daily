@@ -78,3 +78,19 @@ export function sanitizeOtpCode(code: string | null | undefined): string {
 export function isPersistentSession(rememberValue: string | null | undefined): boolean {
   return rememberValue !== "0";
 }
+
+/** Cookie marking that someone has signed in on this device before (shows "Log in" first). */
+export const HAS_ACCOUNT_COOKIE = "campus_has_account";
+
+export type AuthMode = "login" | "signup";
+
+/** Returning devices start on "Log in"; first-time visitors on "Sign up". */
+export function initialAuthMode(cookieHeader: string | null | undefined): AuthMode {
+  return /(?:^|;\s*)campus_has_account=1(?:;|$)/.test(cookieHeader || "") ? "login" : "signup";
+}
+
+/** Supabase's reply when "Log in" (shouldCreateUser: false) is used for an email with no account. */
+export function isNoAccountError(error: { message?: string; code?: string } | null | undefined): boolean {
+  if (!error) return false;
+  return error.code === "otp_disabled" || /signups? not allowed|user not found/i.test(error.message || "");
+}

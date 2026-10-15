@@ -72,3 +72,14 @@ assert(mail.html.includes("Fee &lt;deadline&gt;"), "escapes HTML");
 assert(!mail.html.includes("<deadline>"));
 
 console.log("✓ Passed: broadcasts, course lookup, timetable overrides and reminder emails verified");
+
+// --- Log in vs Sign up
+import { initialAuthMode, isNoAccountError } from "./src/lib/auth.ts";
+assert.strictEqual(initialAuthMode(""), "signup");
+assert.strictEqual(initialAuthMode("a=1; campus_has_account=1; b=2"), "login");
+assert.strictEqual(initialAuthMode("campus_has_account=0"), "signup");
+assert.strictEqual(isNoAccountError({ code: "otp_disabled", message: "Signups not allowed for otp" }), true);
+assert.strictEqual(isNoAccountError({ message: "Signups not allowed for otp" }), true);
+assert.strictEqual(isNoAccountError({ message: "Email rate limit exceeded" }), false);
+assert.strictEqual(isNoAccountError(null), false);
+console.log("✓ Passed: log in / sign up mode selection");
