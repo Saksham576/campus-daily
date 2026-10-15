@@ -1,29 +1,28 @@
 /**
  * Campus Daily WhatsApp bridge — runs on your PC.
- * Reads ONLY the WhatsApp groups listed in GROUPS (in .env) on a SPARE number
- * and sends each substantive message to Campus Daily's ingest API.
  *
- * Uses whatsapp-web.js (unofficial). Automated WhatsApp use breaks WhatsApp's
- * terms and the number can be banned — never use your main number.
+ * Safety & privacy by design:
+ *  - Read-only: never sends messages, never marks chats as read.
+ *  - Only the groups in GROUPS (.env), and by default only posts by group ADMINS.
+ *  - Shares only the group name + message text — never author names or numbers.
+ *  - Stores no message content on disk; logs only counts.
  *
- *   cd whatsapp-bridge
- *   npm install
- *   copy .env.example .env   (then fill it in)
- *   npm start                (scan the QR code once with the spare phone)
+ * Uses whatsapp-web.js (unofficial WhatsApp Web automation). This breaks WhatsApp's terms,
+ * so there is always some risk to the linked number. Read-only use keeps that risk low.
+ *
+ *   cd whatsapp-bridge && npm install && npm start   (scan the QR once: WhatsApp > Linked devices)
  */
 import "dotenv/config";
 import qrcode from "qrcode-terminal";
 import pkg from "whatsapp-web.js";
-import { toIngestPayload, isRelevant } from "./lib.mjs";
+import { toIngestPayload, isRelevant, parseGroups, isAllowedGroup } from "./lib.mjs";
 
 const { Client, LocalAuth } = pkg;
 
 const INGEST_URL = process.env.INGEST_URL || "https://campusdaily.nexuspulsetech.com/api/ingest/email";
 const SECRET = process.env.INGEST_SECRET_KEY;
-const GROUPS = (process.env.GROUPS || "")
-  .split("|")
-  .map((g) => g.trim().toLowerCase())
-  .filter(Boolean);
+const GROUPS = parseGroups(process.env.GROUPS);
+const ADMINS_ONLY = (process.env.ADMINS_ONLY || "true").toLowerCase() !== "false";
 
 if (!SECRET || GROUPS.length === 0) {
   console.error("Set INGEST_SECRET_KEY and GROUPS in whatsapp-bridge/.env first.");
@@ -36,15 +35,21 @@ const client = new Client({
 });
 
 client.on("qr", (qr) => {
-  console.log("Scan this QR with the SPARE phone: WhatsApp > Linked devices > Link a device");
+  console.log("\nScan with your phone: WhatsApp > Settings > Linked devices > Link a device\n");
   qrcode.generate(qr, { small: true });
 });
-client.on("ready", () => console.log(`Bridge ready. Watching ${GROUPS.length} group(s).`));
+client.on("ready", async () => {
+  const chats = await client.getChats().catch(() => []);
+  const found = chats.filter((c) => c.isGroup && isAllowedGroup(c.name, GROUPS)).length;
+  console.log(`Bridge ready (read-only${ADMINS_ONLY ? ", admins only" : ""}). Watching ${found}/${GROUPS.length} group(s).`);
+  if (found < GROUPS.length) console.log("Some group names in .env were not found — check spelling.");
+});
 client.on("disconnected", (r) => {
-  console.error("Disconnected:", r, "— restarting in 30s");
-  setTimeout(() => client.initialize(), 30000);
+  console.error("Disconnected:", r, "— restarting in 60s");
+  setTimeout(() => client.initialize(), 60000);
 });
 
+let sent = 0;
 async function send(payload, attempt = 1) {
   try {
     const res = await fetch(INGEST_URL, {
@@ -52,33 +57,32 @@ async function send(payload, attempt = 1) {
       headers: { "content-type": "application/json", "x-ingest-secret": SECRET },
       body: JSON.stringify(payload),
     });
-    if (res.ok || res.status === 422) {
-      const j = await res.json().catch(() => ({}));
-      console.log(`→ sent "${payload.subject}" score=${j.score ?? "-"} timetable=${j.timetable_update ?? "-"}`);
+    if (res.ok || res.status === 422 || res.status === 400) {
+      sent++;
+      console.log(`${new Date().toISOString()} forwarded notice #${sent} (HTTP ${res.status})`);
       return;
     }
     throw new Error(`HTTP ${res.status}`);
   } catch (e) {
-    if (attempt >= 5) return console.error("Giving up on message:", payload.subject, e.message);
+    if (attempt >= 5) return console.error("Giving up on one message:", e.message);
     setTimeout(() => send(payload, attempt + 1), attempt * 60000);
   }
+}
+
+async function isFromAdmin(msg, chat) {
+  if (!ADMINS_ONLY) return true;
+  const author = msg.author || msg.from;
+  const p = (chat.participants || []).find((x) => x.id?._serialized === author);
+  return Boolean(p && (p.isAdmin || p.isSuperAdmin));
 }
 
 client.on("message", async (msg) => {
   try {
     const chat = await msg.getChat();
-    if (!chat.isGroup || !GROUPS.includes(chat.name.trim().toLowerCase())) return;
+    if (!chat.isGroup || !isAllowedGroup(chat.name, GROUPS)) return;
     if (!isRelevant(msg.body)) return;
-    const contact = await msg.getContact().catch(() => null);
-    await send(
-      toIngestPayload({
-        id: msg.id._serialized,
-        group: chat.name,
-        author: contact?.pushname || contact?.name || "member",
-        body: msg.body,
-        timestamp: msg.timestamp,
-      })
-    );
+    if (!(await isFromAdmin(msg, chat))) return;
+    await send(toIngestPayload({ id: msg.id._serialized, group: chat.name, body: msg.body, timestamp: msg.timestamp }));
   } catch (e) {
     console.error("Message handling failed:", e.message);
   }
