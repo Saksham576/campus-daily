@@ -217,7 +217,7 @@ node test_suite.mjs
 
 | Backlog item | Status | Where |
 |---|---|---|
-| Cloud email ingestion (no personal Gmail) | Built. Forward Email webhook (Enhanced plan, signed) → `/api/ingest/forwardemail` | `src/lib/server/ingestPipeline.ts` |
+| Cloud email ingestion (no personal Gmail) | Built, free. A dedicated ingest Gmail receives IITB auto-forwards and `apps-script/Ingest.gs` posts new mail to `/api/ingest/email` every 10 min. Optional paid path: signed Forward Email webhook `/api/ingest/forwardemail` | `apps-script/Ingest.gs`, `src/lib/server/ingestPipeline.ts` |
 | Self-updating timetable (core USP) | Built. Notices create `course_updates`, applied on `/schedule` for every student in the course | `src/lib/timetable/updates.ts`, migration 0004 |
 | WhatsApp group notices | Built. PC bridge on a spare number | `whatsapp-bridge/` |
 | Offline PWA | Built. Service worker caches `/`, `/schedule` and timetable data | `public/sw.js` |
@@ -231,7 +231,7 @@ node test_suite.mjs
 **Environment variables (Vercel, Production):** see `.env.example`.
 **Migrations to apply in order:** `0004_course_updates`, `0005_me_feed_live`, `0006_launch_features`.
 **Tests:** `npm test` (core suite + ingest + timetable + launch features). The WhatsApp bridge has its own tests: `cd whatsapp-bridge && npm test`.
-**Retire the Apps Script** once Forward Email delivery is confirmed, so notices aren't stored twice.
+**Retire the old digest Apps Script item sync** once the ingest Gmail is confirmed, so notices aren't stored twice.
 
 ---
 
