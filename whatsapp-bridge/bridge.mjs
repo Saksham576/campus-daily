@@ -13,9 +13,10 @@
  *   cd whatsapp-bridge && npm install && npm start   (scan the QR once: WhatsApp > Linked devices)
  */
 import "dotenv/config";
+import { existsSync } from "node:fs";
 import qrcode from "qrcode-terminal";
 import pkg from "whatsapp-web.js";
-import { toIngestPayload, isRelevant, parseGroups, isAllowedGroup } from "./lib.mjs";
+import { toIngestPayload, isRelevant, parseGroups, isAllowedGroup, normalizeName } from "./lib.mjs";
 
 const { Client, LocalAuth } = pkg;
 
@@ -29,9 +30,20 @@ if (!SECRET || GROUPS.length === 0) {
   process.exit(1);
 }
 
+// Prefer an installed Chrome/Edge (runs with its own separate profile under .wwebjs_auth).
+const BROWSER_CANDIDATES = [
+  process.env.CHROME_PATH,
+  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+  "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "/usr/bin/google-chrome",
+].filter(Boolean);
+const executablePath = BROWSER_CANDIDATES.find((p) => existsSync(p));
+
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: ".wwebjs_auth" }),
-  puppeteer: { headless: true, args: ["--no-sandbox"] },
+  puppeteer: { headless: true, executablePath, timeout: 120000, args: ["--no-first-run", "--disable-extensions"] },
 });
 
 client.on("qr", (qr) => {
@@ -39,8 +51,8 @@ client.on("qr", (qr) => {
   qrcode.generate(qr, { small: true });
 });
 client.on("ready", async () => {
-  const chats = await client.getChats().catch(() => []);
-  const found = chats.filter((c) => c.isGroup && isAllowedGroup(c.name, GROUPS)).length;
+  const chats = await client.getChats().catch((e) => (console.error("getChats failed:", e?.stack || e), []));
+  const found = new Set(chats.filter((c) => c.isGroup && isAllowedGroup(c.name, GROUPS)).map((c) => normalizeName(c.name))).size;
   console.log(`Bridge ready (read-only${ADMINS_ONLY ? ", admins only" : ""}). Watching ${found}/${GROUPS.length} group(s).`);
   if (found < GROUPS.length) console.log("Some group names in .env were not found — check spelling.");
 });
@@ -84,7 +96,7 @@ client.on("message", async (msg) => {
     if (!(await isFromAdmin(msg, chat))) return;
     await send(toIngestPayload({ id: msg.id._serialized, group: chat.name, body: msg.body, timestamp: msg.timestamp }));
   } catch (e) {
-    console.error("Message handling failed:", e.message);
+    console.error("Message handling failed:", e?.stack || e);
   }
 });
 
