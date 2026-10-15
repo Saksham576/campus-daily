@@ -221,8 +221,8 @@ function LoginForm() {
       <p className="eyebrow">Campus Daily</p>
       <h1>Your campus, in one feed.</h1>
       <p className="muted">
-        Sign in with your IITB email (@iitb.ac.in). We’ll send an instant 6-digit
-        verification code and a one-tap magic link.
+        Sign in with your IITB email (@iitb.ac.in). We’ll email you a 6-digit
+        code and a one-tap sign-in link.
       </p>
 
       {step === "email" ? (
@@ -256,7 +256,7 @@ function LoginForm() {
           </label>
 
           <button type="submit" disabled={status === "sending"}>
-            {status === "sending" ? "Sending code…" : "Continue with IITB Email"}
+            {status === "sending" ? "Sending…" : "Sign in"}
           </button>
 
           {status === "error" && <p className="err">{errorMsg}</p>}
