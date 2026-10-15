@@ -147,22 +147,48 @@ export async function scoreWithGemini(
   return typeof text === "string" ? parseScoredNotice(text) : null;
 }
 
-/** Row shape for public.items (links stored as jsonb array). */
-export function buildItemRow(email: InboundEmail, scored: ScoredNotice) {
+/** Row shape for the live public.items table (links/tags are jsonb arrays). */
+export function buildItemRow(
+  email: InboundEmail,
+  scored: ScoredNotice,
+  extras: { source?: string; venue?: string | null; deadline_at?: string | null } = {}
+) {
   const links = Array.from(new Set(email.body.match(/https?:\/\/[^\s<>")\]]+/g) ?? [])).slice(0, 10);
   return {
     id: itemIdFor(email.messageId),
+    source: extras.source ?? "ingest",
     subject: email.subject.slice(0, 500),
-    from_address: email.from.slice(0, 300),
+    sender: email.from.slice(0, 300),
     received_at: email.date,
-    score: scored.score,
     summary: scored.summary,
     body: email.body,
     links,
     tags: scored.tags,
-    is_personal: scored.is_personal,
-    target_departments: scored.target_departments,
-    target_years: scored.target_years,
-    target_hostels: scored.target_hostels,
+    venue: extras.venue ?? null,
+    deadline_at: extras.deadline_at ?? null,
+    // Personal notices need personal_for (recipient emails), which list mail doesn't give us.
+    is_personal: false,
   };
+}
+
+export type SubscriberTarget = { email: string; department?: string | null; year?: string | null; hostel?: string | null };
+
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+const matchesAny = (value: string | null | undefined, targets: string[]) => {
+  if (targets.length === 0) return true;
+  if (!value) return false;
+  const v = norm(value);
+  return targets.some((t) => {
+    const n = norm(t);
+    return n.length > 0 && (v.includes(n) || n.includes(v));
+  });
+};
+
+/** Per-student score: notices aimed at another department/year/hostel drop by 3 (min 1). */
+export function personalizeScore(scored: ScoredNotice, sub: SubscriberTarget): number {
+  const fits =
+    matchesAny(sub.department, scored.target_departments) &&
+    matchesAny(sub.year, scored.target_years) &&
+    matchesAny(sub.hostel, scored.target_hostels);
+  return fits ? scored.score : Math.max(1, scored.score - 3);
 }

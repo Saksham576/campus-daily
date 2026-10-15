@@ -30,7 +30,7 @@ export default async function HomePage() {
 
   const since = new Date(Date.now() - 7 * 864e5).toISOString();
 
-  // Try calling me_feed RPC first, then fallback to direct query if RPC is not present
+  // me_feed joins items with this student's own scores in user_items (see migration 0005)
   let items: FeedItem[] = [];
   let fetchError: string | null = null;
 
@@ -39,25 +39,8 @@ export default async function HomePage() {
       p_since: since,
       p_min_score: MIN_SCORE,
     });
-
-    if (!rpcError && rpcData) {
-      items = rpcData as FeedItem[];
-    } else {
-      // Fallback to querying items directly
-      const { data: fallbackData, error: fallbackError } = await supabase
-        .from("items")
-        .select("*")
-        .gte("received_at", since)
-        .or(`score.gte.${MIN_SCORE},is_personal.eq.true`)
-        .order("received_at", { ascending: false })
-        .limit(150);
-
-      if (fallbackError) {
-        fetchError = fallbackError.message;
-      } else if (fallbackData) {
-        items = fallbackData as FeedItem[];
-      }
-    }
+    if (rpcError) fetchError = rpcError.message;
+    else items = (rpcData || []) as FeedItem[];
   } catch (err: any) {
     fetchError = err.message;
   }

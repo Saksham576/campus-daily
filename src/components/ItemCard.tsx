@@ -22,6 +22,8 @@ export type FeedItem = {
   tags?: string[];
   is_personal?: boolean;
   status?: "new" | "kept" | "removed";
+  venue?: string | null;
+  source?: string | null;
 };
 
 function formatHost(u: string): string {
@@ -99,16 +101,13 @@ export function ItemCard({
         data: { user },
       } = await supabase.auth.getUser();
 
-      if (user && itemId) {
-        await supabase.from("user_items").upsert(
-          {
-            user_id: user.id,
-            item_id: itemId,
-            status: newStatus,
-            interacted_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id,item_id" }
-        );
+      if (user?.email && itemId) {
+        // Live schema: user_items(email, item_id, score, state); RLS allows updating own rows.
+        await supabase
+          .from("user_items")
+          .update({ state: newStatus, updated_at: new Date().toISOString() })
+          .eq("email", user.email.toLowerCase())
+          .eq("item_id", itemId);
       }
     } catch {
       // Ignore background interaction errors

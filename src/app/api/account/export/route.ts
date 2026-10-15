@@ -14,7 +14,7 @@ export async function GET() {
   const [profile, schedules, items, interactions] = await Promise.all([
     supabase.from("subscribers").select("*").eq("email", email),
     supabase.from("user_schedules").select("*").eq("user_id", user.id),
-    supabase.from("user_items").select("*").eq("user_id", user.id),
+    supabase.from("user_items").select("*").eq("email", email),
     supabase.from("notice_interactions").select("*").eq("user_id", user.id),
   ]);
 
