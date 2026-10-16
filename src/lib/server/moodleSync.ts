@@ -118,7 +118,10 @@ export async function syncMoodle(admin: SupabaseClient, deadlineMs: number) {
         timesortfrom: now - 86400,
         timesortto: now + 45 * 86400,
         limitnum: 50,
-      }).catch(() => null);
+      }).catch((e) => {
+        stats.errors.push(`timeline: ${e instanceof Error ? e.message : "failed"}`);
+        return null;
+      });
       if (timeline?.events) {
         const rows = (timeline.events as any[]).map((e) => ({
           user_id: c.user_id,
@@ -190,13 +193,31 @@ export async function syncMoodle(admin: SupabaseClient, deadlineMs: number) {
         // 2) Files (slides, handouts, seating plans)
         const sections = await moodleCall<any[]>(token, "core_course_get_contents", { courseid: course.id }).catch(() => []);
         const files: { key: string; name: string; url: string; modified: number; module: string }[] = [];
+        const library: Record<string, unknown>[] = [];
         for (const s of sections) {
           for (const m of s.modules || []) {
             for (const f of m.contents || []) {
               if (f.type !== "file") continue;
               files.push({ key: `file:${course.id}:${f.fileurl}:${f.timemodified}`, name: f.filename, url: f.fileurl, modified: f.timemodified || 0, module: m.name });
+              library.push({
+                course_id: course.id,
+                file_url: f.fileurl,
+                course_code: code,
+                course_short: htmlToText(course.shortname).trim(),
+                section: htmlToText(s.name || "").trim() || null,
+                module: htmlToText(m.name || "").trim() || null,
+                name: f.filename,
+                mimetype: f.mimetype || null,
+                view_url: m.url || courseUrl,
+                modified_at: f.timemodified ? new Date(f.timemodified * 1000).toISOString() : null,
+              });
             }
           }
+        }
+        // Course library: the full current file list (Moodle is the source of truth).
+        if (sections.length) {
+          await admin.from("course_files").delete().eq("course_id", course.id);
+          for (let i = 0; i < library.length; i += 500) await admin.from("course_files").insert(library.slice(i, i + 500));
         }
         const alreadyFiles = await seen(admin, files.map((f) => f.key));
         const fresh = files.filter((f) => !alreadyFiles.has(f.key));
