@@ -7,6 +7,7 @@ import { AppBar } from "@/components/AppBar";
 import { DayBoard, type BoardRow } from "@/components/DayBoard";
 import { FeedView } from "@/components/FeedView";
 import { HomeHead } from "@/components/HomeHead";
+import { AskBox } from "@/components/AskBox";
 import { buildSections } from "@/lib/sections";
 import { buildWeek, formatCourseCode, type UserCourse } from "@/lib/timetable/slots";
 import { applyCourseUpdates, istDate, withPersonalOverrides, type CourseUpdate } from "@/lib/timetable/updates";
@@ -158,6 +159,8 @@ export default async function HomePage() {
             <Link href="/settings#courses">→ Add your courses</Link> to light up the board.
           </p>
         )}
+
+        <AskBox />
 
         <FeedView sections={sections as any} sponsored={sponsored || null} />
       </main>
