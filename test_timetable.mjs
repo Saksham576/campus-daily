@@ -102,3 +102,18 @@ assert.strictEqual(merged.find((x) => x.title.startsWith("CH")).is_cancelled, tr
 assert.strictEqual(merged.find((x) => x.title.startsWith("MA")).is_cancelled, false, "my restore beats the notice");
 assert.strictEqual(merged[0].title.startsWith("MA"), true, "sorted by time");
 console.log("✓ Passed: your own cancel/restore survives reloads");
+
+// The real CH 111 notice: event date is in the subject (Oct 16), the Moodle posting line says Oct 14
+const ch = extractEventDetails(
+  "CH 111-2026-1-D3: Quiz on Friday, October 16th: Logistics",
+  "Quiz logistics by Prof X - Wednesday, 14 October 2026, 5:15 PM\nThe quiz will be held on 16TH OCTOBER at 8:30 AM in LA 201."
+);
+assert.strictEqual(new Date(ch.start_time).toISOString(), "2026-10-16T03:00:00.000Z", "Friday 16 Oct 8:30 IST, not the posting time");
+// The exact real notice text (Moodle email): Friday 16 Oct, 5:15–6:15 PM
+const realCh = extractEventDetails(
+  "CH 111-2026-1-D3: Quiz on Friday, October 16th: Logistics",
+  "CH 111-2026-1-D3 -> Forums -> Announcements -> Quiz on Friday, October\n16th: Logistics\nhttps://moodle.iitb.ac.in/mod/forum/discuss.php?d=8888#p11775\nQuiz on Friday, October 16th: Logistics\nby Shobhna Kapoor - Wednesday, 14 October 2026, 9:34 AM\n\nDear students,\n\nWe hope you are all preparing well for FRIDAY'S (16TH OCTOBER) Quiz.\n\n1)  EXAM TIMINGS AND SEATING ARRANGEMENT: The exam duration is 60 MIN\n(5:15 PM – 6:15 PM). Please occupy your seats between 4:45-4:55 PM as per\nthe SEATING ARRANGEMENT (ATTACHED) in this email."
+);
+assert.strictEqual(realCh.start_time, "2026-10-16T11:45:00.000Z", "Fri 16 Oct 17:15 IST");
+assert.strictEqual(realCh.end_time, "2026-10-16T12:45:00.000Z", "ends 18:15 IST");
+console.log("✓ Passed: posting time is never taken as the event date");

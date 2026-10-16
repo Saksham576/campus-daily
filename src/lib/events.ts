@@ -121,11 +121,17 @@ export function extractTimeFromText(text: string): {
   return null;
 }
 
+// Moodle/Bodhitree forum mails carry "by Name - Wednesday, 14 October 2026, 5:15 PM": the posting
+// time, not the event time. It must never be read as the event date.
+export const POSTED_LINE_RE =
+  /\bby\s[^\n]{0,80}?\s[-–]\s(?:mon|tues|wednes|thurs|fri|satur|sun)day,?\s+\d{1,2}\s+[a-z]+\s+\d{4},?\s+\d{1,2}:\d{2}\s*(?:am|pm)?/gi;
+
 // Heuristic structured event extractor from notice subject + body
 export function extractEventDetails(
   subject: string,
-  body: string = ""
+  rawBody: string = ""
 ): ExtractedEvent | null {
+  const body = rawBody.replace(POSTED_LINE_RE, " ");
   const text = `${subject} \n ${body}`;
   const lower = text.toLowerCase();
 
@@ -217,23 +223,28 @@ export function extractEventDetails(
   let targetMonth = now.getMonth();
   let targetDay = now.getDate();
 
+  // The subject states the event ("Quiz on Friday, October 16th"); bodies often mention other dates.
+  const SUBJECT_HAS_DATE =
+    /\b\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?\b|\b\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}\b|\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/i;
+  const dateText = SUBJECT_HAS_DATE.test(subject) ? subject : text;
+
   // 1. Day Month format: "23rd October", "23 Oct 2026"
-  const dayMonthMatch = text.match(
+  const dayMonthMatch = dateText.match(
     /\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)(?:\s*,?\s*(\d{4}))?\b/i
   );
 
   // 2. Month Day format: "October 23rd", "Oct 23, 2026"
-  const monthDayMatch = text.match(
+  const monthDayMatch = dateText.match(
     /\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?\b/i
   );
 
   // 3. ISO format: "2026-10-23", "2026/10/23"
-  const isoDateMatch = text.match(/\b(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\b/);
+  const isoDateMatch = dateText.match(/\b(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\b/);
 
   // 4. Numeric format: "23/10/2026", "23-10-2026"
   // First plausible DD/MM — skips academic years ("2026-27"), ranges ("2-5", "45-4") and similar.
   const numericMatch =
-    Array.from(text.matchAll(/(?<![\d\-\/])(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?(?![\d\-\/])/g)).find((m) => {
+    Array.from(dateText.matchAll(/(?<![\d\-\/])(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?(?![\d\-\/])/g)).find((m) => {
       const d = parseInt(m[1], 10);
       const mo = parseInt(m[2], 10);
       return d >= 1 && d <= 31 && mo >= 1 && mo <= 12 && (Boolean(m[3]) || m[0].includes("/"));

@@ -27,7 +27,7 @@ export type FeedItem = {
   is_verified?: boolean;
   deadline_at?: string | null;
   /** Set by the sections builder. */
-  section?: "action" | "courses" | "events" | "opportunities" | "campus";
+  section?: "action" | "exams" | "courses" | "events" | "opportunities" | "campus";
   when?: string | null;
   myCourse?: string | null;
   /** Your seat, when a seating plan mentions your roll number. */
@@ -36,6 +36,7 @@ export type FeedItem = {
 
 const STUB: Record<string, { code: string; whenLabel: string }> = {
   action: { code: "Action", whenLabel: "Due" },
+  exams: { code: "Exam", whenLabel: "When" },
   courses: { code: "Course", whenLabel: "When" },
   events: { code: "Event", whenLabel: "Starts" },
   opportunities: { code: "Opportunity", whenLabel: "Posted" },
@@ -172,6 +173,17 @@ export function ItemCard({
         alert("Please sign in to add to your timetable.");
         return;
       }
+      // Already in the timetable? Don't add it twice.
+      const { data: existing } = await supabase
+        .from("user_schedules")
+        .select("id")
+        .eq("title", ev.title)
+        .eq("start_time", ev.start_time)
+        .limit(1);
+      if (existing && existing.length > 0) {
+        setTimetableAdded(true);
+        return;
+      }
       const { error } = await supabase.from("user_schedules").insert({
         user_id: user.id,
         notice_id: itemId ? itemId : null,
@@ -278,7 +290,7 @@ export function ItemCard({
             </div>
             <div className="actions" style={{ marginTop: 8 }}>
               <button onClick={() => handleAddToTimetable(event)} disabled={addingToTimetable || timetableAdded}>
-                {timetableAdded ? "✓ On your week" : addingToTimetable ? "Adding…" : "+ Add to week"}
+                {timetableAdded ? "✓ In your timetable" : addingToTimetable ? "Adding…" : "+ Add to timetable"}
               </button>
               <button onClick={() => handleDownloadIcs(event)} title="Download .ics for Apple/Outlook/Google Calendar">
                 .ics

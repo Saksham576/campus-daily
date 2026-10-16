@@ -290,7 +290,7 @@ function SettingsContent() {
               </div>
             </Panel>
 
-            <Panel n="02" id="courses" title="My courses" sub="Your week board is built from these. Pick your division and the slots fill in from ResoBin.">
+            <Panel n="02" id="courses" title="My courses" sub="Your timetable is built from these. Pick your division and the slots fill in from ResoBin.">
               <CoursesEditor />
             </Panel>
 

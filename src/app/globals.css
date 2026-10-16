@@ -611,6 +611,9 @@ h3 {
 .ticket.sec-action .stub .sec {
   color: var(--red);
 }
+.ticket.sec-exams .stub .sec {
+  color: #c2410c;
+}
 .ticket.sec-courses .stub .sec {
   color: var(--blue);
 }

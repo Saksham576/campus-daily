@@ -15,7 +15,7 @@ const intern = { ...base, id: "f", subject: "Internship opportunity at L&T", sum
 const otherCourse = { ...base, id: "g", subject: "PH 109-2026-1-D2: Group activity" };
 
 assert.strictEqual(placeItem(scholarship, mine, now).section, "action");
-assert.strictEqual(placeItem(quiz, mine, now).section, "courses");
+assert.strictEqual(placeItem(quiz, mine, now).section, "exams", "quizzes now have their own section");
 assert.strictEqual(placeItem(quiz, mine, now).myCourse, "CH 111");
 assert.strictEqual(placeItem(talk, mine, now).section, "events");
 assert.strictEqual(placeItem(oldTalk, mine, now), null, "past events drop out");
@@ -45,3 +45,13 @@ const odd = [
 const so = buildSections(odd, mine, now);
 assert.strictEqual(so.all.length, 3, "all odd items still shown");
 console.log("✓ Passed: odd tag shapes never break the board");
+
+// Exams & quizzes get their own section, soonest first; solutions/results stay with the course
+const q1 = { ...base, id: "q1", subject: "CH 111-2026-1-D3: Quiz on Friday, October 16th: Logistics", body: "Quiz at 8:30 AM in LA 201" };
+const q2 = { ...base, id: "q2", subject: "MA 105 Quiz 3 on 23 October 2026", body: "2 PM, LT 204" };
+const sol = { ...base, id: "q3", subject: "CS 105-2026-1-D3: Midsem solutions" };
+assert.strictEqual(placeItem(q1, mine, now).section, "exams");
+assert.strictEqual(placeItem(sol, mine, now).section !== "exams", true);
+const se = buildSections([q2, q1, sol], mine, now);
+assert.deepStrictEqual(se.exams.map((x) => x.id), ["q1", "q2"]);
+console.log("✓ Passed: exams & quizzes section");

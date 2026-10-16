@@ -67,7 +67,15 @@ export function MoodleConnect() {
         <li>A Moodle window opens — sign in with IIT Bombay SSO as usual.</li>
         <li>The window closes by itself and this page shows &quot;Connected&quot;.</li>
       </ol>
-      <button type="button" style={{ marginTop: 12 }} onClick={() => load()}>
+      <button
+        type="button"
+        style={{ marginTop: 12 }}
+        onClick={async () => {
+          setMsg("Checking…");
+          await load();
+          setMsg("Not connected yet. Run Connect Moodle on the PC, sign in, wait for the window to close, then check again.");
+        }}
+      >
         I&apos;ve done it — check again
       </button>
       {msg && <p className="note">{msg}</p>}
