@@ -55,6 +55,34 @@ function boardFor(courses: UserCourse[], updates: CourseUpdate[], saved: any[], 
   return { title: "Today", rows: [] };
 }
 
+type MoodleDue = { event_id: number; course_code: string | null; name: string; kind: string | null; due_at: string; url: string | null };
+
+/** Your own Moodle deadlines: quizzes join Exams, everything else Action needed, soonest first. */
+function addMoodleDeadlines(sections: Record<string, any[]>, rows: MoodleDue[]) {
+  const t = (x: any) => (x.when ? new Date(x.when).getTime() : Infinity);
+  for (const r of rows) {
+    const quiz = r.kind === "quiz";
+    const item = {
+      id: `moodle-due-${r.event_id}`,
+      subject: `${r.course_code ? r.course_code + ": " : ""}${r.name}`,
+      summary: `${quiz ? "Moodle quiz" : r.kind === "assign" ? "Assignment" : "Moodle task"} — due ${new Date(r.due_at).toLocaleString("en-IN", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })}. Leaves once you submit it on Moodle.`,
+      source: "moodle",
+      from_address: "Moodle",
+      links: r.url ? [r.url] : [],
+      score: 9,
+      status: "new",
+      deadline_at: r.due_at,
+      section: quiz ? "exams" : "action",
+      when: r.due_at,
+      myCourse: r.course_code,
+    };
+    sections[item.section].push(item);
+    sections.all.push(item);
+  }
+  sections.action.sort((a, b) => t(a) - t(b));
+  sections.exams.sort((a, b) => t(a) - t(b));
+}
+
 export default async function HomePage() {
   const supabase = await createClient();
   const {
@@ -74,13 +102,14 @@ export default async function HomePage() {
   const since = new Date(now.getTime() - 21 * 86400_000).toISOString();
   const today = istDate(now.toISOString());
 
-  const [feedRes, coursesRes, updatesRes, cardsRes, savedRes, enrolRes] = await Promise.all([
+  const [feedRes, coursesRes, updatesRes, cardsRes, savedRes, enrolRes, dueRes] = await Promise.all([
     supabase.rpc("me_feed", { p_since: since, p_min_score: MIN_SCORE }),
     supabase.from("user_courses").select("course_code, title, division, lecture_slots, tutorial_slots, venue"),
     supabase.from("course_updates").select("*").gte("on_date", today).lte("on_date", istDate(new Date(now.getTime() + 8 * 86400_000).toISOString())),
     supabase.from("sponsored_cards").select("id, sponsor, title, body, link, ends_on").lte("starts_on", today).order("created_at", { ascending: false }).limit(5),
     supabase.from("user_schedules").select("id, title, location, start_time, end_time, slot_type, is_cancelled, notice_id").gte("start_time", new Date(now.getTime() - 86400_000).toISOString()).lte("start_time", new Date(now.getTime() + 9 * 86400_000).toISOString()),
     supabase.from("moodle_enrolments").select("course_code"),
+    supabase.from("moodle_deadlines").select("event_id, course_code, name, kind, due_at, url").gte("due_at", new Date(now.getTime() - 3600_000).toISOString()).order("due_at"),
   ]);
 
   const muted = new Set<string>(profile?.muted_senders || []);
@@ -99,6 +128,7 @@ export default async function HomePage() {
     ...(enrolRes.data || []).filter((e) => e.course_code).map((e) => formatCourseCode(e.course_code as string)),
   ]);
   const sections = buildSections(items, myCourses, now);
+  addMoodleDeadlines(sections as any, dueRes.data || []);
   const board = boardFor(courses, (updatesRes.data || []) as CourseUpdate[], savedRes.data || [], now);
   const sponsored = ((cardsRes.data || []) as (Sponsored & { ends_on: string | null })[]).find(
     (c) => !c.ends_on || c.ends_on >= today
