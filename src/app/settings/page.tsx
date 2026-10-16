@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { PushToggle } from "@/components/PushToggle";
+import { DigestPicker } from "@/components/DigestPicker";
 import { CoursesEditor } from "@/components/CoursesEditor";
 import { MoodleConnect } from "@/components/MoodleConnect";
 import { CalendarLink } from "@/components/CalendarLink";
@@ -370,6 +371,7 @@ function SettingsContent() {
 
             <Panel n="06" id="alerts" title="Alerts & calendar" sub="Phone alerts for cancellations and top-priority notices, and a live calendar link.">
               <PushToggle />
+              <DigestPicker />
               <div style={{ marginTop: 16 }}>
                 <CalendarLink />
               </div>
