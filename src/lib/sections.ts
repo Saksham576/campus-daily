@@ -18,7 +18,7 @@ export type SectionItem = {
   subject: string;
   summary?: string | null;
   body?: string | null;
-  tags?: string[] | null;
+  tags?: unknown;
   received_at?: string | null;
   deadline_at?: string | null;
   source?: string | null;
@@ -103,7 +103,7 @@ function myCourseIn(text: string, myCourses: Set<string>): string | null {
  */
 export function placeItem<T extends SectionItem>(item: T, myCourses: Set<string>, now = new Date()): Placed<T> | null {
   const text = `${item.subject}\n${item.summary || ""}`;
-  const tags = (item.tags || []).map((t) => t.toLowerCase());
+  const tags = normalizeTags(item.tags);
   const myCourse = myCourseIn(`${item.subject}\n${item.body || ""}`, myCourses);
 
   let ev = null;
@@ -155,9 +155,26 @@ ${item.body || ""}`, now) : null) ||
 
 const t = (s?: string | null) => (s ? new Date(s).getTime() : 0);
 
+/** tags is jsonb: a list, a comma-separated string (old digest script) or anything else. */
+export function normalizeTags(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.filter((x) => typeof x === "string").map((x) => x.toLowerCase());
+  if (typeof raw === "string") return raw.split(/[,;|]/).map((x) => x.trim().toLowerCase()).filter(Boolean);
+  if (raw && typeof raw === "object") return Object.keys(raw).map((x) => x.toLowerCase());
+  return [];
+}
+
+/** One odd notice must never break the board: if placing it fails, it goes to Campus life. */
+function safePlace<T extends SectionItem>(i: T, myCourses: Set<string>, now: Date): Placed<T> | null {
+  try {
+    return placeItem(i, myCourses, now);
+  } catch {
+    return { ...i, section: "campus", when: null, myCourse: null } as Placed<T>;
+  }
+}
+
 /** Build every section with a stable order. */
 export function buildSections<T extends SectionItem>(items: T[], myCourses: Set<string>, now = new Date()) {
-  const placed = items.map((i) => placeItem(i, myCourses, now)).filter(Boolean) as Placed<T>[];
+  const placed = items.map((i) => safePlace(i, myCourses, now)).filter(Boolean) as Placed<T>[];
   const by = (k: string) => placed.filter((p) => (p.section as string) === k);
   const newest = (a: Placed<T>, b: Placed<T>) => t(b.received_at) - t(a.received_at);
   const soonest = (a: Placed<T>, b: Placed<T>) => (t(a.when) || Infinity) - (t(b.when) || Infinity) || newest(a, b);
@@ -171,7 +188,7 @@ export function buildSections<T extends SectionItem>(items: T[], myCourses: Set<
     // Saved items stay visible here even after their deadline/event has passed.
     saved: items
       .filter((i) => i.status === "kept")
-      .map((i) => placeItem(i, myCourses, now) || ({ ...i, section: "campus", when: null, myCourse: null } as Placed<T>))
+      .map((i) => safePlace(i, myCourses, now) || ({ ...i, section: "campus", when: null, myCourse: null } as Placed<T>))
       .sort(newest),
     all: [...placed].sort(newest),
   } satisfies Record<SectionKey, Placed<T>[]>;

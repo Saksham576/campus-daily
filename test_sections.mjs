@@ -31,3 +31,17 @@ assert.deepStrictEqual(s.action.map((x) => x.id), ["a", "h"], "earliest deadline
 assert.deepStrictEqual(s.saved.map((x) => x.id), ["f"]);
 assert.strictEqual(s.all.length, 5);
 console.log("✓ Passed: notices land in stable sections; deadlines sorted by due date");
+
+// Old digest items store tags as a string or object (jsonb) — must not crash the board
+import { normalizeTags } from "./src/lib/sections.ts";
+assert.deepStrictEqual(normalizeTags("Academics, Events"), ["academics", "events"]);
+assert.deepStrictEqual(normalizeTags({ Hostel: 1 }), ["hostel"]);
+assert.deepStrictEqual(normalizeTags(null), []);
+const odd = [
+  { ...base, id: "s1", subject: "Hostel 16 water cut", tags: "Hostel / Campus Life" },
+  { ...base, id: "s2", subject: "Fest night", tags: { fest: true } },
+  { ...base, id: "s3", subject: "Weird", tags: 42, body: null, summary: null },
+];
+const so = buildSections(odd, mine, now);
+assert.strictEqual(so.all.length, 3, "all odd items still shown");
+console.log("✓ Passed: odd tag shapes never break the board");
