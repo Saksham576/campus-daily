@@ -29,7 +29,9 @@ const GROUPS = parseGroups(process.env.GROUPS);
 const MIN_MEMBERS = Number(process.env.MIN_MEMBERS || 50);
 const EXCLUDE = new RegExp(process.env.EXCLUDE || "family|orgies|organi[sz]|\\bcore\\b|\\bteam\\b|committee", "i");
 const ADMINS_ONLY = (process.env.ADMINS_ONLY || "true").toLowerCase() !== "false";
-const STATE_FILE = "state.json";
+// On a server, keep the WhatsApp session and timestamps on a persistent volume.
+const DATA_DIR = process.env.DATA_DIR || ".";
+const STATE_FILE = `${DATA_DIR}/state.json`;
 const FIRST_RUN_LOOKBACK_S = 12 * 3600;
 
 if (!SECRET) {
@@ -62,15 +64,18 @@ const BROWSER_CANDIDATES = [
   "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
   "/usr/bin/google-chrome",
+  "/usr/bin/chromium",
+  "/usr/bin/chromium-browser",
 ].filter(Boolean);
+const LINUX = process.platform === "linux";
 const executablePath = BROWSER_CANDIDATES.find((p) => existsSync(p));
 
 const client = new Client({
-  authStrategy: new LocalAuth({ dataPath: ".wwebjs_auth" }),
+  authStrategy: new LocalAuth({ dataPath: `${DATA_DIR}/.wwebjs_auth` }),
   // After a restart WhatsApp may think the old session is still open elsewhere; take over quietly.
   takeoverOnConflict: true,
   takeoverTimeoutMs: 0,
-  puppeteer: { headless: true, executablePath, timeout: 120000, args: ["--no-first-run", "--disable-extensions"] },
+  puppeteer: { headless: true, executablePath, timeout: 120000, args: ["--no-first-run", "--disable-extensions", ...(LINUX ? ["--no-sandbox", "--disable-dev-shm-usage"] : [])] },
 });
 
 /** chatId -> group name, for groups we read. */
@@ -175,13 +180,16 @@ async function catchUp(reason) {
   if (n) console.log(`Caught up ${n} message(s) (${reason}).`);
 }
 
+/** Latest login QR (only while not logged in), shown on Campus Daily's /admin page for remote scanning. */
+let pendingQr = null;
+
 async function heartbeat() {
   rollDay();
   try {
     await fetch(HEARTBEAT_URL, {
       method: "POST",
       headers: { "content-type": "application/json", "x-ingest-secret": SECRET },
-      body: JSON.stringify({ ...stats, groups: [...watched.values()] }),
+      body: JSON.stringify({ ...stats, groups: [...watched.values()], qr: pendingQr }),
     });
   } catch {}
   console.log(`${new Date().toLocaleTimeString()} · ${watched.size} groups · ${stats.seenToday} messages read today · ${stats.forwardedToday} sent to Campus Daily · skipped: ${stats.skippedShort} short/chit-chat, ${stats.skippedNotAdmin} not from admins`);
@@ -191,10 +199,15 @@ async function heartbeat() {
 client.on("qr", (qr) => {
   console.log("\nScan with your phone: WhatsApp > Settings > Linked devices > Link a device\n");
   qrcode.generate(qr, { small: true });
+  pendingQr = qr;
+  heartbeat(); // so /admin shows the fresh code right away
 });
 
 client.on("loading_screen", (pct, msg) => console.log(`Loading WhatsApp ${pct}% ${msg || ""}`));
-client.on("authenticated", () => console.log("Logged in to WhatsApp."));
+client.on("authenticated", () => {
+  pendingQr = null;
+  console.log("Logged in to WhatsApp.");
+});
 client.on("auth_failure", (m) => console.error("WhatsApp login failed — delete .wwebjs_auth and scan the QR again:", m));
 
 client.on("ready", async () => {
