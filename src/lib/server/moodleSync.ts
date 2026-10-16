@@ -74,7 +74,7 @@ function courseScore(code: string | null, high: number) {
 
 export async function syncMoodle(admin: SupabaseClient, deadlineMs: number) {
   const apiKey = process.env.GEMINI_API_KEY || "";
-  const stats = { connections: 0, courses: 0, notices: 0, files: 0, seatingPlans: 0, errors: [] as string[] };
+  const stats = { connections: 0, courses: 0, notices: 0, files: 0, seatingPlans: 0, deadlines: 0, errors: [] as string[] };
   const { data: conns } = await admin.from("moodle_connections").select("user_id, moodle_userid, token_enc").order("last_sync_at", { ascending: true, nullsFirst: true });
   const doneCourses = new Set<number>(); // each course once per run, whoever is connected
   let pdfs = 0;
@@ -111,6 +111,29 @@ export async function syncMoodle(admin: SupabaseClient, deadlineMs: number) {
       if (enrolments.length) {
         await admin.from("moodle_enrolments").delete().eq("user_id", c.user_id).not("course_id", "in", `(${enrolments.map((e) => e.course_id).join(",")})`);
         await admin.from("moodle_enrolments").upsert(enrolments);
+      }
+
+      // This student's own upcoming deadlines (what Moodle's Timeline shows). Submitted ones drop off.
+      const timeline = await moodleCall<any>(token, "core_calendar_get_action_events_by_timesort", {
+        timesortfrom: now - 86400,
+        timesortto: now + 45 * 86400,
+        limitnum: 50,
+      }).catch(() => null);
+      if (timeline?.events) {
+        const rows = (timeline.events as any[]).map((e) => ({
+          user_id: c.user_id,
+          event_id: e.id,
+          course_code: e.course?.shortname ? courseCodeFromShortname(e.course.shortname) : null,
+          course_name: e.course?.fullname ? htmlToText(e.course.fullname).trim() : null,
+          name: htmlToText(e.activityname || e.name || "").trim() || "Moodle task",
+          kind: e.modulename || null,
+          due_at: new Date((e.timesort || e.timestart) * 1000).toISOString(),
+          url: e.action?.url || e.url || null,
+          updated_at: new Date().toISOString(),
+        }));
+        await admin.from("moodle_deadlines").delete().eq("user_id", c.user_id);
+        if (rows.length) await admin.from("moodle_deadlines").insert(rows);
+        stats.deadlines += rows.length;
       }
 
       for (const course of courses) {
