@@ -1,4 +1,4 @@
-import { extractEventDetails } from "./events.ts";
+import { extractEventDetails, POSTED_LINE_RE } from "./events.ts";
 import { formatCourseCode } from "./timetable/slots.ts";
 
 export type SectionKey = "action" | "exams" | "courses" | "events" | "opportunities" | "campus" | "saved" | "all";
@@ -44,7 +44,8 @@ const CAMPUS_RE = /\b(hostel|mess|h\d{1,2}\b|gymkhana|council|lost|found|sports|
 
 const EXAM_RE = /\b(quiz(?:zes)?|exams?|mid-?sems?|end-?sems?|tests?|viva|re-?exam|make-?up quiz)\b/i;
 // Follow-ups about a past assessment belong with the course, not in upcoming exams.
-const EXAM_AFTERMATH_RE = /\b(solutions?|answer\s*key|results?|marks|grades?|graded|uploaded|feedback|re-?evaluation|crib)\b/i;
+const EXAM_AFTERMATH_RE =
+  /\b(solutions?|answer\s*(?:keys?|sheets?|scripts?|books?)|answersheets?|results?|marks|grades?|graded|uploaded|released|feedback|re-?evaluation|crib|syllabus|papers?|are over|is over|celebrat\w*|night|party)\b/i;
 
 const COURSE_RE = /\b([A-Z]{2,3})\s?-?(\d{3}[A-Z]?)\b/g;
 
@@ -136,13 +137,16 @@ ${item.body || ""}`, now) : null) ||
   }
 
   // Quizzes, exams and tests: their own section, soonest first, gone once they're over.
-  if (EXAM_RE.test(item.subject) && !EXAM_AFTERMATH_RE.test(item.subject)) {
-    if (ev && new Date(ev.start_time).getTime() < now.getTime() - 3 * 3600_000) return null;
-    return { ...item, section: "exams", when: ev?.start_time || null, myCourse };
-  }
-  if (ev && (ev.slot_type === "quiz" || ev.slot_type === "exam") && !EXAM_AFTERMATH_RE.test(item.subject)) {
-    if (new Date(ev.start_time).getTime() < now.getTime() - 3 * 3600_000) return null;
-    return { ...item, section: "exams", when: ev.start_time, myCourse };
+  // Only notices about an upcoming, dated assessment qualify; everything else stays with the course.
+  const looksLikeExam = (EXAM_RE.test(item.subject) || ev?.slot_type === "quiz" || ev?.slot_type === "exam") && !EXAM_AFTERMATH_RE.test(item.subject);
+  if (looksLikeExam) {
+    // The event parser falls back to "today" when no date is written, so insist on a real date.
+    const written = parseDueDate(`${item.subject}\n${(item.body || "").replace(POSTED_LINE_RE, " ")}`, now);
+    const examAt = written ? ev?.start_time || written : null;
+    if (examAt) {
+      if (new Date(examAt).getTime() < now.getTime() - 3 * 3600_000) return null; // over
+      return { ...item, section: "exams", when: examAt, myCourse };
+    }
   }
 
   if (myCourse || item.source === "moodle" || item.is_verified) {

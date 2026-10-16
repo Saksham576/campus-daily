@@ -55,3 +55,20 @@ assert.strictEqual(placeItem(sol, mine, now).section !== "exams", true);
 const se = buildSections([q2, q1, sol], mine, now);
 assert.deepStrictEqual(se.exams.map((x) => x.id), ["q1", "q2"]);
 console.log("✓ Passed: exams & quizzes section");
+
+// Real notices that wrongly showed under Exams: follow-ups, celebrations, undated, past
+const wrong = [
+  "CS 105-2026-1-D3: Midsem answersheets and crib session TONIGHT",
+  "[Bodhitree] Theory Quiz 2 Paper and Solutions Uploaded",
+  "MA 105- midsem exam answer script released",
+  "[S.Events] Mid-Sems Are Over, Now Come Celebrate! PG Night",
+  "[Bodhitree] Syllabus for theory quiz 2",
+  "MA 105 Quiz 4 announced", // no date yet
+];
+for (const s of wrong) {
+  const p = placeItem({ ...base, id: s, subject: s, body: "by Prof X - Thursday, 15 October 2026, 2:34 PM\nSee attached." }, mine, now);
+  assert.strictEqual(p?.section === "exams", false, s);
+}
+const past = { ...base, id: "p", subject: "MA 105 Quiz 1 on 1 October 2026", body: "2 PM" };
+assert.strictEqual(placeItem(past, mine, now), null, "past quiz is gone");
+console.log("✓ Passed: only upcoming, dated assessments appear under Exams");
