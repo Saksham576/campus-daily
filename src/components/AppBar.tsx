@@ -19,6 +19,7 @@ export function AppBar() {
   const nav = [
     { href: "/", label: "Home", icon: <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" /> },
     { href: "/schedule", label: "Timetable", icon: <><rect x="3" y="4.5" width="18" height="16.5" rx="2" /><path d="M3 9.5h18M8 2.5v4M16 2.5v4" /></> },
+    { href: "/library", label: "Library", icon: <><path d="M4 19.5V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2.5z" /><path d="M8 7h7M8 11h5" /></> },
     {
       href: "/settings",
       label: "Settings",
