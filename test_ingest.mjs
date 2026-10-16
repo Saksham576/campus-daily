@@ -117,6 +117,8 @@ console.log("✓ Passed: ingest auth, parsing, score validation, row mapping and
 import { privateMailReason } from "./src/lib/ingest.ts";
 assert.strictEqual(privateMailReason({ from: "Campus Daily <signin@campusdaily.nexuspulsetech.com>", subject: "123456 is your Campus Daily code" }), "auth sender");
 assert.strictEqual(privateMailReason({ from: "Supabase Auth <noreply@mail.app.supabase.io>", subject: "Your sign-in link" }), "auth sender");
+assert.notStrictEqual(privateMailReason({ from: "IITB SSO <noreply-cc@iitb.ac.in>", subject: "New LDAP login to SSO" }), null, "SSO login alerts are personal");
+assert.notStrictEqual(privateMailReason({ from: "Someone <x@iitb.ac.in>", subject: "Security alert: new sign-in" }), null);
 assert.strictEqual(privateMailReason({ from: "it@iitb.ac.in", subject: "Your OTP for SSO" }), "auth subject");
 assert.strictEqual(privateMailReason({ from: "cbssbi.cas@alerts.sbi.co.in", subject: "E-account statement" }), "not IITB");
 assert.strictEqual(privateMailReason({ from: '"Bharat Adsul (via IITB Moodle)" <noreply@moodle.iitb.ac.in>', subject: "CS 105: Midsem solutions" }), null);

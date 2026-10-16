@@ -26,6 +26,8 @@ export type SectionItem = {
   score?: number | null;
   status?: string | null;
   is_verified?: boolean | null;
+  sender?: string | null;
+  from_address?: string | null;
 };
 
 export type Placed<T> = T & {
@@ -45,7 +47,7 @@ const CAMPUS_RE = /\b(hostel|mess|h\d{1,2}\b|gymkhana|council|lost|found|sports|
 const EXAM_RE = /\b(quiz(?:zes)?|exams?|mid-?sems?|end-?sems?|tests?|viva|re-?exam|make-?up quiz)\b/i;
 // Follow-ups about a past assessment belong with the course, not in upcoming exams.
 const EXAM_AFTERMATH_RE =
-  /\b(solutions?|answer\s*(?:keys?|sheets?|scripts?|books?)|answersheets?|results?|marks|grades?|graded|uploaded|released|feedback|re-?evaluation|crib|syllabus|papers?|are over|is over|celebrat\w*|night|party)\b/i;
+  /\b(solutions?|answer\s*(?:keys?|sheets?|scripts?|books?)|answersheets?|results?|marks|grades?|graded|uploaded|released|feedback|re-?evaluation|crib|papers?|are over|is over|celebrat\w*|night|party)\b/i;
 
 const COURSE_RE = /\b([A-Z]{2,3})\s?-?(\d{3}[A-Z]?)\b/g;
 
@@ -95,12 +97,17 @@ export function parseDueDate(text: string, now = new Date()): string | null {
   return new Date(`${year}-${pad(month + 1)}-${pad(day)}T${pad(hh)}:${pad(mm)}:00+05:30`).toISOString();
 }
 
+function courseCodes(text: string): string[] {
+  // Bodhitree writes "CS101A26" (course + offering): read it as CS 101.
+  return Array.from(text.replace(/\b([A-Z]{2,3}\d{3})[A-Z]\d{2}\b/g, "$1 ").matchAll(COURSE_RE), (m) => formatCourseCode(`${m[1]}${m[2]}`));
+}
+
+function firstCourseCode(text: string): string | null {
+  return courseCodes(text)[0] || null;
+}
+
 function myCourseIn(text: string, myCourses: Set<string>): string | null {
-  for (const m of text.matchAll(COURSE_RE)) {
-    const code = formatCourseCode(`${m[1]}${m[2]}`);
-    if (myCourses.has(code)) return code;
-  }
-  return null;
+  return courseCodes(text).find((c) => myCourses.has(c)) || null;
 }
 
 /**
@@ -127,6 +134,12 @@ ${item.body || ""}`, now) : null) ||
     (ev && ev.slot_type === "deadline" ? ev.start_time : null);
 
   if (item.status === "done") return null;
+
+  // Course mail for a course you don't take, and students' doubt-forum chatter, aren't for your board.
+  const courseMail = item.source === "moodle" || /moodle|bodhitree/i.test(item.sender || item.from_address || "") || /^\s*[A-Z]{2,3}\s?-?\d{3}\b/.test(item.subject);
+  const subjectCode = firstCourseCode(item.subject);
+  if (courseMail && subjectCode && myCourses.size > 0 && !myCourses.has(subjectCode)) return null;
+  if (/->\s*Doubt Forum\s*->/i.test(item.body || "")) return null;
   if (deadline && ACTION_RE.test(text)) {
     if (new Date(deadline).getTime() < now.getTime() - 3600_000) return null; // expired
     return { ...item, section: "action", when: deadline, myCourse };
@@ -139,12 +152,13 @@ ${item.body || ""}`, now) : null) ||
   // Quizzes, exams and tests: their own section, soonest first, gone once they're over.
   // Only notices about an upcoming, dated assessment qualify; everything else stays with the course.
   const looksLikeExam = (EXAM_RE.test(item.subject) || ev?.slot_type === "quiz" || ev?.slot_type === "exam") && !EXAM_AFTERMATH_RE.test(item.subject);
-  if (looksLikeExam) {
+  // Only your own courses' assessments: club quizzes (Heisenberg, Astromania…) are events.
+  if (looksLikeExam && myCourseIn(item.subject, myCourses)) {
     // The event parser falls back to "today" when no date is written, so insist on a real date.
     const written = parseDueDate(`${item.subject}\n${(item.body || "").replace(POSTED_LINE_RE, " ")}`, now);
     const examAt = written ? ev?.start_time || written : null;
-    if (examAt) {
-      if (new Date(examAt).getTime() < now.getTime() - 3 * 3600_000) return null; // over
+    // Once it's over, the notice stays with the course instead.
+    if (examAt && new Date(examAt).getTime() >= now.getTime() - 3 * 3600_000) {
       return { ...item, section: "exams", when: examAt, myCourse };
     }
   }
