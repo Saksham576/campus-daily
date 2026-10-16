@@ -1387,3 +1387,262 @@ input[type="radio"] {
   font-size: 14px;
   color: var(--muted);
 }
+
+/* ---------- v3 polish: search chips, source labels, overflow menu, board legibility ---------- */
+
+.search {
+  position: relative;
+  align-items: center;
+}
+.search-ico {
+  position: absolute;
+  left: 13px;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  color: var(--faint);
+  pointer-events: none;
+}
+.search input[type="search"] {
+  flex: 1;
+  min-width: 0;
+  padding-left: 36px;
+}
+.search-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+  font: 600 13px/1 var(--font-sans);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.search-chip .count {
+  font-size: 11px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+.search-chip:hover {
+  color: var(--ink);
+  border-color: var(--rule-strong);
+}
+.search-chip.active {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+/* Source label: where a notice came from, in place of raw email addresses */
+.meta .src {
+  font: 600 12px/1.2 var(--font-sans);
+  color: var(--ink-2);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.meta .src + .from::before {
+  content: "·";
+  margin-right: 8px;
+  color: var(--faint);
+}
+.meta .src-whatsapp {
+  color: var(--green);
+}
+.meta .src-moodle {
+  color: var(--blue);
+}
+
+.ticket h3 {
+  text-wrap: pretty;
+}
+
+/* Save / Hide as quiet buttons; "⋯" holds the rarely used options */
+.ticket-actions .ghost.on {
+  color: var(--ink);
+  border-color: var(--rule-strong);
+  background: var(--surface-2);
+}
+.more {
+  position: relative;
+  margin-left: auto;
+}
+.more > summary {
+  list-style: none;
+  cursor: pointer;
+  width: 34px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  user-select: none;
+}
+.more > summary::-webkit-details-marker {
+  display: none;
+}
+.more > summary::marker {
+  content: "";
+}
+.more > summary:hover,
+.more[open] > summary {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.more-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 20;
+  min-width: 220px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+.more-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+  padding: 9px 10px;
+  border-radius: 6px;
+  font: 500 13px/1.3 var(--font-sans);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.more-menu button:hover {
+  background: var(--surface-2);
+  color: var(--red);
+}
+
+/* Board: finished classes stay legible, venues never wrap */
+.board-row.past {
+  opacity: 0.42;
+}
+.status.done {
+  color: #8d877a;
+  text-shadow: none;
+}
+.board-row .v {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.board-row.now {
+  background: linear-gradient(90deg, #33e27a14, transparent 70%);
+  margin: 0 -18px;
+  padding-left: 18px;
+  padding-right: 18px;
+}
+
+@media (max-width: 640px) {
+  .search-chip {
+    padding: 0 10px;
+  }
+  .search-chip .count {
+    display: none;
+  }
+}
+
+.brief {
+  margin-top: 8px;
+  font: 500 14px/1.5 var(--font-sans);
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.brief b {
+  color: var(--ink);
+  font-weight: 650;
+}
+.brief-due {
+  color: var(--red);
+  font-weight: 650;
+}
+.brief-sep {
+  color: var(--faint);
+  margin: 0 2px;
+}
+
+.btn-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font: 600 13px/1 var(--font-sans);
+  color: var(--muted);
+  text-decoration: none;
+}
+.btn-link:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+
+/* Nav icons: hidden on desktop; on phones the nav becomes a bottom tab bar */
+.appnav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.nav-ico {
+  display: none;
+}
+@media (max-width: 640px) {
+  .appnav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--rule);
+  }
+  .appnav a {
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    padding: 6px 0;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 10px;
+  }
+  .appnav a.active {
+    background: var(--surface-2);
+  }
+  .nav-ico {
+    display: block;
+  }
+  .wrap {
+    padding-bottom: calc(110px + env(safe-area-inset-bottom));
+  }
+}
+@media (max-width: 640px) {
+  /* backdrop-filter would trap the fixed bottom nav inside the header */
+  .appbar {
+    backdrop-filter: none;
+    background: var(--bg);
+  }
+}
+@media (max-width: 640px) {
+  .platforms {
+    mask-image: linear-gradient(90deg, #000 85%, transparent);
+    top: 52px;
+  }
+}

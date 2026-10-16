@@ -8,6 +8,7 @@ import {
   getGoogleCalendarUrl,
   type ExtractedEvent,
 } from "@/lib/events";
+import { cleanSubject, senderName, sourceLabel } from "@/lib/display";
 
 export type FeedItem = {
   id: string;
@@ -49,6 +50,17 @@ function formatHost(u: string): string {
   } catch {
     return u.slice(0, 30);
   }
+}
+
+/** "2h ago" / "Yesterday" / "12 Oct" */
+function ago(iso?: string | null): string {
+  if (!iso) return "";
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  if (mins < 24 * 60) return `${Math.round(mins / 60)}h ago`;
+  if (mins < 48 * 60) return "Yesterday";
+  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
 }
 
 function formatDate(isoDate?: string | null): string {
@@ -229,7 +241,7 @@ export function ItemCard({
   if (muted) {
     return (
       <div className="card removed">
-        <span>Hidden. You won&apos;t see notices from {item.from_address} again.</span>
+        <span>Hidden. You won&apos;t see notices from {senderName(item.from_address)} again.</span>
       </div>
     );
   }
@@ -269,22 +281,26 @@ export function ItemCard({
 
       <div className="ticket-main">
         <div className="meta">
+          <span className={`src src-${item.source || "mail"}`} title={item.from_address || ""}>
+            {sourceLabel(item)}
+          </span>
+          {item.received_at && (
+            <time className="from" dateTime={item.received_at} title={formatDate(item.received_at)}>
+              {ago(item.received_at)}
+            </time>
+          )}
           {item.is_verified && <span className="tag verified">✓ Instructor</span>}
-          {item.source === "whatsapp" && <span className="tag wa">WhatsApp</span>}
-          {item.source === "moodle" && <span className="tag personal">Moodle</span>}
           {item.score >= 8 && <span className="tag high">Priority</span>}
           {event?.is_cancelled && <span className="tag event high">Class cancelled</span>}
-          {item.from_address && <span className="from">{item.from_address}</span>}
-          {item.received_at && <span className="from">{formatDate(item.received_at)}</span>}
         </div>
 
-        <h3>{item.subject}</h3>
+        <h3 title={item.subject}>{cleanSubject(item.subject)}</h3>
         {item.summary && <p className="summary">{item.summary}</p>}
 
-        {event && (
+        {event && sec !== "action" && sec !== "opportunities" && sec !== "campus" && (
           <div className="event-banner">
             <div>
-              <strong>{event.title}</strong>
+              <strong>{cleanSubject(event.title)}</strong>
               {event.location && <span> · {event.location}</span>}
               <span> · {formatDate(event.start_time)}</span>
             </div>
@@ -306,9 +322,9 @@ export function ItemCard({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => logInteraction("add_to_calendar")}
-                className="small mono"
+                className="btn-link"
               >
-                Google Cal ↗
+                Google Calendar ↗
               </a>
             </div>
           </div>
@@ -339,16 +355,23 @@ export function ItemCard({
               ✓ Done
             </button>
           )}
-          <button onClick={() => updateItemStatus(status === "kept" ? "new" : "kept")}>
+          <button
+            className={`ghost ${status === "kept" ? "on" : ""}`}
+            onClick={() => updateItemStatus(status === "kept" ? "new" : "kept")}
+            aria-pressed={status === "kept"}
+          >
             {status === "kept" ? "★ Saved" : "☆ Save"}
           </button>
           <button className="ghost" onClick={() => updateItemStatus("removed")}>
             Hide
           </button>
           {item.from_address && (
-            <button className="link" onClick={muteSender} style={{ marginLeft: "auto" }}>
-              Not interested in this sender
-            </button>
+            <details className="more">
+              <summary aria-label="More options">⋯</summary>
+              <div className="more-menu">
+                <button onClick={muteSender}>Stop showing {senderName(item.from_address) || "this sender"}</button>
+              </div>
+            </details>
           )}
         </div>
       </div>

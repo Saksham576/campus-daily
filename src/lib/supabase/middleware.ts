@@ -80,7 +80,8 @@ export async function updateSession(req: NextRequest) {
     path.startsWith("/login") ||
     path.startsWith("/auth") ||
     path.startsWith("/privacy") ||
-    path.startsWith("/verify-email");
+    path.startsWith("/verify-email") ||
+    (process.env.NODE_ENV !== "production" && path.startsWith("/preview"));
 
   // Helper to attach all current cookies to any redirect response
   function redirectWithCookies(targetUrl: URL) {

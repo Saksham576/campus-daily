@@ -6,6 +6,7 @@ import { type Sponsored } from "@/components/SponsoredCard";
 import { AppBar } from "@/components/AppBar";
 import { DayBoard, type BoardRow } from "@/components/DayBoard";
 import { FeedView } from "@/components/FeedView";
+import { HomeHead } from "@/components/HomeHead";
 import { buildSections } from "@/lib/sections";
 import { buildWeek, formatCourseCode, type UserCourse } from "@/lib/timetable/slots";
 import { applyCourseUpdates, istDate, withPersonalOverrides, type CourseUpdate } from "@/lib/timetable/updates";
@@ -27,7 +28,7 @@ function boardFor(courses: UserCourse[], updates: CourseUpdate[], saved: any[], 
       ),
       saved
     ).filter((s) => istDate(s.start_time) === date);
-    const remaining = offset === 0 ? week.filter((s) => new Date(s.end_time || s.start_time).getTime() > now.getTime() - 2 * 3600_000) : week;
+    const remaining = offset === 0 ? week.filter((s) => new Date(s.end_time || s.start_time).getTime() > now.getTime() - 15 * 60_000) : week;
     if (week.length > 0 && (offset > 0 || remaining.length > 0)) {
       const label =
         offset === 0
@@ -108,19 +109,12 @@ export default async function HomePage() {
     await supabase.from("subscribers").update({ last_seen_at: now.toISOString() }).eq("email", (user.email || "").toLowerCase());
   }
 
-  const first = (profile?.name || "").split(" ")[0];
-  const dateLine = now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Kolkata" });
 
   return (
     <>
       <AppBar />
       <main className="wrap">
-        <div className="page-head">
-          <div>
-            <p className="eyebrow">{dateLine}</p>
-            <h1>{first ? `Morning, ${first}` : "Your board"}</h1>
-          </div>
-        </div>
+        <HomeHead name={profile?.name} now={now} action={sections.action} exams={sections.exams} />
 
         {feedRes.error && <p className="err">Could not load notices: {feedRes.error.message}</p>}
 
