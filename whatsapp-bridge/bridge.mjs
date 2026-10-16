@@ -48,9 +48,9 @@ const saveState = () => {
   } catch {}
 };
 
-const stats = { day: new Date().toDateString(), seenToday: 0, forwardedToday: 0, caughtUp: 0, startedAt: new Date().toISOString(), lastMessageAt: null };
+const stats = { day: new Date().toDateString(), seenToday: 0, forwardedToday: 0, caughtUp: 0, skippedShort: 0, skippedNotAdmin: 0, startedAt: new Date().toISOString(), lastMessageAt: null };
 const rollDay = () => {
-  if (stats.day !== new Date().toDateString()) Object.assign(stats, { day: new Date().toDateString(), seenToday: 0, forwardedToday: 0, caughtUp: 0 });
+  if (stats.day !== new Date().toDateString()) Object.assign(stats, { day: new Date().toDateString(), seenToday: 0, forwardedToday: 0, caughtUp: 0, skippedShort: 0, skippedNotAdmin: 0 });
 };
 const handledIds = new Set();
 
@@ -67,6 +67,9 @@ const executablePath = BROWSER_CANDIDATES.find((p) => existsSync(p));
 
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: ".wwebjs_auth" }),
+  // After a restart WhatsApp may think the old session is still open elsewhere; take over quietly.
+  takeoverOnConflict: true,
+  takeoverTimeoutMs: 0,
   puppeteer: { headless: true, executablePath, timeout: 120000, args: ["--no-first-run", "--disable-extensions"] },
 });
 
@@ -105,11 +108,22 @@ async function send(payload, attempt = 1) {
   }
 }
 
+/** Admin check that copes with WhatsApp's hidden-number ids (@lid) as well as phone ids (@c.us). */
 async function isFromAdmin(msg, chat) {
   if (!ADMINS_ONLY) return true;
-  const author = msg.author || msg.from;
-  const p = (chat.participants || []).find((x) => x.id?._serialized === author);
-  return Boolean(p && (p.isAdmin || p.isSuperAdmin));
+  // "Only admins can send messages" groups (incl. community announcements): every post is an admin's.
+  if (chat.groupMetadata?.announce) return true;
+  const parts = chat.participants || chat.groupMetadata?.participants || [];
+  const admins = parts.filter((p) => p.isAdmin || p.isSuperAdmin);
+  const ids = new Set();
+  const author = msg.author || msg.from || "";
+  ids.add(author);
+  ids.add(author.split("@")[0]);
+  const contact = await msg.getContact().catch(() => null);
+  if (contact?.id?._serialized) ids.add(contact.id._serialized);
+  if (contact?.id?.user) ids.add(contact.id.user);
+  if (contact?.number) ids.add(contact.number);
+  return admins.some((p) => ids.has(p.id?._serialized) || ids.has(p.id?.user) || (p.lid && (ids.has(p.lid._serialized) || ids.has(p.lid.user))));
 }
 
 async function handle(msg, chat) {
@@ -122,8 +136,14 @@ async function handle(msg, chat) {
   stats.lastMessageAt = new Date((msg.timestamp || Date.now() / 1000) * 1000).toISOString();
   const key = chat.id._serialized;
   state.lastTs[key] = Math.max(state.lastTs[key] || 0, msg.timestamp || 0);
-  if (!isRelevant(msg.body)) return;
-  if (!(await isFromAdmin(msg, chat))) return;
+  if (!isRelevant(msg.body)) {
+    stats.skippedShort++;
+    return;
+  }
+  if (!(await isFromAdmin(msg, chat))) {
+    stats.skippedNotAdmin++;
+    return;
+  }
   await send(toIngestPayload({ id, group: chat.name, body: msg.body, timestamp: msg.timestamp }));
 }
 
@@ -164,7 +184,7 @@ async function heartbeat() {
       body: JSON.stringify({ ...stats, groups: [...watched.values()] }),
     });
   } catch {}
-  console.log(`${new Date().toLocaleTimeString()} · ${watched.size} groups · ${stats.seenToday} messages read today · ${stats.forwardedToday} sent to Campus Daily`);
+  console.log(`${new Date().toLocaleTimeString()} · ${watched.size} groups · ${stats.seenToday} messages read today · ${stats.forwardedToday} sent to Campus Daily · skipped: ${stats.skippedShort} short/chit-chat, ${stats.skippedNotAdmin} not from admins`);
 }
 
 // ---------- wiring ----------
@@ -172,6 +192,10 @@ client.on("qr", (qr) => {
   console.log("\nScan with your phone: WhatsApp > Settings > Linked devices > Link a device\n");
   qrcode.generate(qr, { small: true });
 });
+
+client.on("loading_screen", (pct, msg) => console.log(`Loading WhatsApp ${pct}% ${msg || ""}`));
+client.on("authenticated", () => console.log("Logged in to WhatsApp."));
+client.on("auth_failure", (m) => console.error("WhatsApp login failed — delete .wwebjs_auth and scan the QR again:", m));
 
 client.on("ready", async () => {
   await refreshWatched();
@@ -211,4 +235,5 @@ setInterval(() => watched.size && catchUp("periodic"), 20 * 60_000);
 setInterval(heartbeat, 10 * 60_000);
 setInterval(refreshWatched, 6 * 3600_000);
 
-client.initialize();
+console.log(`Starting bridge (browser: ${executablePath || "bundled"})…`);
+client.initialize().catch((e) => console.error("Could not start WhatsApp:", e?.message || e));
