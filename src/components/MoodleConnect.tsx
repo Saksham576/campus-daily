@@ -1,18 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 type Conn = { moodle_fullname: string | null; connected_at: string; last_sync_at: string | null; last_error: string | null };
 
 /**
  * IITB Moodle signs in only through IIT Bombay SSO in a real browser, and students can't see
- * Moodle's "Security keys" page. So connecting is done by the small Campus Daily PC helper,
- * which opens Moodle's own app-login page, lets you sign in with SSO, and saves the app key.
+ * Moodle's "Security keys" page. The Campus Daily Connect extension catches the key Moodle hands
+ * its own app after SSO; the PC helper is the fallback.
  */
 export function MoodleConnect() {
   const [conn, setConn] = useState<Conn | null | undefined>(undefined);
   const [msg, setMsg] = useState<string | null>(null);
+  const [hasExt, setHasExt] = useState(false);
+  const [waiting, setWaiting] = useState(false);
+  const poll = useRef<ReturnType<typeof setInterval> | null>(null);
 
   async function load() {
     const { data } = await createClient()
@@ -20,10 +23,37 @@ export function MoodleConnect() {
       .select("moodle_fullname, connected_at, last_sync_at, last_error")
       .maybeSingle();
     setConn((data as Conn) || null);
+    return data;
   }
+
   useEffect(() => {
     load();
+    // The extension marks the page (content script runs at document_start).
+    setHasExt(document.documentElement.dataset.cdConnect === "1");
+    const m = new URLSearchParams(window.location.search).get("moodle");
+    if (m) setMsg(m);
+    return () => {
+      if (poll.current) clearInterval(poll.current);
+    };
   }, []);
+
+  async function connect() {
+    setMsg(null);
+    const res = await fetch("/api/moodle/connect-start", { method: "POST" });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || !j.url) return setMsg(j.error || "Couldn't start. Try again.");
+    window.open(j.url, "_blank", "noopener");
+    setWaiting(true);
+    let tries = 0;
+    poll.current = setInterval(async () => {
+      tries++;
+      const d = await load();
+      if (d || tries > 100) {
+        if (poll.current) clearInterval(poll.current);
+        setWaiting(false);
+      }
+    }, 3000);
+  }
 
   async function disconnect() {
     await createClient().from("moodle_connections").delete().neq("user_id", "00000000-0000-0000-0000-000000000000");
@@ -51,33 +81,46 @@ export function MoodleConnect() {
             Disconnect
           </button>
         </div>
+        {msg && <p className="note">{msg}</p>}
       </div>
     );
   }
 
   return (
     <div>
-      <p className="help" style={{ marginBottom: 8 }}>
-        IIT Bombay Moodle only lets apps sign in through the IITB SSO page, so connecting happens on a computer with the Campus Daily helper:
-      </p>
-      <ol className="steps">
-        <li>
-          On the PC with Campus Daily&apos;s helper, open the <b>whatsapp-bridge</b> folder and double-click <b>Connect Moodle</b>.
-        </li>
-        <li>A Moodle window opens — sign in with IIT Bombay SSO as usual.</li>
-        <li>The window closes by itself and this page shows &quot;Connected&quot;.</li>
-      </ol>
-      <button
-        type="button"
-        style={{ marginTop: 12 }}
-        onClick={async () => {
-          setMsg("Checking…");
-          await load();
-          setMsg("Not connected yet. Run Connect Moodle on the PC, sign in, wait for the window to close, then check again.");
-        }}
-      >
-        I&apos;ve done it — check again
-      </button>
+      {hasExt ? (
+        <>
+          <p className="help" style={{ marginBottom: 10 }}>
+            Moodle opens in a new tab. Sign in with IIT Bombay SSO as usual — the tab comes back here when it&apos;s done.
+          </p>
+          <button type="button" className="primary" onClick={connect} disabled={waiting}>
+            {waiting ? "Waiting for Moodle sign-in…" : "Connect Moodle"}
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="help" style={{ marginBottom: 8 }}>
+            IIT Bombay Moodle only lets apps sign in through the IITB SSO page, so connecting needs the small Campus Daily Connect
+            extension (Chrome, Edge or Brave on a laptop — about a minute, once):
+          </p>
+          <ol className="steps">
+            <li>
+              <a href="/campus-daily-connect.zip" download>
+                Download the extension
+              </a>{" "}
+              and unzip it.
+            </li>
+            <li>
+              Open <code>chrome://extensions</code>, switch on <b>Developer mode</b> (top right), click <b>Load unpacked</b> and pick the
+              unzipped folder.
+            </li>
+            <li>Reload this page — a one-click Connect Moodle button appears here.</li>
+          </ol>
+          <p className="help" style={{ marginTop: 8 }}>
+            The extension only watches Moodle&apos;s app-login page. Your password stays on IITB&apos;s sign-in page.
+          </p>
+        </>
+      )}
       {msg && <p className="note">{msg}</p>}
     </div>
   );
