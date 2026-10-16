@@ -284,3 +284,17 @@ SUPABASE_ACCESS_TOKEN=<your_supabase_management_access_token>
 | `https://campusdaily.nexuspulsetech.com/schedule` | `GET` | Yes | Weekly Monday–Friday timetable, cancellation strikethrough, Moodle sync, and full semester `.ics` export. |
 | `https://campusdaily.nexuspulsetech.com/settings` | `GET` | Yes | Edit department, year, division, HASMED, hostel, categories, keywords, Moodle iCal URL, and delivery preference. |
 | `https://campusdaily.nexuspulsetech.com/api/sync/moodle` | `POST` | Yes | Parses Moodle private iCal stream and inserts new deadlines into `user_schedules`. |
+
+---
+
+## 9. October 16, 2026 Update
+
+- **Feed sections** (`src/lib/sections.ts`): Action needed (pinned until *Done* or expiry, by due date) · My courses · Events (by start time, past events drop) · Opportunities · Campus life · Saved · Everything, plus search and "Not interested in this sender" (`subscribers.muted_senders`).
+- **Design**: "departure board" system in `src/app/globals.css` (Big Shoulders / IBM Plex Sans / IBM Plex Mono), live day board with split-flap countdown (`DayBoard`), ticket notice cards (`ItemCard`), Settings as numbered panels with an index rail.
+- **Real timetable**: IITB slot chart + autumn-2026 course data from ResoBin (`src/lib/timetable/slots.ts`, `catalog.ts`); students' courses in `user_courses` (Settings → My courses). The old placeholder division timetable was removed.
+- **Moodle reader**: Settings → Connect Moodle (password used once; only the AES-GCM-encrypted app token is stored, key `MOODLE_TOKEN_KEY`). `/api/cron/moodle` runs every 30 min via GitHub Actions (`.github/workflows/moodle-sync.yml`, secrets `CRON_SECRET`, `APP_URL`). New announcements and files go to students in that course; seating-plan PDFs are read by Gemini into `seat_assignments`, and each student sees only their own seat (RLS).
+- **Live calendar**: `/api/calendar/<token>.ics` (Settings → Alerts & calendar) for Google/Apple Calendar, with cancellations applied.
+- **WhatsApp bridge**: reads every group with 50+ members (excluding family/organiser-team names) and only forwards admin posts. It catches up after sleep or restart (`state.json` stores timestamps only) and reports counts to `/admin` → Sources.
+- **Email ingestion**: `campusdaily.ingest@gmail.com` + `apps-script/Ingest.gs` (Google-identity auth), checked every 10 min. Sign-in codes and non-IITB mail are never published (`privateMailReason` + DB trigger, migration 0009). The legacy Apps Script push is disabled (migration 0007).
+- **Sign-in**: Campus Daily sends its own code email via Resend (`/api/auth/send-code`), with separate Log in / Sign up tabs and a scanner-safe `/auth/confirm` link.
+- Migrations applied through **0013**.
