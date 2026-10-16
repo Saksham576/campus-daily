@@ -114,7 +114,7 @@ export async function syncMoodle(admin: SupabaseClient, deadlineMs: number) {
             if (already.has(keys[i])) continue;
             const modified = d.modified || d.timemodified || d.created || 0;
             if (!(firstSync && now - modified > FIRST_SYNC_WINDOW_S)) {
-              const subject = `${course.shortname}: ${d.subject || d.name}`;
+              const subject = htmlToText(`${course.shortname}: ${d.subject || d.name}`).trim();
               // Skip if the same announcement already arrived by email.
               const { count } = await admin.from("items").select("id", { count: "exact", head: true }).eq("subject", subject).gte("received_at", new Date(Date.now() - 14 * 86400_000).toISOString());
               if (!count) {
