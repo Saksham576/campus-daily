@@ -26,10 +26,9 @@ export function AppBar() {
     <header className="appbar">
       <div className="appbar-in">
         <Link href="/" className="brand" aria-label="Campus Daily home">
-          <span className="brand-mark">
-            Campus<b>·</b>Daily
-          </span>
-          <span className="brand-sub">IIT BOMBAY</span>
+          <span className="brand-deva" lang="hi">कैंपस डेली</span>
+          <span className="brand-mark">Campus Daily</span>
+          <span className="brand-sub">IIT Bombay · Powai</span>
         </Link>
         <nav className="appnav" aria-label="Main">
           {nav.map((n) => (

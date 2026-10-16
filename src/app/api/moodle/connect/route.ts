@@ -2,14 +2,15 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/server/admin";
 import { encryptSecret } from "@/lib/server/crypto";
-import { moodleLogin, moodleCall } from "@/lib/moodle";
+import { moodleCall } from "@/lib/moodle";
 
 export const runtime = "nodejs";
 
 /**
- * POST /api/moodle/connect { username, password }
- * Exchanges the student's Moodle login for Moodle's app token. The password is used once
- * and never stored or logged; only the encrypted token is kept.
+ * POST /api/moodle/connect { key }
+ * IITB Moodle signs in through IIT Bombay SSO, so students paste their personal
+ * "Moodle mobile web service" key (Moodle → Preferences → Security keys). We check it with
+ * Moodle and keep it only encrypted. No password ever reaches Campus Daily.
  */
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -20,29 +21,32 @@ export async function POST(req: NextRequest) {
   const admin = getAdminClient();
   if (!admin || !process.env.MOODLE_TOKEN_KEY) return NextResponse.json({ error: "Moodle is not configured yet." }, { status: 500 });
 
-  let body: { username?: string; password?: string } = {};
+  let body: { key?: string } = {};
   try {
     body = await req.json();
   } catch {}
-  const username = (body.username || "").trim();
-  const password = body.password || "";
-  if (!username || !password) return NextResponse.json({ error: "Enter your Moodle username and password." }, { status: 400 });
+  const key = (body.key || "").trim();
+  if (!/^[a-f0-9]{32}$/i.test(key)) {
+    return NextResponse.json({ error: "That doesn't look like a Moodle key — it's 32 letters and numbers. Copy it again." }, { status: 400 });
+  }
 
   try {
-    const token = await moodleLogin(username, password);
-    const info = await moodleCall<{ userid: number; fullname: string }>(token, "core_webservice_get_site_info");
+    const info = await moodleCall<{ userid: number; fullname: string; username?: string }>(key, "core_webservice_get_site_info");
     const { error } = await admin.from("moodle_connections").upsert({
       user_id: user.id,
       moodle_userid: info.userid,
       moodle_fullname: info.fullname,
-      token_enc: encryptSecret(token),
+      token_enc: encryptSecret(key),
       connected_at: new Date().toISOString(),
       last_error: null,
     });
-    if (error) throw new Error("Could not save the connection.");
+    if (error) throw new Error("save");
     return NextResponse.json({ ok: true, name: info.fullname });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Moodle login failed.";
-    return NextResponse.json({ error: /password|username/i.test(msg) ? msg : "Could not connect to Moodle. Try again." }, { status: 400 });
+    const msg = e instanceof Error ? e.message : "";
+    return NextResponse.json(
+      { error: /invalidtoken|accessexception/i.test(msg) ? "Moodle didn't accept that key. Copy the 'Moodle mobile web service' key again (or Reset it)." : "Could not reach Moodle. Try again in a minute." },
+      { status: 400 }
+    );
   }
 }

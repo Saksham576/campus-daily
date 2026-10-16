@@ -247,17 +247,12 @@ export function ItemCard({
   const when = stubWhen(item.when || (sec === "opportunities" || sec === "campus" ? item.received_at : null));
 
   return (
-    <article className={`ticket sec-${sec} ${status === "kept" ? "kept" : ""}`}>
+    <article className={`ticket sec-${sec} ${status === "kept" ? "kept" : ""}`} data-serial={`No. ${itemId.slice(-6).toUpperCase()}`}>
       <div className="stub">
         <span className="sec">{item.myCourse ? item.myCourse.replace(" ", "") : stub.code}</span>
         <span className="when-k">{stub.whenLabel}</span>
         <span className={`when-v ${when.hot ? "hot" : ""}`}>{when.text}</span>
-        {item.seat && (
-          <>
-            <span className="when-k">Your seat</span>
-            <span className="when-v hot">{item.seat}</span>
-          </>
-        )}
+        {item.seat && <span className="seat">Your seat · {item.seat}</span>}
       </div>
 
       <div className="ticket-main">
