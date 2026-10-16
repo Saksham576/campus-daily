@@ -142,3 +142,15 @@ export function applyCourseUpdates(slots: Slot[], updates: CourseUpdate[]): Slot
   }
   return out;
 }
+
+/**
+ * A student's own saved slots (their Cancel / Restore and custom slots) replace the
+ * matching computed class (same title and start time).
+ */
+export function withPersonalOverrides<A extends { title: string; start_time: string }>(week: A[], saved: A[]): A[] {
+  const key = (x: A) => `${x.title}|${new Date(x.start_time).getTime()}`;
+  const savedKeys = new Set(saved.map(key));
+  return [...week.filter((w) => !savedKeys.has(key(w))), ...saved].sort(
+    (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+  );
+}

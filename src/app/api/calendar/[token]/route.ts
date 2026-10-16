@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getAdminClient } from "@/lib/server/admin";
 import { generateMultiEventIcs } from "@/lib/events";
 import { buildWeek, type UserCourse } from "@/lib/timetable/slots";
-import { applyCourseUpdates, istDate, type CourseUpdate } from "@/lib/timetable/updates";
+import { applyCourseUpdates, istDate, withPersonalOverrides, type CourseUpdate } from "@/lib/timetable/updates";
 
 export const runtime = "nodejs";
 
@@ -34,14 +34,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tok
       (updates || []) as CourseUpdate[]
     )
   );
-  const seen = new Set<string>();
-  const events = [...weeks, ...((custom || []) as any[])]
-    .filter((s) => {
-      const k = `${s.title}|${s.start_time}`;
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    })
+  const events = withPersonalOverrides(weeks as any[], (custom || []) as any[])
     .map((s) => ({
       uid: `${Buffer.from(`${s.title}|${s.start_time}`).toString("base64url").slice(0, 40)}@campusdaily`,
       title: `${s.is_cancelled ? "CANCELLED · " : ""}${s.title}`,

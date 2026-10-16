@@ -85,3 +85,20 @@ assert.strictEqual(real.start_time, "2026-10-23T08:30:00.000Z");
 const rng = extractEventDetails("Makeup lab", "EE makeup lab 2-5 pm in Dept EE Lab, Oct 17.");
 assert.strictEqual(new Date(rng.start_time).getUTCMonth(), 9, "2-5 is a time range, Oct 17 is the date");
 console.log("✓ Passed: academic years and time ranges are not mistaken for dates");
+
+// Your own Cancel / Restore beats the computed class (and a notice's cancellation)
+import { withPersonalOverrides } from "./src/lib/timetable/updates.ts";
+const wk = [
+  { title: "CH 111: Chemistry", start_time: "2026-10-19T06:00:00.000Z", is_cancelled: false },
+  { title: "MA 105: Calculus", start_time: "2026-10-19T05:00:00.000Z", is_cancelled: true }, // cancelled by a notice
+];
+const mineSaved = [
+  { title: "CH 111: Chemistry", start_time: "2026-10-19T06:00:00.000Z", is_cancelled: true },
+  { title: "MA 105: Calculus", start_time: "2026-10-19T05:00:00.000Z", is_cancelled: false },
+];
+const merged = withPersonalOverrides(wk, mineSaved);
+assert.strictEqual(merged.length, 2);
+assert.strictEqual(merged.find((x) => x.title.startsWith("CH")).is_cancelled, true, "my cancel sticks");
+assert.strictEqual(merged.find((x) => x.title.startsWith("MA")).is_cancelled, false, "my restore beats the notice");
+assert.strictEqual(merged[0].title.startsWith("MA"), true, "sorted by time");
+console.log("✓ Passed: your own cancel/restore survives reloads");
