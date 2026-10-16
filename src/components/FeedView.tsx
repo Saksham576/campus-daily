@@ -7,13 +7,13 @@ import { SponsoredCard, type Sponsored } from "@/components/SponsoredCard";
 type Key = "action" | "courses" | "events" | "opportunities" | "campus" | "saved" | "all";
 
 const PLATFORMS: { key: Key; code: string; label: string; note: string }[] = [
-  { key: "action", code: "ACT", label: "Action needed", note: "Deadlines & registrations — pinned until you tick Done or the date passes. Soonest first." },
-  { key: "courses", code: "CRS", label: "My courses", note: "Anything about the courses you take, plus verified instructor posts." },
-  { key: "events", code: "EVT", label: "Events", note: "Upcoming talks, workshops and fests — ordered by start time. Past events leave by themselves." },
-  { key: "opportunities", code: "OPP", label: "Opportunities", note: "Internships, competitions, scholarships." },
-  { key: "campus", code: "CMP", label: "Campus life", note: "Hostel, mess, sports and WhatsApp group announcements." },
-  { key: "saved", code: "SVD", label: "Saved", note: "Everything you starred. Stays here even after it expires." },
-  { key: "all", code: "ALL", label: "Everything", note: "Every notice, newest first." },
+  { key: "action", code: "1", label: "Action needed", note: "Deadlines & registrations — pinned until you tick Done or the date passes. Soonest first." },
+  { key: "courses", code: "2", label: "My courses", note: "Anything about the courses you take, plus verified instructor posts." },
+  { key: "events", code: "3", label: "Events", note: "Upcoming talks, workshops and fests — ordered by start time. Past events leave by themselves." },
+  { key: "opportunities", code: "4", label: "Opportunities", note: "Internships, competitions, scholarships." },
+  { key: "campus", code: "5", label: "Campus life", note: "Hostel, mess, sports and WhatsApp group announcements." },
+  { key: "saved", code: "6", label: "Saved", note: "Everything you starred. Stays here even after it expires." },
+  { key: "all", code: "7", label: "Everything", note: "Every notice, newest first." },
 ];
 
 export function FeedView({
@@ -69,8 +69,10 @@ export function FeedView({
             aria-pressed={tab === p.key}
           >
             <span className="code">{p.code}</span>
-            <span className="count">{sections[p.key].length}</span>
             <span className="label">{p.label}</span>
+            <span className="count">
+              {sections[p.key].length} notice{sections[p.key].length === 1 ? "" : "s"}
+            </span>
           </button>
         ))}
       </nav>

@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { StationSign } from "@/components/StationSign";
 import {
   isValidIitbEmail,
   sanitizeRedirectUrl,
@@ -222,7 +223,7 @@ function LoginForm() {
   if (status === "checking" || status === "verified") {
     return (
       <main className="wrap narrow">
-        <p className="eyebrow">Campus Daily</p>
+        <StationSign />
         <h1>Welcome to Campus Daily</h1>
         <div className="login-redirect-card">
           <p className="muted">
@@ -238,8 +239,8 @@ function LoginForm() {
 
   return (
     <main className="wrap narrow">
-      <p className="eyebrow">Campus Daily</p>
-      <h1>Your campus, in one feed.</h1>
+      <StationSign />
+      <h1 style={{ fontSize: 28, marginTop: 22 }}>Your campus, in one feed.</h1>
       <div className="auth-tabs" role="tablist" aria-label="Log in or sign up">
         {(["login", "signup"] as const).map((m) => (
           <button
@@ -386,8 +387,8 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <main className="wrap narrow">
-          <p className="eyebrow">Campus Daily</p>
-          <h1>Your campus, in one feed.</h1>
+          <StationSign />
+          <h1 style={{ fontSize: 28, marginTop: 22 }}>Your campus, in one feed.</h1>
           <p className="muted">Loading sign-in…</p>
         </main>
       }
