@@ -1,9 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Archivo, Archivo_Black, Doto, Noto_Sans_Devanagari } from "next/font/google";
+import { Archivo, Doto, Noto_Sans_Devanagari } from "next/font/google";
 import "./globals.css";
 import { ServiceWorker } from "@/components/ServiceWorker";
 
-const sign = Archivo_Black({ subsets: ["latin"], weight: "400", variable: "--f-sign", display: "swap" });
 const sans = Archivo({ subsets: ["latin"], variable: "--f-sans", display: "swap" });
 const led = Doto({ subsets: ["latin"], variable: "--f-led", display: "swap" });
 const deva = Noto_Sans_Devanagari({ subsets: ["devanagari"], variable: "--f-deva", display: "swap" });
@@ -17,7 +16,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#ffcc00",
+  themeColor: "#f5f4f0",
 };
 
 export default function RootLayout({
@@ -26,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${sign.variable} ${sans.variable} ${led.variable} ${deva.variable}`}>
+    <html lang="en" className={`${sans.variable} ${led.variable} ${deva.variable}`}>
       <body>
         {children}
         <ServiceWorker />

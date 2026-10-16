@@ -36,3 +36,14 @@ assert.strictEqual(shouldWatch({ name: "Techfest Core Orgies", members: 120 }, o
 assert.strictEqual(shouldWatch({ name: "Marketing Orgies MI'26", members: 80 }, opts), false);
 assert.strictEqual(shouldWatch({ name: "CS101-26-G39", members: 55 }, opts), true);
 console.log("✓ WhatsApp group selection tests passed");
+
+import { createHash } from "node:crypto";
+import { tokenFromLaunchRedirect } from "./lib.mjs";
+const pass = "abc123";
+const sig = createHash("md5").update("https://moodle.iitb.ac.in" + pass).digest("hex");
+const tok = "0123456789abcdef0123456789abcdef";
+const loc = "moodlemobile://token=" + Buffer.from(`${sig}:::${tok}:::private`).toString("base64");
+assert.strictEqual(tokenFromLaunchRedirect(loc, "https://moodle.iitb.ac.in", pass), tok);
+assert.strictEqual(tokenFromLaunchRedirect(loc, "https://moodle.iitb.ac.in", "other"), null, "wrong passport rejected");
+assert.strictEqual(tokenFromLaunchRedirect("moodlemobile://nothing", "https://moodle.iitb.ac.in", pass), null);
+console.log("✓ Moodle connect helper tests passed");

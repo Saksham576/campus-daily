@@ -70,9 +70,7 @@ export function FeedView({
           >
             <span className="code">{p.code}</span>
             <span className="label">{p.label}</span>
-            <span className="count">
-              {sections[p.key].length} notice{sections[p.key].length === 1 ? "" : "s"}
-            </span>
+            <span className="count">{sections[p.key].length}</span>
           </button>
         ))}
       </nav>
