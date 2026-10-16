@@ -1745,3 +1745,70 @@ input[type="radio"] {
   color: var(--faint);
   white-space: nowrap;
 }
+
+/* ---------- Ask Campus Daily ---------- */
+.ask {
+  margin: 16px 0 4px;
+}
+.ask-form {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.ask-ico {
+  position: absolute;
+  left: 14px;
+  color: var(--violet);
+  font-size: 15px;
+  pointer-events: none;
+}
+.ask-form input[type="text"] {
+  flex: 1;
+  min-width: 0;
+  padding-left: 38px;
+  height: 46px;
+  border-radius: 12px;
+}
+.ask-form button {
+  height: 46px;
+  border-radius: 12px;
+}
+.ask-sugg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.ask-sugg button {
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 6px 11px;
+  font-weight: 500;
+}
+.ask-reply {
+  margin-top: 10px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--violet);
+  border-radius: var(--radius);
+}
+.ask-q {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.ask-a {
+  font-size: 15px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+.ask-src {
+  list-style: none;
+  margin: 10px 0 6px;
+  display: grid;
+  gap: 3px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}

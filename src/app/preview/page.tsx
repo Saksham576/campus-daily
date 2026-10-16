@@ -3,6 +3,7 @@ import { AppBar } from "@/components/AppBar";
 import { DayBoard, type BoardRow } from "@/components/DayBoard";
 import { FeedView } from "@/components/FeedView";
 import { HomeHead } from "@/components/HomeHead";
+import { AskBox } from "@/components/AskBox";
 import { buildSections } from "@/lib/sections";
 
 /** Dev-only: the Home screen with realistic sample data, for design work without signing in. */
@@ -42,6 +43,7 @@ export default function Preview() {
       <main className="wrap">
         <HomeHead name={"Saksham Tiwari"} now={now} action={sections.action} exams={sections.exams} />
         <DayBoard title={late ? "Tomorrow" : "Today"} rows={rows} emptyText="No classes scheduled." />
+        <AskBox />
         <FeedView sections={sections as any} sponsored={null} />
       </main>
     </>
