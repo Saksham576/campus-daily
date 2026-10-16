@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 /** Normalise group names so curly quotes, "×" and extra spaces don't break matching. */
 export function normalizeName(name) {
   return String(name || "")
@@ -54,3 +55,14 @@ export function shouldWatch({ name, members }, { minMembers = 50, include = [], 
   if (include.length && isAllowedGroup(name, include)) return true;
   return (members || 0) >= minMembers;
 }
+
+/** "moodlemobile://token=BASE64(signature:::token[:::privatetoken])" → token, after checking the signature. */
+export function tokenFromLaunchRedirect(location, wwwroot, pass) {
+  const m = String(location).match(/token=([A-Za-z0-9+/=_-]+)/);
+  if (!m) return null;
+  const [signature, token] = Buffer.from(m[1], "base64").toString("utf8").split(":::");
+  const expected = createHash("md5").update(wwwroot + pass).digest("hex");
+  if (signature !== expected || !/^[a-f0-9]{32}$/i.test(token || "")) return null;
+  return token;
+}
+

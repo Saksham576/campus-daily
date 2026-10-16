@@ -35,11 +35,11 @@ export type FeedItem = {
 };
 
 const STUB: Record<string, { code: string; whenLabel: string }> = {
-  action: { code: "ACT", whenLabel: "Due" },
-  courses: { code: "CRS", whenLabel: "When" },
-  events: { code: "EVT", whenLabel: "Starts" },
-  opportunities: { code: "OPP", whenLabel: "Posted" },
-  campus: { code: "CMP", whenLabel: "Posted" },
+  action: { code: "Action", whenLabel: "Due" },
+  courses: { code: "Course", whenLabel: "When" },
+  events: { code: "Event", whenLabel: "Starts" },
+  opportunities: { code: "Opportunity", whenLabel: "Posted" },
+  campus: { code: "Campus", whenLabel: "Posted" },
 };
 
 function formatHost(u: string): string {
@@ -247,12 +247,12 @@ export function ItemCard({
   const when = stubWhen(item.when || (sec === "opportunities" || sec === "campus" ? item.received_at : null));
 
   return (
-    <article className={`ticket sec-${sec} ${status === "kept" ? "kept" : ""}`} data-serial={`No. ${itemId.slice(-6).toUpperCase()}`}>
+    <article className={`ticket sec-${sec} ${status === "kept" ? "kept" : ""}`}>
       <div className="stub">
         <span className="sec">{item.myCourse ? item.myCourse.replace(" ", "") : stub.code}</span>
         <span className="when-k">{stub.whenLabel}</span>
         <span className={`when-v ${when.hot ? "hot" : ""}`}>{when.text}</span>
-        {item.seat && <span className="seat">Your seat · {item.seat}</span>}
+        {item.seat && <span className="seat">Seat {item.seat}</span>}
       </div>
 
       <div className="ticket-main">
