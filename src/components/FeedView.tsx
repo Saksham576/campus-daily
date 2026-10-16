@@ -55,11 +55,14 @@ export function FeedView({
   }, [q, tab, sections]);
 
   const meta = PLATFORMS.find((p) => p.key === tab)!;
+  // Main sections as tabs (empty ones step aside); Saved and Everything sit by the search box.
+  const MAIN: Key[] = ["action", "exams", "courses", "events", "opportunities", "campus"];
+  const tabs = PLATFORMS.filter((p) => MAIN.includes(p.key) && (p.key === "action" || p.key === tab || sections[p.key].length > 0));
 
   return (
     <>
       <nav className="platforms" aria-label="Sections">
-        {PLATFORMS.map((p) => (
+        {tabs.map((p) => (
           <button
             key={p.key}
             className={`platform ${tab === p.key && !q ? "active" : ""} ${p.key === "action" && dueSoon ? "urgent" : ""}`}
@@ -69,7 +72,6 @@ export function FeedView({
             }}
             aria-pressed={tab === p.key}
           >
-            <span className="code">{p.code}</span>
             <span className="label">{p.label}</span>
             <span className="count">{sections[p.key].length}</span>
           </button>
@@ -77,13 +79,32 @@ export function FeedView({
       </nav>
 
       <div className="search">
+        <span className="search-ico" aria-hidden>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+        </span>
         <input
           type="search"
-          placeholder="Search every notice — e.g. CH111 quiz, scholarship, H16"
+          placeholder="Search notices — CH111 quiz, scholarship, H16…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           aria-label="Search notices"
         />
+        {(["saved", "all"] as Key[]).map((k) => (
+          <button
+            key={k}
+            className={`search-chip ${tab === k && !q ? "active" : ""}`}
+            onClick={() => {
+              setQ("");
+              pick(k);
+            }}
+            aria-pressed={tab === k}
+          >
+            {k === "saved" ? "★ Saved" : "All"} <span className="count">{sections[k].length}</span>
+          </button>
+        ))}
       </div>
 
       <p className="section-note">
