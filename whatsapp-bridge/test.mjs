@@ -24,3 +24,15 @@ assert.strictEqual(p.subject, "[WhatsApp · Hostel 16] CS 101 lab shifted to Min
 assert.strictEqual(p.from, "WhatsApp: Hostel 16", "no author name or number");
 assert.strictEqual(p.date, new Date(1792000000 * 1000).toISOString());
 console.log("✓ WhatsApp bridge tests passed");
+
+import { shouldWatch } from "./lib.mjs";
+const ex = /family|orgies|organi[sz]|\bcore\b|\bteam\b|committee/i;
+const opts = { minMembers: 50, include: parseGroups("Hostel 16"), exclude: ex };
+assert.strictEqual(shouldWatch({ name: "IIT Bombay Freshers' 2026 (UG)", members: 900 }, opts), true);
+assert.strictEqual(shouldWatch({ name: "Hostel 16", members: 12 }, opts), true, "listed group even if small");
+assert.strictEqual(shouldWatch({ name: "Wingmates", members: 9 }, opts), false, "small group");
+assert.strictEqual(shouldWatch({ name: "Family group", members: 60 }, opts), false, "excluded name");
+assert.strictEqual(shouldWatch({ name: "Techfest Core Orgies", members: 120 }, opts), false, "organiser team");
+assert.strictEqual(shouldWatch({ name: "Marketing Orgies MI'26", members: 80 }, opts), false);
+assert.strictEqual(shouldWatch({ name: "CS101-26-G39", members: 55 }, opts), true);
+console.log("✓ WhatsApp group selection tests passed");
