@@ -44,3 +44,13 @@ export function toIngestPayload({ id, group, body, timestamp }) {
     text: body.trim(),
   };
 }
+
+/**
+ * Should the bridge read this group? Listed groups always (unless excluded);
+ * otherwise only big groups (members >= minMembers), never excluded names.
+ */
+export function shouldWatch({ name, members }, { minMembers = 50, include = [], exclude = null } = {}) {
+  if (exclude && exclude.test(name || "")) return false;
+  if (include.length && isAllowedGroup(name, include)) return true;
+  return (members || 0) >= minMembers;
+}
