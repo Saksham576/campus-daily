@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { AppBar } from "@/components/AppBar";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { generateMultiEventIcs } from "@/lib/events";
@@ -77,8 +78,6 @@ export default function SchedulePage() {
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
   const [userDivision, setUserDivision] = useState<string>("D1");
   const [userHasmed, setUserHasmed] = useState<string | null>(null);
-  const [hasMoodleUrl, setHasMoodleUrl] = useState<boolean>(false);
-  const [syncingMoodle, setSyncingMoodle] = useState(false);
   const [statusNotification, setStatusNotification] = useState<string | null>(null);
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -103,10 +102,10 @@ export default function SchedulePage() {
         return;
       }
 
-      // Fetch user profile metadata (division, HASMED elective, Moodle URL)
+      // Fetch user profile metadata (division, HASMED elective)
       const { data: sub } = await supabase
         .from("subscribers")
-        .select("division, hasmed, moodle_ical_url")
+        .select("division, hasmed")
         .eq("email", user.email)
         .single();
 
@@ -115,9 +114,6 @@ export default function SchedulePage() {
       }
       if (sub?.hasmed) {
         setUserHasmed(sub.hasmed);
-      }
-      if (sub?.moodle_ical_url) {
-        setHasMoodleUrl(true);
       }
 
       setSchedules(await loadMergedSchedule(user.id, sub?.division, sub?.hasmed));
@@ -203,33 +199,6 @@ export default function SchedulePage() {
     }
   }
 
-  async function handleSyncMoodle() {
-    setSyncingMoodle(true);
-    setStatusNotification("Syncing assignments and quizzes from Moodle…");
-
-    try {
-      const res = await fetch("/api/sync/moodle", { method: "POST" });
-      const data = await res.json();
-
-      if (!res.ok) {
-        setStatusNotification(`Sync error: ${data.error || "Failed to reach Moodle"}`);
-      } else {
-        setStatusNotification(data.message || `Synced ${data.synced} events from Moodle!`);
-        // Refresh schedules from DB
-        const supabase = createClient();
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (user) setSchedules(await loadMergedSchedule(user.id, userDivision, userHasmed));
-      }
-    } catch (err: any) {
-      setStatusNotification(`Sync error: ${err.message}`);
-    } finally {
-      setSyncingMoodle(false);
-      setTimeout(() => setStatusNotification(null), 5000);
-    }
-  }
-
   function handleExportWeekIcs() {
     if (schedules.length === 0) {
       alert("No slots to export.");
@@ -280,27 +249,21 @@ export default function SchedulePage() {
   }
 
   return (
+    <>
+    <AppBar />
     <main className="wrap">
-      <header className="top">
+      <div className="page-head">
         <div>
-          <p className="eyebrow">Academic Timetable</p>
-          <h1>Your Schedule</h1>
-          <p className="muted">
-            Built from your courses (slots as on ResoBin) · Auto-updated from notices ·{" "}
-            <Link href="/settings#courses">Edit my courses</Link>
-          </p>
-          {!loading && schedules.length === 0 && (
-            <p className="note">
-              No classes yet. Add your courses in{" "}
-              <Link href="/settings#courses">Settings → My courses</Link> and your week will appear here.
-            </p>
-          )}
+          <p className="eyebrow">Week board · slots as on ResoBin · auto-updated from notices</p>
+          <h1>Your week</h1>
         </div>
-        <div className="nav-links">
-          <Link href="/" className="navlink">Feed</Link>
-          <Link href="/settings" className="navlink">Settings</Link>
-        </div>
-      </header>
+        <Link href="/settings#courses" className="navlink">Edit courses</Link>
+      </div>
+      {!loading && schedules.length === 0 && (
+        <p className="note">
+          No classes yet. Add your courses in <Link href="/settings#courses">Settings → My courses</Link> and your week appears here.
+        </p>
+      )}
 
       {statusNotification && (
         <p className="note" style={{ borderColor: "var(--accent)", marginBottom: 16 }}>
@@ -322,18 +285,10 @@ export default function SchedulePage() {
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-        <h3 style={{ fontSize: 18, fontFamily: "Georgia, serif" }}>
-          {DAYS[selectedDay]} Classes & Deadlines
-        </h3>
+        <h2>
+          {DAYS[selectedDay]}
+        </h2>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button
-            onClick={handleSyncMoodle}
-            disabled={syncingMoodle}
-            className="small"
-            title="Pull quiz and assignment deadlines from your Moodle iCal URL"
-          >
-            {syncingMoodle ? "Syncing…" : "🔄 Sync Moodle"}
-          </button>
           <button
             onClick={() => setShowAddModal(!showAddModal)}
             className="small"
@@ -345,7 +300,7 @@ export default function SchedulePage() {
             className="small accent"
             title="Download full semester recurring .ics calendar file"
           >
-            📥 Export All (.ics)
+            Export .ics
           </button>
         </div>
       </div>
@@ -476,5 +431,6 @@ export default function SchedulePage() {
         </div>
       )}
     </main>
+    </>
   );
 }

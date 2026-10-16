@@ -14,6 +14,17 @@ export async function processInbound(email: InboundEmail): Promise<{ status: num
   const skip = privateMailReason(email);
   if (skip) return { status: 200, body: { ok: true, skipped: skip } };
 
+  // The Moodle reader may already have posted this announcement (same "COURSE: subject").
+  if (/moodle/i.test(email.from)) {
+    const { count } = await admin
+      .from("items")
+      .select("id", { count: "exact", head: true })
+      .eq("subject", email.subject)
+      .eq("source", "moodle")
+      .gte("received_at", new Date(Date.now() - 14 * 86400_000).toISOString());
+    if (count) return { status: 200, body: { ok: true, skipped: "already from Moodle" } };
+  }
+
   let scored;
   try {
     scored = await scoreWithGemini(email, geminiKey);
