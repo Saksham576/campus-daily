@@ -1,8 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isAuthorizedIngest } from "@/lib/ingest";
 import { getAdminClient } from "@/lib/server/admin";
-import { encryptSecret } from "@/lib/server/crypto";
-import { moodleCall } from "@/lib/moodle";
+import { saveMoodleKey } from "@/lib/server/moodleConnect";
 
 export const runtime = "nodejs";
 
@@ -32,17 +31,8 @@ export async function POST(req: NextRequest) {
   if (!sub?.user_id) return NextResponse.json({ error: "Sign in to Campus Daily once with this email first." }, { status: 404 });
 
   try {
-    const info = await moodleCall<{ userid: number; fullname: string }>(key, "core_webservice_get_site_info");
-    const { error } = await admin.from("moodle_connections").upsert({
-      user_id: sub.user_id,
-      moodle_userid: info.userid,
-      moodle_fullname: info.fullname,
-      token_enc: encryptSecret(key),
-      connected_at: new Date().toISOString(),
-      last_error: null,
-    });
-    if (error) throw new Error("save");
-    return NextResponse.json({ ok: true, name: info.fullname });
+    const { name } = await saveMoodleKey(admin, sub.user_id, key);
+    return NextResponse.json({ ok: true, name });
   } catch {
     return NextResponse.json({ error: "Moodle didn't accept that key." }, { status: 400 });
   }
