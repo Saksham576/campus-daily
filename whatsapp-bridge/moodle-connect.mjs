@@ -46,22 +46,28 @@ const browser = await puppeteer.launch({
   args: ["--no-first-run", "--window-size=520,760"],
 });
 const [page] = await browser.pages();
+await page.bringToFront().catch(() => {});
+console.log("A small Chrome window with the Moodle sign-in page is open. If you don't see it, check the taskbar.");
+console.log("Waiting up to 20 minutes for you to sign in…");
 
 const token = await new Promise((resolve) => {
-  const timer = setTimeout(() => resolve(null), 5 * 60_000);
+  const timer = setTimeout(() => resolve(null), 20 * 60_000);
   page.on("response", (res) => {
     const loc = res.headers()["location"] || "";
     if (res.url().includes("/admin/tool/mobile/launch.php") && loc.startsWith("moodlemobile://")) {
       clearTimeout(timer);
-      resolve(tokenFromLaunchRedirect(loc, MOODLE, passport));
+      const t = tokenFromLaunchRedirect(loc, MOODLE, passport);
+      if (!t) console.error("Moodle answered, but the key failed its check.");
+      resolve(t);
     }
   });
+  browser.on("disconnected", () => resolve(null));
   page.goto(launch).catch(() => {});
 });
 
 await browser.close().catch(() => {});
 if (!token) {
-  console.error("Didn't receive a Moodle key (timed out or sign-in was cancelled). Run it again.");
+  console.error("No Moodle key received (window closed, sign-in not finished, or 20 minutes passed). Run it again.");
   process.exit(1);
 }
 
