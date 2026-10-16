@@ -21,7 +21,7 @@ assert.strictEqual(placeItem(talk, mine, now).section, "events");
 assert.strictEqual(placeItem(oldTalk, mine, now), null, "past events drop out");
 assert.strictEqual(placeItem(hostel, mine, now).section, "campus");
 assert.strictEqual(placeItem(intern, mine, now).section, "opportunities");
-assert.notStrictEqual(placeItem(otherCourse, mine, now).section, "courses", "not my course");
+assert.notStrictEqual(placeItem(otherCourse, mine, now)?.section, "courses", "not my course");
 assert.strictEqual(placeItem({ ...scholarship, status: "done" }, mine, now), null, "done actions leave");
 
 // Stable order: a high-priority deadline is not pushed down by newer items
@@ -51,7 +51,7 @@ const q1 = { ...base, id: "q1", subject: "CH 111-2026-1-D3: Quiz on Friday, Octo
 const q2 = { ...base, id: "q2", subject: "MA 105 Quiz 3 on 23 October 2026", body: "2 PM, LT 204" };
 const sol = { ...base, id: "q3", subject: "CS 105-2026-1-D3: Midsem solutions" };
 assert.strictEqual(placeItem(q1, mine, now).section, "exams");
-assert.strictEqual(placeItem(sol, mine, now).section !== "exams", true);
+assert.strictEqual(placeItem(sol, mine, now)?.section !== "exams", true);
 const se = buildSections([q2, q1, sol], mine, now);
 assert.deepStrictEqual(se.exams.map((x) => x.id), ["q1", "q2"]);
 console.log("✓ Passed: exams & quizzes section");
@@ -70,5 +70,24 @@ for (const s of wrong) {
   assert.strictEqual(p?.section === "exams", false, s);
 }
 const past = { ...base, id: "p", subject: "MA 105 Quiz 1 on 1 October 2026", body: "2 PM" };
-assert.strictEqual(placeItem(past, mine, now), null, "past quiz is gone");
+assert.strictEqual(placeItem(past, mine, now).section, "courses", "a past quiz stays with the course");
 console.log("✓ Passed: only upcoming, dated assessments appear under Exams");
+
+// Real ones that SHOULD be there, and club quizzes that shouldn't
+const syl = { ...base, id: "syl", subject: "MA 105-2026-1-ALL: Quiz 2 syllabus", body: "Dear Students, The syllabus for the second quiz for MA 105, to be held on Friday, 23rd October , is as follows: Double and triple integration" };
+assert.strictEqual(placeItem(syl, mine, now).section, "exams", "syllabus for an upcoming quiz");
+const club = { ...base, id: "club", subject: "[S.Events] Heisenberg - Fresher's Orientation | Chemistry Club and ChemETL |17th - LH 101 - 5 pm", body: "an exciting chemistry quiz packed with mind-bending questions" };
+assert.notStrictEqual(placeItem(club, mine, now).section, "exams", "club quiz is an event");
+const bt = { ...base, id: "bt", subject: "[Bodhitree] [Forum - CS101A26] Theory Quiz 3 on 28th October", body: "Course: CS101A26 - Computer Programming" };
+assert.strictEqual(placeItem(bt, new Set(["CS 101"]), now).section, "exams", "Bodhitree course code CS101A26");
+const other = { ...base, id: "o", subject: "PH 107 Quiz 2 on 23 October 2026", body: "2 PM" };
+assert.notStrictEqual(placeItem(other, mine, now)?.section, "exams", "not my course");
+console.log("✓ Passed: exams only for your courses; club quizzes stay events");
+
+// Course mail for courses you don't take, and doubt-forum chatter, stay off your board
+assert.strictEqual(placeItem({ ...base, id: "c1", subject: "CS 105-2026-1-D3: Midsem answersheets and crib session TONIGHT", from_address: "Bharat Adsul (via IITB Moodle) <noreply@moodle.iitb.ac.in>" }, mine, now), null);
+assert.strictEqual(placeItem({ ...base, id: "c2", subject: "BB101(D2): Lecture today (Friday, 16.10.2026) at 2.0PM in LH302", from_address: "pbhaumik@iitb.ac.in" }, mine, now), null);
+assert.strictEqual(placeItem({ ...base, id: "c3", subject: "MA 105-2026-1-ALL: MA105 Quizz", body: "MA 105-2026-1-ALL -> Forums -> Doubt Forum -> MA105 Quizz" }, mine, now), null);
+assert.notStrictEqual(placeItem({ ...base, id: "c4", subject: "[S.Events] Reminder: CP 101 Tonight at 8:30 PM | Venue Changed to LH101", from_address: "gsectech@iitb.ac.in" }, mine, now), null, "club event named like a course stays");
+assert.strictEqual(placeItem({ ...base, id: "c5", subject: "CH 111-2026-1-D3: New file — CH111 Physical Slides", source: "moodle" }, mine, now).section, "courses");
+console.log("✓ Passed: other courses' mail and doubt-forum chatter stay off your board");

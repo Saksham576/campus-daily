@@ -266,11 +266,11 @@ export function personalizeScore(scored: ScoredNotice, sub: SubscriberTarget): n
  */
 export function privateMailReason(email: Pick<InboundEmail, "from" | "subject">): string | null {
   if (email.from.startsWith("WhatsApp:")) return null;
-  if (/(supabase|signin@campusdaily|@campusdaily\.nexuspulsetech\.com|accounts\.google|no-?reply@google)/i.test(email.from)) {
+  if (/(supabase|signin@campusdaily|@campusdaily\.nexuspulsetech\.com|accounts\.google|no-?reply@google|noreply-cc@iitb)/i.test(email.from)) {
     return "auth sender";
   }
   if (
-    /(sign-?in (link|code)|log-?in code|verification code|verify your|confirm your (email|account)|one-?time (code|password)|\botp\b|password reset|reset your password|campus daily code|magic link)/i.test(
+    /(sign-?in (link|code)|log-?in code|verification code|verify your|confirm your (email|account)|one-?time (code|password)|\botp\b|password reset|reset your password|campus daily code|magic link|new (ldap )?log-?in|log-?in (alert|notification)|new sign-?in|sign-?in alert|security alert)/i.test(
       email.subject
     )
   ) {

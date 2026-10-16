@@ -93,6 +93,26 @@ export async function syncMoodle(admin: SupabaseClient, deadlineMs: number) {
       const courses = await moodleCall<Course[]>(token, "core_enrol_get_users_courses", { userid: c.moodle_userid });
       const now = Math.floor(Date.now() / 1000);
 
+      // What this student is enrolled in, and their groups (tutorial / lab batch) in each course.
+      const enrolments = await Promise.all(
+        courses.map(async (course) => {
+          const g = await moodleCall<any>(token, "core_group_get_course_user_groups", { courseid: course.id, userid: c.moodle_userid }).catch(() => ({ groups: [] }));
+          return {
+            user_id: c.user_id,
+            course_id: course.id,
+            course_code: courseCodeFromShortname(course.shortname),
+            shortname: htmlToText(course.shortname).trim(),
+            fullname: htmlToText(course.fullname || "").trim(),
+            groups: (g?.groups || []).map((x: any) => htmlToText(String(x.name || "")).trim()).filter(Boolean),
+            updated_at: new Date().toISOString(),
+          };
+        })
+      );
+      if (enrolments.length) {
+        await admin.from("moodle_enrolments").delete().eq("user_id", c.user_id).not("course_id", "in", `(${enrolments.map((e) => e.course_id).join(",")})`);
+        await admin.from("moodle_enrolments").upsert(enrolments);
+      }
+
       for (const course of courses) {
         if (Date.now() > deadlineMs) break;
         if (doneCourses.has(course.id)) continue;
