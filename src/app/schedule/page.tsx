@@ -277,14 +277,14 @@ export default function SchedulePage() {
     <main className="wrap">
       <div className="page-head">
         <div>
-          <p className="eyebrow">Week board · slots as on ResoBin · auto-updated from notices</p>
-          <h1>Your week</h1>
+          <p className="eyebrow">Class times from ResoBin · updates itself from notices</p>
+          <h1>Your timetable</h1>
         </div>
         <Link href="/settings#courses" className="navlink">Edit courses</Link>
       </div>
       {!loading && schedules.length === 0 && (
         <p className="note">
-          No classes yet. Add your courses in <Link href="/settings#courses">Settings → My courses</Link> and your week appears here.
+          No classes yet. Add your courses in <Link href="/settings#courses">Settings → My courses</Link> and your timetable appears here.
         </p>
       )}
 

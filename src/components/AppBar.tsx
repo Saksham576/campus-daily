@@ -17,8 +17,8 @@ export function AppBar() {
   }, []);
 
   const nav = [
-    { href: "/", label: "Board" },
-    { href: "/schedule", label: "Week" },
+    { href: "/", label: "Home" },
+    { href: "/schedule", label: "Timetable" },
     { href: "/settings", label: "Settings" },
   ];
 

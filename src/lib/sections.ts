@@ -1,10 +1,11 @@
 import { extractEventDetails } from "./events.ts";
 import { formatCourseCode } from "./timetable/slots.ts";
 
-export type SectionKey = "action" | "courses" | "events" | "opportunities" | "campus" | "saved" | "all";
+export type SectionKey = "action" | "exams" | "courses" | "events" | "opportunities" | "campus" | "saved" | "all";
 
 export const SECTIONS: { key: SectionKey; code: string; label: string }[] = [
   { key: "action", code: "ACT", label: "Action needed" },
+  { key: "exams", code: "EXM", label: "Exams & quizzes" },
   { key: "courses", code: "CRS", label: "My courses" },
   { key: "events", code: "EVT", label: "Events" },
   { key: "opportunities", code: "OPP", label: "Opportunities" },
@@ -40,6 +41,10 @@ const ACTION_RE =
 const OPPORTUNITY_RE = /\b(internship|placement|job|hiring|recruit|competition|hackathon|challenge|fellowship|scholarship|grant|olympiad|case comp)\b/i;
 const EVENT_RE = /\b(workshop|talk|seminar|lecture series|session|orientation|fest|night|screening|meet|webinar|colloquium|competition|match|tournament|concert|show)\b/i;
 const CAMPUS_RE = /\b(hostel|mess|h\d{1,2}\b|gymkhana|council|lost|found|sports|ground|water|electricity|maintenance|wifi|internet|bus|shuttle)\b/i;
+
+const EXAM_RE = /\b(quiz(?:zes)?|exams?|mid-?sems?|end-?sems?|tests?|viva|re-?exam|make-?up quiz)\b/i;
+// Follow-ups about a past assessment belong with the course, not in upcoming exams.
+const EXAM_AFTERMATH_RE = /\b(solutions?|answer\s*key|results?|marks|grades?|graded|uploaded|feedback|re-?evaluation|crib)\b/i;
 
 const COURSE_RE = /\b([A-Z]{2,3})\s?-?(\d{3}[A-Z]?)\b/g;
 
@@ -130,6 +135,16 @@ ${item.body || ""}`, now) : null) ||
     return { ...item, section: "action", when: deadline, myCourse };
   }
 
+  // Quizzes, exams and tests: their own section, soonest first, gone once they're over.
+  if (EXAM_RE.test(item.subject) && !EXAM_AFTERMATH_RE.test(item.subject)) {
+    if (ev && new Date(ev.start_time).getTime() < now.getTime() - 3 * 3600_000) return null;
+    return { ...item, section: "exams", when: ev?.start_time || null, myCourse };
+  }
+  if (ev && (ev.slot_type === "quiz" || ev.slot_type === "exam") && !EXAM_AFTERMATH_RE.test(item.subject)) {
+    if (new Date(ev.start_time).getTime() < now.getTime() - 3 * 3600_000) return null;
+    return { ...item, section: "exams", when: ev.start_time, myCourse };
+  }
+
   if (myCourse || item.source === "moodle" || item.is_verified) {
     return { ...item, section: "courses", when: ev?.start_time || null, myCourse };
   }
@@ -181,6 +196,7 @@ export function buildSections<T extends SectionItem>(items: T[], myCourses: Set<
 
   return {
     action: by("action").sort(soonest),
+    exams: by("exams").sort(soonest),
     courses: by("courses").sort(newest),
     events: by("events").sort(soonest),
     opportunities: by("opportunities").sort(newest),
