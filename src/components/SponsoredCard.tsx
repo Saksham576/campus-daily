@@ -11,7 +11,7 @@ export function SponsoredCard({ card }: { card: Sponsored }) {
   }, [card.id]);
 
   return (
-    <article className="card" style={{ borderStyle: "dashed" }}>
+    <article className="card sponsored">
       <p className="eyebrow small" style={{ marginBottom: 4 }}>Sponsored · {card.sponsor}</p>
       <h3>{card.title}</h3>
       {card.body && <p>{card.body}</p>}

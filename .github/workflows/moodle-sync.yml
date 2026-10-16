@@ -1,0 +1,16 @@
+name: Moodle reader
+# Every 30 minutes: read connected students' Moodle courses (announcements, files, seating plans).
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Run Moodle reader
+        run: |
+          code=$(curl -s -o out.json -w "%{http_code}" -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" "${{ secrets.APP_URL }}/api/cron/moodle")
+          echo "HTTP $code"; cat out.json | head -c 600; echo
+          test "$code" = "200"
