@@ -23,6 +23,8 @@ export async function POST(req: NextRequest) {
     caughtUp: Number(data.caughtUp) || 0,
     startedAt: typeof data.startedAt === "string" ? data.startedAt : null,
     lastMessageAt: typeof data.lastMessageAt === "string" ? data.lastMessageAt : null,
+    // Login QR while the bridge is logged out (admins scan it from /admin). Short-lived.
+    qr: typeof data.qr === "string" && data.qr.length < 2000 ? data.qr : null,
   };
   await admin.from("bridge_status").upsert({ id: "whatsapp", data: clean, updated_at: new Date().toISOString() });
   return NextResponse.json({ ok: true });

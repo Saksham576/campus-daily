@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAdminClient, isAdminEmail } from "@/lib/server/admin";
 import { AdminPanel } from "./AdminPanel";
 import { AppBar } from "@/components/AppBar";
+import QRCode from "qrcode";
 
 export const dynamic = "force-dynamic";
 
@@ -25,8 +26,10 @@ export default async function AdminPage() {
     admin.from("bridge_status").select("data, updated_at").eq("id", "whatsapp").maybeSingle(),
     admin.from("moodle_connections").select("user_id", { count: "exact", head: true }),
   ]);
-  const wa = (bridge?.data || {}) as { groups?: string[]; seenToday?: number; forwardedToday?: number; caughtUp?: number };
+  const wa = (bridge?.data || {}) as { groups?: string[]; seenToday?: number; forwardedToday?: number; caughtUp?: number; qr?: string | null };
   const waAgeMin = bridge?.updated_at ? Math.round((Date.now() - new Date(bridge.updated_at).getTime()) / 60000) : null;
+  // The bridge is logged out and waiting: show its login QR (codes rotate every ~20 s; reload for a fresh one).
+  const waQr = wa.qr && waAgeMin !== null && waAgeMin < 2 ? await QRCode.toString(wa.qr, { type: "svg", margin: 1, width: 240 }) : null;
 
   return (
     <>
@@ -70,6 +73,15 @@ export default async function AdminPage() {
           <span className="status go">On</span>
         </div>
         {wa.groups && wa.groups.length > 0 && <div className="board-empty">Groups: {wa.groups.join(" · ")}</div>}
+        {waQr && (
+          <div className="note" style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ background: "#fff", padding: 8, borderRadius: 8, lineHeight: 0 }} dangerouslySetInnerHTML={{ __html: waQr }} />
+            <span>
+              The WhatsApp bridge is waiting to log in. On the spare phone: WhatsApp → Settings → Linked devices → Link a device, and
+              scan this. Codes change every ~20 seconds — reload this page if it doesn&apos;t scan.
+            </span>
+          </div>
+        )}
       </section>
       <AdminPanel requests={requests || []} cards={cards || []} />
     </main>

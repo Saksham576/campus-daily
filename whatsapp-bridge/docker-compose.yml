@@ -1,0 +1,8 @@
+services:
+  bridge:
+    build: .
+    restart: unless-stopped
+    env_file: .env          # INGEST_SECRET_KEY=… (same as on the PC); optional GROUPS, MIN_MEMBERS
+    volumes:
+      - ./data:/data        # WhatsApp login + timestamps survive restarts
+    shm_size: "512mb"
