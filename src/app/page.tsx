@@ -8,7 +8,7 @@ import { DayBoard, type BoardRow } from "@/components/DayBoard";
 import { FeedView } from "@/components/FeedView";
 import { buildSections } from "@/lib/sections";
 import { buildWeek, formatCourseCode, type UserCourse } from "@/lib/timetable/slots";
-import { applyCourseUpdates, istDate, type CourseUpdate } from "@/lib/timetable/updates";
+import { applyCourseUpdates, istDate, withPersonalOverrides, type CourseUpdate } from "@/lib/timetable/updates";
 
 export const dynamic = "force-dynamic";
 
@@ -16,13 +16,16 @@ const MIN_SCORE = 4;
 const IST = 5.5 * 3600_000;
 
 /** Today's classes (or the next class day's) for the departure board. */
-function boardFor(courses: UserCourse[], updates: CourseUpdate[], now: Date): { title: string; rows: BoardRow[] } {
+function boardFor(courses: UserCourse[], updates: CourseUpdate[], saved: any[], now: Date): { title: string; rows: BoardRow[] } {
   for (let offset = 0; offset < 8; offset++) {
     const day = new Date(now.getTime() + offset * 86400_000);
     const date = istDate(day.toISOString());
-    const week = applyCourseUpdates(
-      buildWeek(courses, day).map((s) => ({ ...s, is_cancelled: false })),
-      updates
+    const week = withPersonalOverrides(
+      applyCourseUpdates(
+        buildWeek(courses, day).map((s) => ({ ...s, is_cancelled: false })),
+        updates
+      ),
+      saved
     ).filter((s) => istDate(s.start_time) === date);
     const remaining = offset === 0 ? week.filter((s) => new Date(s.end_time || s.start_time).getTime() > now.getTime() - 2 * 3600_000) : week;
     if (week.length > 0 && (offset > 0 || remaining.length > 0)) {
@@ -70,11 +73,12 @@ export default async function HomePage() {
   const since = new Date(now.getTime() - 21 * 86400_000).toISOString();
   const today = istDate(now.toISOString());
 
-  const [feedRes, coursesRes, updatesRes, cardsRes] = await Promise.all([
+  const [feedRes, coursesRes, updatesRes, cardsRes, savedRes] = await Promise.all([
     supabase.rpc("me_feed", { p_since: since, p_min_score: MIN_SCORE }),
     supabase.from("user_courses").select("course_code, title, division, lecture_slots, tutorial_slots, venue"),
     supabase.from("course_updates").select("*").gte("on_date", today).lte("on_date", istDate(new Date(now.getTime() + 8 * 86400_000).toISOString())),
     supabase.from("sponsored_cards").select("id, sponsor, title, body, link, ends_on").lte("starts_on", today).order("created_at", { ascending: false }).limit(5),
+    supabase.from("user_schedules").select("id, title, location, start_time, end_time, slot_type, is_cancelled, notice_id").gte("start_time", new Date(now.getTime() - 86400_000).toISOString()).lte("start_time", new Date(now.getTime() + 9 * 86400_000).toISOString()),
   ]);
 
   const muted = new Set<string>(profile?.muted_senders || []);
@@ -89,7 +93,7 @@ export default async function HomePage() {
   const courses = (coursesRes.data || []) as UserCourse[];
   const myCourses = new Set(courses.map((c) => formatCourseCode(c.course_code)));
   const sections = buildSections(items, myCourses, now);
-  const board = boardFor(courses, (updatesRes.data || []) as CourseUpdate[], now);
+  const board = boardFor(courses, (updatesRes.data || []) as CourseUpdate[], savedRes.data || [], now);
   const sponsored = ((cardsRes.data || []) as (Sponsored & { ends_on: string | null })[]).find(
     (c) => !c.ends_on || c.ends_on >= today
   );

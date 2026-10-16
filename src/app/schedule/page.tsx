@@ -48,13 +48,7 @@ async function loadMergedSchedule(
     user_id: userId,
     is_cancelled: false,
   })) as ScheduleItem[];
-  const savedKeys = new Set(saved.map((s) => `${s.title}|${new Date(s.start_time).getTime()}`));
-  const merged = [
-    ...baseline.filter((b) => !savedKeys.has(`${b.title}|${new Date(b.start_time).getTime()}`)),
-    ...saved,
-  ];
-
-  // This week's course updates (Mon–Sun, IST dates)
+  // This week's course updates (Mon–Sun, IST dates), applied to the course classes first…
   const monday = new Date();
   monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
   const sunday = new Date(monday);
@@ -65,8 +59,12 @@ async function loadMergedSchedule(
     .gte("on_date", istDate(monday.toISOString()))
     .lte("on_date", istDate(sunday.toISOString()))
     .order("created_at", { ascending: true });
+  const week = applyCourseUpdates(baseline, (updates || []) as CourseUpdate[]) as ScheduleItem[];
 
-  return (applyCourseUpdates(merged, (updates || []) as CourseUpdate[]) as ScheduleItem[]).sort(
+  // …then the student's own saved slots win (their own Cancel / Restore and custom slots).
+  const key = (x: ScheduleItem) => `${x.title}|${new Date(x.start_time).getTime()}`;
+  const savedKeys = new Set(saved.map(key));
+  return [...week.filter((w) => !savedKeys.has(key(w))), ...saved].sort(
     (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
   );
 }
@@ -186,16 +184,41 @@ export default function SchedulePage() {
   async function handleToggleCancellation(slotId: string, currentStatus?: boolean) {
     const supabase = createClient();
     const nextStatus = !currentStatus;
+    const slot = schedules.find((s) => s.id === slotId);
+    if (!slot) return;
+    setSchedules((prev) => prev.map((s) => (s.id === slotId ? { ...s, is_cancelled: nextStatus } : s)));
 
-    setSchedules((prev) =>
-      prev.map((s) => (s.id === slotId ? { ...s, is_cancelled: nextStatus } : s))
-    );
-
-    if (!slotId.startsWith("course-") && !slotId.startsWith("custom-") && !slotId.startsWith("update-")) {
-      await supabase
+    if (slotId.startsWith("course-") || slotId.startsWith("update-") || slotId.startsWith("custom-")) {
+      // A class from your courses: save your own override so it survives reloads.
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data, error } = await supabase
         .from("user_schedules")
-        .update({ is_cancelled: nextStatus })
-        .eq("id", slotId);
+        .insert({
+          user_id: user.id,
+          title: slot.title,
+          location: slot.location || null,
+          start_time: slot.start_time,
+          end_time: slot.end_time || slot.start_time,
+          slot_type: ["lecture", "lab", "quiz", "exam", "deadline", "event", "custom"].includes(slot.slot_type) ? slot.slot_type : "lecture",
+          is_cancelled: nextStatus,
+        })
+        .select()
+        .single();
+      if (error) {
+        setStatusNotification("Could not save that change. Please try again.");
+        setSchedules((prev) => prev.map((s) => (s.id === slotId ? { ...s, is_cancelled: currentStatus } : s)));
+        return;
+      }
+      setSchedules((prev) => prev.map((s) => (s.id === slotId ? (data as ScheduleItem) : s)));
+    } else {
+      const { error } = await supabase.from("user_schedules").update({ is_cancelled: nextStatus }).eq("id", slotId);
+      if (error) {
+        setStatusNotification("Could not save that change. Please try again.");
+        setSchedules((prev) => prev.map((s) => (s.id === slotId ? { ...s, is_cancelled: currentStatus } : s)));
+      }
     }
   }
 
