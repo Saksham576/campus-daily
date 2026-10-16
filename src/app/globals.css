@@ -1646,3 +1646,27 @@ input[type="radio"] {
     top: 52px;
   }
 }
+
+/* Segmented control */
+.seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--surface-2);
+  width: fit-content;
+}
+.seg button {
+  border: 0;
+  background: none;
+  padding: 8px 12px;
+  border-radius: 7px;
+  color: var(--muted);
+}
+.seg button.on {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
