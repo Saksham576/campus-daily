@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { buildAskPrompt, parseAskReply, ASK_DAILY_LIMIT, type AskNotice } from "@/lib/ask";
 import { buildWeek, type UserCourse } from "@/lib/timetable/slots";
 import { cleanSubject } from "@/lib/display";
+import { geminiJson } from "@/lib/server/gemini";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -19,8 +20,6 @@ export async function POST(req: NextRequest) {
   const question = String(q || "").trim();
   if (question.length < 3) return NextResponse.json({ error: "Ask a question." }, { status: 400 });
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: "Not configured." }, { status: 500 });
 
   const since = new Date(Date.now() - 86400_000).toISOString();
   const { count } = await supabase.from("ask_log").select("id", { count: "exact", head: true }).eq("user_id", user.id).gte("asked_at", since);
@@ -43,18 +42,23 @@ export async function POST(req: NextRequest) {
   const classes = buildWeek((courses.data || []) as UserCourse[], now).map((s) => ({ when: s.start_time, title: s.title, venue: s.location }));
 
   const prompt = buildAskPrompt(question, { now, notices, classes, deadlines: deadlines.data || [], files: files.data || [] });
-  const model = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
-    }),
-  });
-  if (!res.ok) return NextResponse.json({ error: "Couldn't answer right now. Try again in a minute." }, { status: 502 });
-  const data: any = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  const g = await geminiJson(prompt);
+  if (!g.ok) {
+    const busy = g.status === 429 || g.status === 503;
+    return NextResponse.json({ error: busy ? "The AI is busy right now — try again in a minute." : "Couldn't answer that one. Try rephrasing." }, { status: 502 });
+  }
+  const text = g.text;
   const out = parseAskReply(text, notices);
   return NextResponse.json({ answer: out.answer, sources: out.sources.map((s) => ({ ...s, subject: cleanSubject(s.subject) })) });
+}
+
+/** GET /api/ask (Bearer CRON_SECRET) — health check: a tiny and a large Gemini call, statuses only. */
+export async function GET(req: NextRequest) {
+  if (!process.env.CRON_SECRET || req.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const small = await geminiJson('Reply as JSON: {"answer":"ok"}');
+  const big = await geminiJson('Reply as JSON: {"answer":"ok"}\n' + "Notice text. ".repeat(6000));
+  const view = (r: Awaited<ReturnType<typeof geminiJson>>) => (r.ok ? { ok: true } : { ok: false, status: r.status, detail: r.detail.slice(0, 200) });
+  return NextResponse.json({ model: process.env.GEMINI_MODEL || "default", small: view(small), big: view(big) });
 }
