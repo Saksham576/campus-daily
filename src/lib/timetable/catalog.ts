@@ -58,3 +58,20 @@ export function coursesFromShortnames(shortnames: string[]): { course_code: stri
   }
   return [...out.values()];
 }
+
+/**
+ * Courses every first-year student of a division takes (those offered to two or more of D1–D4,
+ * e.g. MA 105, CH 111, CS 101, BB 101), so the timetable isn't empty before Moodle is connected.
+ * Labs, HASMED electives and department courses need Moodle or a manual add.
+ */
+export function coursesForDivision(division: string | null | undefined) {
+  const d = (division || "").toUpperCase();
+  if (!/^D\d$/.test(d)) return [];
+  const out: { course_code: string; title: string; division: string; lecture_slots: string[]; tutorial_slots: string[]; venue: string | null }[] = [];
+  for (const [key, c] of Object.entries(COURSE_CATALOG)) {
+    const shared = c.divisions.filter((x) => /^D\d$/.test(x.d)).length >= 2;
+    const mine = c.divisions.find((x) => x.d === d);
+    if (shared && mine) out.push({ course_code: key, title: c.title, division: d, lecture_slots: mine.l, tutorial_slots: mine.t, venue: mine.v || null });
+  }
+  return out;
+}

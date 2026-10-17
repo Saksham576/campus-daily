@@ -9,6 +9,7 @@ import { CoursesEditor } from "@/components/CoursesEditor";
 import { MoodleConnect } from "@/components/MoodleConnect";
 import { PushToggle } from "@/components/PushToggle";
 import { DigestPicker } from "@/components/DigestPicker";
+import { coursesForDivision } from "@/lib/timetable/catalog";
 import { CATEGORIES, DEPARTMENTS, DIVISIONS, HASMED, HOSTELS, PROGRAM_YEARS } from "@/lib/constants";
 
 const STEPS = ["About you", "Your courses", "Interests", "Alerts"] as const;
@@ -90,6 +91,13 @@ export function WelcomeWizard({ demo = false }: { demo?: boolean }) {
       const { error: e } = await supabase.from("subscribers").upsert(payload, { onConflict: "email" });
       if (e) throw new Error(e.message);
       if (finish) {
+        // Show everything straight away: the division common courses (if none yet) and recent notices.
+        const { count } = await supabase.from("user_courses").select("course_code", { count: "exact", head: true });
+        if (!count && form.year === "1") {
+          const rows = coursesForDivision(form.division).map((c) => ({ ...c, user_id: user.id }));
+          if (rows.length) await supabase.from("user_courses").upsert(rows, { onConflict: "user_id,course_code", ignoreDuplicates: true });
+        }
+        await supabase.rpc("backfill_my_feed");
         router.refresh();
         router.replace("/");
       }
@@ -223,10 +231,19 @@ export function WelcomeWizard({ demo = false }: { demo?: boolean }) {
 
       {step === 3 && (
         <section className="welcome-card">
-          <h1>Stay in the loop</h1>
-          <p className="muted">Get a buzz when a class is cancelled or something urgent lands, plus a short morning summary at 7:30.</p>
+          <h1>Never walk to a cancelled class</h1>
+          <p className="muted">Turn on notifications and we&apos;ll tell you the moment a class is cancelled or moved. It looks like this:</p>
+          <div className="notif-demo" aria-hidden>
+            <Logo />
+            <div>
+              <b>CH 111 cancelled today</b>
+              <span>The 9:30 lecture in LA 201 won&apos;t happen.</span>
+            </div>
+            <time>now</time>
+          </div>
+          <PushToggle />
           <div className="welcome-block">
-            <PushToggle />
+            <h2>Also: a morning summary at 7:30</h2>
             <DigestPicker />
           </div>
         </section>

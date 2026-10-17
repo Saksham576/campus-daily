@@ -8,6 +8,7 @@ import { FeedView } from "@/components/FeedView";
 import { HomeHead } from "@/components/HomeHead";
 import { AskBox } from "@/components/AskBox";
 import { buildSections } from "@/lib/sections";
+import { coursesForDivision } from "@/lib/timetable/catalog";
 import { groupByEvent } from "@/lib/linking";
 import { buildWeek, formatCourseCode, type UserCourse } from "@/lib/timetable/slots";
 import { applyCourseUpdates, istDate, withPersonalOverrides, type CourseUpdate } from "@/lib/timetable/updates";
@@ -84,6 +85,14 @@ function addMoodleDeadlines(sections: Record<string, any[]>, rows: MoodleDue[]) 
   sections.exams.sort((a, b) => t(a) - t(b));
 }
 
+/** Why the board is empty, and the way out. */
+function noTimetableText(year?: string | null, division?: string | null): string {
+  if (String(year || "") === "1" && division && coursesForDivision(division).length === 0)
+    return `We don't have the ${division} timetable yet. Connect Moodle or add your courses in Settings.`;
+  if (String(year || "") !== "1") return "We only have first-year timetables so far. Connect Moodle or add your courses in Settings.";
+  return "Connect Moodle or add your courses in Settings to see your classes here.";
+}
+
 export default async function HomePage() {
   const supabase = await createClient();
   const {
@@ -93,7 +102,7 @@ export default async function HomePage() {
 
   const { data: profile } = await supabase
     .from("subscribers")
-    .select("onboarded_at, name, last_seen_at, muted_senders")
+    .select("onboarded_at, name, last_seen_at, muted_senders, year, division")
     .eq("email", user.email)
     .single();
   if (!profile?.onboarded_at) redirect("/welcome");
@@ -102,6 +111,17 @@ export default async function HomePage() {
   // 21 days so deadlines and upcoming events announced earlier stay on the board.
   const since = new Date(now.getTime() - 21 * 86400_000).toISOString();
   const today = istDate(now.toISOString());
+
+  // New student with nothing yet: fill recent notices and the division's common courses right away.
+  const [{ count: haveItems }, { count: haveCourses }] = await Promise.all([
+    supabase.from("user_items").select("item_id", { count: "exact", head: true }).eq("email", (user.email || "").toLowerCase()),
+    supabase.from("user_courses").select("course_code", { count: "exact", head: true }),
+  ]);
+  if (!haveItems) await supabase.rpc("backfill_my_feed");
+  if (!haveCourses && String(profile?.year || "") === "1") {
+    const rows = coursesForDivision(profile?.division).map((c) => ({ ...c, user_id: user.id }));
+    if (rows.length) await supabase.from("user_courses").upsert(rows, { onConflict: "user_id,course_code", ignoreDuplicates: true });
+  }
 
   const [feedRes, coursesRes, updatesRes, cardsRes, savedRes, enrolRes, dueRes] = await Promise.all([
     supabase.rpc("me_feed", { p_since: since, p_min_score: MIN_SCORE }),
@@ -163,7 +183,7 @@ export default async function HomePage() {
             <DayBoard
               title={board.title}
               rows={board.rows}
-              emptyText={courses.length ? "No classes scheduled." : "Add your courses in Settings to see your classes here."}
+              emptyText={courses.length ? "No classes scheduled." : noTimetableText(profile?.year, profile?.division)}
             />
             <AskBox />
           </aside>

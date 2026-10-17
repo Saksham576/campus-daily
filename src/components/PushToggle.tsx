@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { Bell, BellOff, BellRing } from "lucide-react";
 
 function urlBase64ToUint8Array(base64: string) {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
@@ -63,15 +64,47 @@ export function PushToggle() {
   }
 
   if (state === "unsupported") {
-    return <p className="muted small">Phone alerts aren&apos;t supported here. On iPhone, first add Campus Daily to your Home Screen.</p>;
+    return (
+      <div className="push-card">
+        <span className="push-ico" aria-hidden>
+          <BellOff />
+        </span>
+        <div className="push-text">
+          <b>Notifications aren&apos;t available in this browser</b>
+          <span className="help">On iPhone, first tap Share → Add to Home Screen, then open Campus Daily from there.</span>
+        </div>
+      </div>
+    );
+  }
+  if (state === "on") {
+    return (
+      <div className="push-card on">
+        <span className="push-ico" aria-hidden>
+          <BellRing />
+        </span>
+        <div className="push-text">
+          <b>Notifications are on</b>
+          <span className="help">You&apos;ll hear about cancelled classes, venue changes and urgent notices.</span>
+        </div>
+        <button type="button" className="ghost" onClick={disable}>
+          Turn off
+        </button>
+      </div>
+    );
   }
   return (
-    <div>
-      <button type="button" className="link" disabled={state === "busy"} onClick={state === "on" ? disable : enable}>
-        {state === "on" ? "🔔 Alerts on — turn off" : state === "busy" ? "…" : "🔕 Turn on phone alerts"}
+    <div className="push-card">
+      <span className="push-ico" aria-hidden>
+        <Bell />
+      </span>
+      <div className="push-text">
+        <b>Get notified when a class is cancelled</b>
+        <span className="help">Also venue changes and urgent notices. Never spam.</span>
+      </div>
+      <button type="button" className="primary" disabled={state === "busy"} onClick={enable}>
+        {state === "busy" ? "Turning on…" : "Turn on notifications"}
       </button>
-      <p className="muted small">Only for class cancellations, venue changes and top-priority notices.</p>
-      {error && <p className="err">{error}</p>}
+      {error && <p className="err" style={{ gridColumn: "1 / -1" }}>{error}</p>}
     </div>
   );
 }
