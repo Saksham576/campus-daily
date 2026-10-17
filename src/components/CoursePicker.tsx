@@ -25,7 +25,9 @@ const DEPT_PREFIX: [RegExp, string[]][] = [
 type Pick = Record<string, string>; // course key → division / batch / section ("" = not taking)
 
 const isLab = (key: string) => COURSE_CATALOG[key].divisions.every((d) => /^P\d+$/.test(d.d));
-const isElective = (key: string) => COURSE_CATALOG[key].divisions.every((d) => /^S\d$/.test(d.d));
+// HASMED: the sectioned humanities / design / management courses, plus ENT 101 (one section).
+const HASMED_EXTRA = ["ENT101"];
+const isElective = (key: string) => HASMED_EXTRA.includes(key) || COURSE_CATALOG[key].divisions.every((d) => /^S\d$/.test(d.d));
 
 /**
  * Setup step without Moodle: build the timetable from the course catalog (ResoBin data).
@@ -140,11 +142,12 @@ export function CoursePicker({ division, department, onSaved }: { division: stri
         </p>
       )}
 
-      <h3>Your lab batches</h3>
-      <p className="help">Your batch is on your lab schedule or Moodle (e.g. P16). Leave unticked if you don&apos;t have that lab this semester.</p>
+      <h3>Labs and Makerspace</h3>
+      <p className="help">These run by batch. Your batch is on your lab schedule or Moodle (e.g. P16). Leave unticked if you don&apos;t have it this semester.</p>
       {labs.map((k) => row(k, opts(k), "Batch"))}
 
-      <h3>HASMED / design electives</h3>
+      <h3>Your HASMED</h3>
+      <p className="help">Tick the one you were allotted and pick its section (S1 or S2).</p>
       {electives.map((k) => row(k, opts(k), "Section"))}
 
       <h3>Department and other courses</h3>
