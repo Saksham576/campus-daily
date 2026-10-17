@@ -105,6 +105,9 @@ export function claimFrom(item: LinkItem, now = new Date()): Claim | null {
   const at = item.received_at || now.toISOString();
   const base = { item_id: item.id, source: sourceKind(item), trust: trustOf(item), at, title: item.subject, tokens: titleTokens(item.subject) };
 
+  // New-file announcements and students' doubt-forum posts aren't events.
+  if (/:\s*(New file|Seating plan) —/.test(item.subject) || /->\s*Doubt Forum\s*->/i.test(body)) return null;
+
   // Course notices: reuse the timetable rules (cancel / move / quiz-exam-deadline).
   const u = updateFromNotice(item.subject, body, item.id, new Date(at));
   if (u) {
@@ -201,10 +204,13 @@ export function resolveClaims(claims: Claim[]): Resolved {
 
 const norm = (v: string) => v.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-/** One timetable change for the whole event (replaces per-notice changes). */
-export function eventCourseUpdate(eventId: string, e: { course_code: string | null; kind: ClaimKind; on_date: string }, r: Resolved, verified: boolean): CourseUpdate | null {
-  if (!e.course_code) return null;
-  const notice_id = `ev:${eventId}`;
+/**
+ * One timetable change for the whole event (replaces per-notice changes). It hangs off the event's
+ * most trusted notice (course_updates.notice_id must be a real notice).
+ */
+export function eventCourseUpdate(primaryNoticeId: string, e: { course_code: string | null; kind: ClaimKind; on_date: string }, r: Resolved, verified: boolean): CourseUpdate | null {
+  if (!e.course_code || !primaryNoticeId) return null;
+  const notice_id = primaryNoticeId;
   if (e.kind === "assessment") {
     if (!r.start) return null;
     return { course_code: e.course_code, kind: "added", on_date: e.on_date, new_start: r.start, new_end: r.end, new_location: r.venue, slot_type: "quiz", title: r.title, notice_id, verified };

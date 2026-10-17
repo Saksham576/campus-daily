@@ -45,7 +45,11 @@ const MOVE_RE = /\b(shifted|moved|rescheduled|preponed|venue\s+(?:changed|change
 const POSTED_LINE_RE =
   /\bby\s[^\n]{0,80}?\s[-–]\s(?:mon|tues|wednes|thurs|fri|satur|sun)day,?\s+\d{1,2}\s+[a-z]+\s+\d{4},?\s+\d{1,2}:\d{2}\s*(?:am|pm)?/gi;
 // Follow-ups about a past assessment, not a new event.
-const AFTERMATH_RE = /\b(solutions?|answer\s*key|results?|marks|grades?|graded|uploaded|released|feedback|re-?evaluation)\b/i;
+const AFTERMATH_RE =
+  /\b(solutions?|answer\s*(?:keys?|sheets?|scripts?)|answersheets?|results?|marks|grades?|graded|uploaded|released|feedback|re-?evaluation|crib|paper viewing|viewing session)\b/i;
+// The event parser falls back to "today" when no date is written; a timetable change needs a real one.
+const DATE_WORDS_RE =
+  /\b(\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?|\d{1,2}[/.-]\d{1,2}(?:[/.-]\d{2,4})?|\d{4}-\d{2}-\d{2}|today|tonight|tomorrow|(?:mon|tues|wednes|thurs|fri|satur|sun)day)\b/i;
 
 /** Turn a notice into a course-level timetable change, or null if it isn't one. */
 export function updateFromNotice(
@@ -58,6 +62,7 @@ export function updateFromNotice(
   const ev = extractEventDetails(subject, body);
   if (!ev || !ev.course_code) return null;
   const text = `${subject}\n${body}`;
+  if (!DATE_WORDS_RE.test(text)) return null;
   const hasTime = extractTimeFromText(text) !== null;
   const base = { course_code: ev.course_code, on_date: istDate(ev.start_time), notice_id: noticeId ?? null };
   const startsLater = new Date(ev.start_time).getTime() > receivedAt.getTime();

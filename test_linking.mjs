@@ -39,7 +39,7 @@ assert.strictEqual(cc.kind, "class");
 assert.strictEqual(resolveClaims([cc]).cancelled, true);
 const upd = eventCourseUpdate("abc", { course_code: "CH 111", kind: "class", on_date: cc.on_date }, resolveClaims([cc]), true);
 assert.strictEqual(upd.kind, "cancelled");
-assert.strictEqual(upd.notice_id, "ev:abc");
+assert.strictEqual(upd.notice_id, "abc", "hangs off the primary notice");
 
 // Different courses / days never join
 assert.strictEqual(matchScore({ ...ce, course_code: "CH 111" }, ev), "no");
@@ -68,3 +68,11 @@ assert.strictEqual(grouped[0].linked.sources.length, 3);
 assert.strictEqual(grouped[0].linked.venue, "LA 201");
 assert.strictEqual(grouped[1].linked, undefined);
 console.log("✓ Passed: notices about one event collapse into one card");
+
+// Real false positives from the first backfill
+assert.strictEqual(claimFrom({ id: "f1", source: "moodle", subject: "CS 101-2026-1-ALL: New file — Theory Quiz 1", body: "quiz1.pdf" }, now), null, "a file isn't an event");
+assert.strictEqual(claimFrom({ id: "f2", subject: "MA 105-2026-1-ALL: MA105 Quizz", body: "MA 105-2026-1-ALL -> Forums -> Doubt Forum -> MA105 Quizz. In Q9 part 1 is checked" }, now), null, "doubt forum chatter");
+assert.strictEqual(claimFrom({ id: "f3", subject: "CH 111-2026-1-D3: Crib session: Organic and Inorganic papers", body: "Crib session on 20 October 2026 at 6 PM in LA 202", received_at: "2026-10-17T01:00:00Z" }, now)?.kind === "assessment", false, "crib isn't a quiz");
+import { updateFromNotice } from "./src/lib/timetable/updates.ts";
+assert.strictEqual(updateFromNotice("CS 101 Quiz", "Quiz details are on Moodle.", "n", now), null, "no written date → no timetable change");
+console.log("✓ Passed: files, doubt-forum posts, crib sessions and undated notices don't become events");
