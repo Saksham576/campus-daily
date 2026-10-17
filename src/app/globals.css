@@ -2374,3 +2374,101 @@ a.doc-hit:hover {
 .week-col.today {
   background: color-mix(in srgb, var(--accent) 5%, transparent);
 }
+
+/* Interest chips are buttons in the setup flow: keep the selected colour on hover and while pressed */
+button.chip {
+  box-shadow: none;
+  transition: none;
+}
+button.chip:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--rule-strong);
+}
+.chip.on,
+button.chip.on:hover:not(:disabled) {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+
+/* Notifications card */
+.push-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px 14px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.push-card.on {
+  border-color: color-mix(in srgb, var(--green) 35%, var(--rule));
+}
+.push-ico {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.push-card.on .push-ico {
+  background: var(--green-soft);
+  color: var(--green);
+}
+.push-ico .lucide {
+  width: 20px;
+  height: 20px;
+}
+.push-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.push-text b {
+  font-weight: 600;
+  font-size: 14.5px;
+}
+@media (max-width: 560px) {
+  .push-card {
+    grid-template-columns: auto 1fr;
+  }
+  .push-card > button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}
+
+/* Example notification in the setup flow */
+.notif-demo {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  margin: 18px 0 14px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  box-shadow: var(--shadow);
+  max-width: 420px;
+}
+.notif-demo .brand-logo {
+  width: 32px;
+  height: 32px;
+}
+.notif-demo b {
+  display: block;
+  font-size: 13.5px;
+}
+.notif-demo span {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.notif-demo time {
+  align-self: start;
+  font-size: 11.5px;
+  color: var(--faint);
+}

@@ -124,3 +124,10 @@ assert.strictEqual(updateFromNotice("HS 109-2026-1-S1: Reading about Kant", "Rea
 assert.strictEqual(updateFromNotice("CS 105-2026-1-D3: Tutorial sheet on posets", "Practice for the quiz on 25 October 2026 at 9 AM.", "p", ref), null);
 assert.strictEqual(updateFromNotice("MA 105 Quiz 3", "Quiz 3 on 23 October 2026 at 2 PM in LA 201.", "q", ref).kind, "added");
 console.log("✓ Passed: only notices that name a quiz/exam add one to the timetable");
+
+import { coursesForDivision } from "./src/lib/timetable/catalog.ts";
+assert.deepStrictEqual(coursesForDivision("D3").map((c) => c.course_code).sort(), ["CH111", "CS101", "MA105"]);
+assert.deepStrictEqual(coursesForDivision("D1").map((c) => c.course_code).sort(), ["BB101", "CH111", "MA105"]);
+assert.deepStrictEqual(coursesForDivision("S1"), []);
+assert.deepStrictEqual(coursesForDivision(null), []);
+console.log("✓ Passed: a division's common first-year courses fill the timetable");
