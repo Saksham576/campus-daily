@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
+import { ExtensionUpdate } from "@/components/ExtensionUpdate";
 
 const NEEDS = [1, 2, 0]; // extension version that can import (1.2.0)
 const atLeast = (v: string) => {
@@ -79,7 +80,7 @@ export function ResobinImport({ onDone }: { onDone?: (count: number) => void }) 
           {ready
             ? "Copies your exact courses, labs, HASMED and rooms from your ResoBin timetable."
             : ext
-            ? "Update the Campus Daily Connect extension to use this: download it again from Settings → Moodle, then click Reload on chrome://extensions."
+            ? "Your Campus Daily Connect extension is too old for this. Use the update link below, then click Reload on chrome://extensions."
             : "Needs the Campus Daily Connect extension on a laptop (see Moodle above) and your ResoBin timetable filled in."}
         </span>
       </div>
@@ -87,6 +88,11 @@ export function ResobinImport({ onDone }: { onDone?: (count: number) => void }) 
         <button type="button" className="primary" onClick={start} disabled={busy}>
           {busy ? "Importing…" : "Import"}
         </button>
+      )}
+      {ext && !ready && (
+        <div style={{ gridColumn: "1 / -1" }}>
+          <ExtensionUpdate />
+        </div>
       )}
       {msg && (
         <p className={msg.ok ? "help" : "err"} style={{ gridColumn: "1 / -1", margin: 0 }}>

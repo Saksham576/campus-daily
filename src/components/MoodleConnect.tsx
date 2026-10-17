@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { ExtensionUpdate } from "@/components/ExtensionUpdate";
 
 type Conn = { moodle_fullname: string | null; connected_at: string; last_sync_at: string | null; last_error: string | null };
 
@@ -97,6 +98,7 @@ export function MoodleConnect() {
             Disconnect
           </button>
         </div>
+        <ExtensionUpdate />
         {msg && <p className="note">{msg}</p>}
       </div>
     );
@@ -112,6 +114,7 @@ export function MoodleConnect() {
           <button type="button" className="primary" onClick={connect} disabled={waiting}>
             {waiting ? "Waiting for Moodle sign-in…" : "Connect Moodle"}
           </button>
+          <ExtensionUpdate />
         </>
       ) : (
         <>
