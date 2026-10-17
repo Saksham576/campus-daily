@@ -83,6 +83,7 @@ export default function SchedulePage() {
   const [statusNotification, setStatusNotification] = useState<string | null>(null);
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [moodleOn, setMoodleOn] = useState(true);
 
   // Form state for adding custom slot
   const [newTitle, setNewTitle] = useState("");
@@ -118,6 +119,8 @@ export default function SchedulePage() {
         setUserHasmed(sub.hasmed);
       }
 
+      const { count: mc } = await supabase.from("moodle_connections").select("user_id", { count: "exact", head: true });
+      setMoodleOn(!!mc);
       setSchedules(await loadMergedSchedule(user.id, sub?.division, sub?.hasmed));
       setLoading(false);
     }
@@ -358,6 +361,12 @@ export default function SchedulePage() {
           </form>
         )}
 
+        {!moodleOn && schedules.length > 0 && (
+          <p className="note" style={{ marginTop: 0, marginBottom: 16 }}>
+            Times come from the official IITB slot chart. Moodle isn&apos;t connected, so changes your professors post there (extra classes, shifted labs) won&apos;t show.{" "}
+            <Link href="/settings#moodle">Connect Moodle</Link>
+          </p>
+        )}
         <TimetableView slots={schedules} onToggle={handleToggleCancellation} />
       </main>
     </>

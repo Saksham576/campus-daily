@@ -29,7 +29,7 @@ function statusOf(r: BoardRow, now: number): { text: string; cls: string; phase:
 }
 
 /** Today's classes as a quiet timeline; the current one is highlighted. */
-export function DayBoard({ title, rows, emptyText }: { title: string; rows: BoardRow[]; emptyText: string }) {
+export function DayBoard({ title, rows, emptyText, note }: { title: string; rows: BoardRow[]; emptyText: string; note?: string | null }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
@@ -82,6 +82,7 @@ export function DayBoard({ title, rows, emptyText }: { title: string; rows: Boar
           })}
         </ul>
       )}
+      {note && rows.length > 0 && <p className="today-note">{note}</p>}
     </section>
   );
 }

@@ -8,6 +8,7 @@ import { PushToggle } from "@/components/PushToggle";
 import { DigestPicker } from "@/components/DigestPicker";
 import { Panel, SettingsRail, ThemePicker } from "@/components/SettingsLayout";
 import { CoursesEditor } from "@/components/CoursesEditor";
+import { CoursePicker } from "@/components/CoursePicker";
 import { MoodleConnect } from "@/components/MoodleConnect";
 import { CalendarLink } from "@/components/CalendarLink";
 import { AppBar } from "@/components/AppBar";
@@ -263,7 +264,11 @@ function SettingsContent() {
             </Panel>
 
             <Panel id="courses" title="My courses" sub="Your timetable is built from these. Pick your division and the slots fill in from ResoBin.">
-              <CoursesEditor />
+              <CoursePicker division={form.division || ""} department={form.department} />
+              <details className="more-courses">
+                <summary>A course isn&apos;t listed? Add it by code</summary>
+                <CoursesEditor />
+              </details>
             </Panel>
 
             <Panel

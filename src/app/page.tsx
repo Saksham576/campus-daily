@@ -123,7 +123,7 @@ export default async function HomePage() {
     if (rows.length) await supabase.from("user_courses").upsert(rows, { onConflict: "user_id,course_code", ignoreDuplicates: true });
   }
 
-  const [feedRes, coursesRes, updatesRes, cardsRes, savedRes, enrolRes, dueRes] = await Promise.all([
+  const [feedRes, coursesRes, updatesRes, cardsRes, savedRes, enrolRes, dueRes, moodleRes] = await Promise.all([
     supabase.rpc("me_feed", { p_since: since, p_min_score: MIN_SCORE }),
     supabase.from("user_courses").select("course_code, title, division, lecture_slots, tutorial_slots, venue"),
     supabase.from("course_updates").select("*").gte("on_date", today).lte("on_date", istDate(new Date(now.getTime() + 8 * 86400_000).toISOString())),
@@ -131,6 +131,7 @@ export default async function HomePage() {
     supabase.from("user_schedules").select("id, title, location, start_time, end_time, slot_type, is_cancelled, notice_id").gte("start_time", new Date(now.getTime() - 86400_000).toISOString()).lte("start_time", new Date(now.getTime() + 9 * 86400_000).toISOString()),
     supabase.from("moodle_enrolments").select("course_code"),
     supabase.from("moodle_deadlines").select("event_id, course_code, name, kind, due_at, url").gte("due_at", new Date(now.getTime() - 3600_000).toISOString()).order("due_at"),
+    supabase.from("moodle_connections").select("user_id", { count: "exact", head: true }),
   ]);
 
   const muted = new Set<string>(profile?.muted_senders || []);
@@ -184,6 +185,7 @@ export default async function HomePage() {
               title={board.title}
               rows={board.rows}
               emptyText={courses.length ? "No classes scheduled." : noTimetableText(profile?.year, profile?.division)}
+              note={moodleRes.count ? null : "From the official slot chart. Connect Moodle (Settings) so last-minute changes show here."}
             />
             <AskBox />
           </aside>

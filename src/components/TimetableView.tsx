@@ -54,8 +54,11 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
   const todayKey = ist(new Date().toISOString()).toISOString().slice(0, 10);
 
   const weekday = slots.filter((s) => dayIndex(s.start_time) < 5);
-  const startH = Math.min(8, ...weekday.map((s) => Math.floor(minutesOf(s.start_time) / 60)));
-  const endH = Math.max(18, ...weekday.map((s) => Math.ceil(minutesOf(s.end_time || s.start_time) / 60)));
+  // Fit the grid to the hours that actually have classes (an all-afternoon week starts at 14:00), at least 6 hours tall.
+  const firstH = weekday.length ? Math.min(...weekday.map((s) => Math.floor(minutesOf(s.start_time) / 60))) : 8;
+  const lastH = weekday.length ? Math.max(...weekday.map((s) => Math.ceil(minutesOf(s.end_time || s.start_time) / 60))) : 18;
+  const startH = Math.max(7, Math.min(firstH, lastH - 6));
+  const endH = Math.max(lastH, startH + 6);
   const hours = Array.from({ length: endH - startH }, (_, i) => startH + i);
 
   const daySlots = weekday.filter((s) => dayIndex(s.start_time) === day);
