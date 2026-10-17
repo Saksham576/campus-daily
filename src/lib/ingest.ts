@@ -1,13 +1,25 @@
 import { timingSafeEqual, createHash, createHmac } from "node:crypto";
 import { CATEGORIES } from "./constants.ts";
 
+export type Attachment = { path: string; name: string; mime: string | null };
+
 export type InboundEmail = {
   messageId: string;
   subject: string;
   from: string;
   date: string; // ISO
   body: string;
+  /** Files already uploaded to the private attachments bucket (see /api/ingest/upload-url). */
+  attachments?: Attachment[];
+  /** Mail headers used to tell list mail from personal mail, and whose forward it was. */
+  to?: string;
+  cc?: string;
+  listId?: string;
+  deliveredTo?: string;
 };
+
+/** Upload paths we hand out: "2026-10/<16 hex>/<file name>". Anything else is ignored. */
+export const ATTACHMENT_PATH_RE = /^\d{4}-\d{2}\/[a-f0-9]{16}\/[^/]{1,140}$/;
 
 export type ScoredNotice = {
   score: number;
@@ -126,7 +138,24 @@ export function parseInboundEmail(raw: unknown, now = new Date()): InboundEmail 
     str(r.message_id).trim() ||
     createHash("sha256").update(`${from}|${subject}|${date.toISOString()}|${body.slice(0, 500)}`).digest("hex").slice(0, 32);
 
-  return { messageId, subject: subject || "(no subject)", from, date: date.toISOString(), body };
+  const attachments = (Array.isArray(r.attachments) ? r.attachments : [])
+    .filter((a: any) => a && typeof a.path === "string" && ATTACHMENT_PATH_RE.test(a.path))
+    .slice(0, 10)
+    .map((a: any) => ({ path: a.path, name: str(a.name).slice(0, 200) || a.path.split("/").pop(), mime: str(a.mime) || null }));
+  const hdr = (v: unknown) => str(v).slice(0, 2000);
+
+  return {
+    messageId,
+    subject: subject || "(no subject)",
+    from,
+    date: date.toISOString(),
+    body,
+    attachments,
+    to: hdr(r.to),
+    cc: hdr(r.cc),
+    listId: hdr(r.listId),
+    deliveredTo: hdr(r.deliveredTo),
+  };
 }
 
 /** Stable item id derived from the RFC 5322 Message-ID so redeliveries upsert, not duplicate. */

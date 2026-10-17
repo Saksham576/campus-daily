@@ -1,0 +1,147 @@
+/**
+ * Text out of course documents: PDF (unpdf/pdf.js), Word / PowerPoint / Excel (they are zip files of XML),
+ * and plain text. Scanned PDFs come back nearly empty — the worker can send those to the AI instead.
+ */
+import { unzipSync, strFromU8 } from "fflate";
+
+export type Page = { page: number; text: string };
+export type Extracted = { pages: Page[]; kind: string };
+
+export const MAX_DOC_BYTES = 25 * 1024 * 1024;
+
+export function docKind(name: string, mime?: string | null): string | null {
+  const n = name.toLowerCase();
+  if (n.endsWith(".pdf") || mime === "application/pdf") return "pdf";
+  if (n.endsWith(".docx")) return "docx";
+  if (n.endsWith(".pptx")) return "pptx";
+  if (n.endsWith(".xlsx")) return "xlsx";
+  if (/\.(txt|csv|md|tsv)$/.test(n) || mime?.startsWith("text/")) return "text";
+  return null;
+}
+
+const decode = (s: string) =>
+  s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_m, d) => String.fromCodePoint(+d))
+    .replace(/&amp;/g, "&");
+
+/** Text runs of an Office XML part, with paragraph / row breaks kept as newlines. */
+function xmlText(xml: string, tag: "w:t" | "a:t" | "t"): string {
+  const breaks = xml.replace(/<\/(w:p|a:p|row)>/g, "\n").replace(/<(w:tab|w:br)\/>/g, " ");
+  const re = new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>|\\n`, "g");
+  let out = "";
+  for (const m of breaks.matchAll(re)) out += m[1] !== undefined ? decode(m[1]) + (tag === "t" ? "\t" : "") : "\n";
+  return out.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function officePages(buf: Uint8Array, kind: "docx" | "pptx" | "xlsx"): Page[] {
+  const files = unzipSync(buf, {
+    filter: (f) =>
+      kind === "docx"
+        ? f.name === "word/document.xml"
+        : kind === "pptx"
+          ? /^ppt\/slides\/slide\d+\.xml$/.test(f.name)
+          : f.name === "xl/sharedStrings.xml" || /^xl\/worksheets\/sheet\d+\.xml$/.test(f.name),
+  });
+  if (kind === "docx") return [{ page: 1, text: xmlText(strFromU8(files["word/document.xml"] || new Uint8Array()), "w:t") }];
+  if (kind === "pptx") {
+    return Object.keys(files)
+      .map((k) => ({ page: +k.match(/slide(\d+)\.xml$/)![1], text: xmlText(strFromU8(files[k]), "a:t") }))
+      .sort((a, b) => a.page - b.page);
+  }
+  // xlsx: shared strings in order, then each sheet's cells (strings by index, numbers inline)
+  const shared = [...strFromU8(files["xl/sharedStrings.xml"] || new Uint8Array()).matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) =>
+    [...m[1].matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g)].map((t) => decode(t[1])).join("")
+  );
+  return Object.keys(files)
+    .filter((k) => k.startsWith("xl/worksheets/"))
+    .map((k) => {
+      const xml = strFromU8(files[k]);
+      const rows = [...xml.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g)].map((r) =>
+        [...r[1].matchAll(/<c([^>]*)>([\s\S]*?)<\/c>/g)]
+          .map((c) => {
+            const v = c[2].match(/<v>([\s\S]*?)<\/v>/)?.[1] ?? c[2].match(/<t[^>]*>([\s\S]*?)<\/t>/)?.[1] ?? "";
+            return /t="s"/.test(c[1]) ? shared[+v] ?? "" : decode(v);
+          })
+          .join("\t")
+      );
+      return { page: +(k.match(/sheet(\d+)\.xml$/)?.[1] || 1), text: rows.join("\n").trim() };
+    })
+    .sort((a, b) => a.page - b.page);
+}
+
+export async function extractText(buf: Uint8Array, name: string, mime?: string | null): Promise<Extracted | null> {
+  const kind = docKind(name, mime);
+  if (!kind || buf.byteLength > MAX_DOC_BYTES) return null;
+  if (kind === "text") return { kind, pages: [{ page: 1, text: new TextDecoder().decode(buf).slice(0, 400_000) }] };
+  if (kind === "pdf") {
+    const { extractText: pdfText, getDocumentProxy } = await import("unpdf");
+    const pdf = await getDocumentProxy(new Uint8Array(buf));
+    const { text } = await pdfText(pdf, { mergePages: false });
+    return { kind, pages: (text as string[]).map((t, i) => ({ page: i + 1, text: t.replace(/[ \t]+/g, " ").trim() })) };
+  }
+  return { kind, pages: officePages(buf, kind as "docx" | "pptx" | "xlsx") };
+}
+
+/** True when a PDF yields almost no text for its size — probably a scan. */
+export function looksScanned(ex: Extracted): boolean {
+  if (ex.kind !== "pdf") return false;
+  const chars = ex.pages.reduce((n, p) => n + p.text.length, 0);
+  return chars < 40 * Math.max(1, ex.pages.length);
+}
+
+// ---------- chunks & class lists ----------
+
+export type Chunk = { idx: number; page: number; content: string };
+
+/** ~1,200-character chunks that never span pages (so answers can cite a page). */
+export function chunkPages(pages: Page[], size = 1200): Chunk[] {
+  const out: Chunk[] = [];
+  for (const p of pages) {
+    const paras = p.text.split(/\n{2,}|\n(?=\S)/).map((x) => x.trim()).filter(Boolean);
+    let cur = "";
+    for (const para of paras) {
+      if (cur && cur.length + para.length + 1 > size) {
+        out.push({ idx: out.length, page: p.page, content: cur });
+        cur = "";
+      }
+      cur = cur ? `${cur}\n${para}` : para.slice(0, size * 2);
+    }
+    if (cur) out.push({ idx: out.length, page: p.page, content: cur });
+  }
+  return out;
+}
+
+/** IITB roll numbers: 26b2477, 23D0123, 210100045. */
+const ROLL_RE = /\b(\d{2}[a-z]\d{4}|\d{9})\b/gi;
+
+/**
+ * Lists with many students' rows (mess dues, marks, seating) are never stored whole: each student
+ * only ever sees the lines with their own roll number. Returns null for normal documents.
+ */
+export function rosterRows(pages: Page[]): { roll: string; page: number; line: string }[] | null {
+  const lines = pages.flatMap((p) => p.text.split("\n").map((line) => ({ page: p.page, line: line.trim() })));
+  const rolls = new Set<string>();
+  for (const l of lines) for (const m of l.line.matchAll(ROLL_RE)) rolls.add(m[1].toLowerCase());
+  if (rolls.size < 8) return null;
+  const rows: { roll: string; page: number; line: string }[] = [];
+  for (const l of lines) {
+    const found = new Set([...l.line.matchAll(ROLL_RE)].map((m) => m[1].toLowerCase()));
+    for (const roll of found) rows.push({ roll, page: l.page, line: l.line.slice(0, 500) });
+  }
+  return rows;
+}
+
+/** The shareable part of a class list: only what comes before the first student row (title, headers). */
+export function rosterHeader(pages: Page[]): Page[] {
+  const roll = new RegExp(ROLL_RE.source, "i");
+  for (const p of pages) {
+    const lines = p.text.split("\n");
+    const first = lines.findIndex((l) => roll.test(l));
+    if (first >= 0) return [{ page: p.page, text: lines.slice(0, first).join("\n").slice(0, 1500) }];
+  }
+  return [];
+}

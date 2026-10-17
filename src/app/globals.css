@@ -2209,3 +2209,49 @@ button.danger:hover:not(:disabled) {
   background: repeating-linear-gradient(135deg, var(--surface-2) 0 6px, var(--surface) 6px 12px);
   border-left-color: var(--red);
 }
+
+/* ---------- Document search ---------- */
+.doc-hit {
+  display: grid;
+  gap: 4px;
+  padding: 11px 16px;
+  text-decoration: none;
+}
+a.doc-hit:hover {
+  background: var(--surface-2);
+}
+.doc-hit-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 14px;
+}
+.doc-hit-head .lucide {
+  width: 15px;
+  height: 15px;
+  color: var(--faint);
+  flex: none;
+}
+.doc-hit-head b {
+  font-weight: 550;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.doc-hit-head .from {
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.doc-snippet {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.doc-snippet mark {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  border-radius: 3px;
+  padding: 0 2px;
+}

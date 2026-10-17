@@ -94,6 +94,35 @@ async function refreshWatched() {
   console.log(`Watching ${watched.size} group(s) (${MIN_MEMBERS}+ members${GROUPS.length ? " + listed" : ""}, admins only: ${ADMINS_ONLY}).`);
 }
 
+// ---------- documents ----------
+const UPLOAD_URL = INGEST_URL.replace(/\/api\/ingest\/email$/, "/api/ingest/upload-url");
+const DOC_RE = /\.(pdf|docx|pptx|xlsx|txt|csv)$/i;
+
+/** Upload a shared document (PDF / Word / PowerPoint / Excel) to Campus Daily's private storage. */
+async function uploadDocument(msg) {
+  const name = (msg._data?.filename || msg.body || "").trim();
+  if (!DOC_RE.test(name)) return null;
+  const size = Number(msg._data?.size || 0);
+  if (size > 25 * 1024 * 1024) return null;
+  try {
+    const media = await msg.downloadMedia();
+    if (!media?.data) return null;
+    const bytes = Buffer.from(media.data, "base64");
+    const res = await fetch(UPLOAD_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-ingest-secret": SECRET },
+      body: JSON.stringify({ name, mime: media.mimetype, size: bytes.length }),
+    });
+    if (!res.ok) return null;
+    const { path, url } = await res.json();
+    const put = await fetch(url, { method: "PUT", headers: { "content-type": media.mimetype || "application/octet-stream" }, body: bytes });
+    return put.ok ? { path, name, mime: media.mimetype || null } : null;
+  } catch (e) {
+    console.error("Document upload failed:", e?.message || e);
+    return null;
+  }
+}
+
 // ---------- sending ----------
 async function send(payload, attempt = 1) {
   try {
@@ -142,12 +171,21 @@ async function handle(msg, chat) {
   stats.lastMessageAt = new Date((msg.timestamp || Date.now() / 1000) * 1000).toISOString();
   const key = chat.id._serialized;
   state.lastTs[key] = Math.max(state.lastTs[key] || 0, msg.timestamp || 0);
-  if (!isRelevant(msg.body)) {
+  const isDoc = msg.hasMedia && msg.type === "document";
+  if (!isDoc && !isRelevant(msg.body)) {
     stats.skippedShort++;
     return;
   }
   if (!(await isFromAdmin(msg, chat))) {
     stats.skippedNotAdmin++;
+    return;
+  }
+  if (isDoc) {
+    const file = await uploadDocument(msg);
+    if (!file) return;
+    const caption = (msg._data?.caption || "").trim();
+    const body = caption && caption !== file.name ? `${caption}\n\n(Shared file: ${file.name})` : `Shared a file: ${file.name}`;
+    await send({ ...toIngestPayload({ id, group: chat.name, body, timestamp: msg.timestamp }), attachments: [file] });
     return;
   }
   await send(toIngestPayload({ id, group: chat.name, body: msg.body, timestamp: msg.timestamp }));

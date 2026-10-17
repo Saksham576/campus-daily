@@ -57,6 +57,26 @@ export async function POST(req: NextRequest) {
     .sort((a, b) => String(b.received_at).localeCompare(String(a.received_at)))
     .slice(0, 80)
     .map((i) => ({ id: i.id, subject: i.subject, summary: i.summary, body: i.body, sender: i.from_address, received_at: i.received_at, deadline_at: i.deadline_at }));
+  const realNotices = notices.length;
+
+  // Inside documents: best-matching passages from files the student can see, and their own rows in
+  // class lists (mess dues, marks, seating). Added as extra numbered entries so answers can cite them.
+  const [docHits, ownRows] = await Promise.all([
+    supabase.rpc("search_docs", { q: question, lim: 6, mode: "any" }),
+    supabase.from("personal_rows").select("doc_id, page, line").limit(40),
+  ]);
+  for (const h of (docHits.data || []) as any[]) {
+    notices.push({ id: `doc:${h.doc_id}:${h.page}`, subject: `File: ${h.name}${h.course_code ? ` (${h.course_code})` : ""}, page ${h.page}`, body: String(h.content).slice(0, 1500) });
+  }
+  if (ownRows.data?.length) {
+    const ids = [...new Set(ownRows.data.map((r) => r.doc_id))];
+    const { data: names } = await supabase.from("documents").select("id, name").in("id", ids);
+    const nameOf = new Map((names || []).map((d) => [d.id, d.name]));
+    for (const r of ownRows.data) {
+      notices.push({ id: `row:${r.doc_id}:${r.page}`, subject: `Your row in “${nameOf.get(r.doc_id) || "a class list"}”`, body: r.line });
+    }
+  }
+
   const classes = buildWeek((courses.data || []) as UserCourse[], now).map((s) => ({ when: s.start_time, title: s.title, venue: s.location }));
 
   const prompt = buildAskPrompt(question, { now, notices, classes, deadlines: deadlines.data || [], files: files.data || [], settings, events });
@@ -67,7 +87,7 @@ export async function POST(req: NextRequest) {
   }
   const text = g.text;
   const out = parseAskReply(text, notices);
-  const ctx = { noticeIds: notices.map((n) => n.id), senders: notices.map((n) => n.sender || "").filter(Boolean), muted: settings.muted };
+  const ctx = { noticeIds: notices.slice(0, realNotices).map((n) => n.id), senders: notices.map((n) => n.sender || "").filter(Boolean), muted: settings.muted };
   const title = (id: string) => cleanSubject(notices.find((n) => n.id === id)?.subject || "");
   const actions = out.actions
     .map((a) => validateAction(a, ctx))

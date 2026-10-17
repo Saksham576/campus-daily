@@ -3,9 +3,37 @@ import { scoreWithGemini, buildItemRow, personalizeScore, privateMailReason, typ
 import { extractEventDetails } from "@/lib/events";
 import { updateFromNotice } from "@/lib/timetable/updates";
 import { publishNotice } from "@/lib/server/publish";
+import { docId } from "@/lib/server/docWorker";
 
-/** Score, store, fan out and apply timetable changes for one inbound notice. */
+/** Score, store, fan out and apply timetable changes for one inbound notice (+ its attachments). */
 export async function processInbound(email: InboundEmail): Promise<{ status: number; body: Record<string, unknown> }> {
+  const res = await processNotice(email);
+  const files = email.attachments || [];
+  if (!files.length) return res;
+  const admin = getAdminClient();
+  if (!admin) return res;
+  const id = res.status === 200 && typeof res.body.id === "string" ? res.body.id : null;
+  if (id) {
+    // Read later by the document worker; visible to the students who received this notice.
+    await admin.from("documents").upsert(
+      files.map((a) => ({
+        id: docId("att", a.path),
+        source: email.from.startsWith("WhatsApp:") ? "whatsapp" : "mail",
+        item_id: id,
+        name: a.name,
+        mime: a.mime,
+        storage_path: a.path,
+      })),
+      { onConflict: "id", ignoreDuplicates: true }
+    );
+    return { ...res, body: { ...res.body, attachments: files.length } };
+  }
+  // Not published (private, duplicate, unreadable or failed): don't keep the files.
+  await admin.storage.from("attachments").remove(files.map((a) => a.path));
+  return res;
+}
+
+async function processNotice(email: InboundEmail): Promise<{ status: number; body: Record<string, unknown> }> {
   const admin = getAdminClient();
   const geminiKey = process.env.GEMINI_API_KEY;
   if (!admin || !geminiKey) return { status: 500, body: { error: "Server not configured" } };
