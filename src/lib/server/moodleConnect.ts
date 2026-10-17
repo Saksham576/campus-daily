@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { encryptSecret } from "@/lib/server/crypto";
 import { moodleCall, MOODLE_URL } from "@/lib/moodle";
+import { syncEnrolments } from "@/lib/server/moodleSync";
 
 /**
  * Moodle's app login ends with a redirect to moodlemobile://token=<base64 "sig:::token[:::private]">,
@@ -28,5 +29,7 @@ export async function saveMoodleKey(admin: SupabaseClient, userId: string, key: 
     last_error: null,
   });
   if (error) throw new Error("save");
+  // Right away: their courses (so classmates' files show in Library) and timetable courses.
+  await syncEnrolments(admin, userId, info.userid, key).catch(() => null);
   return { name: info.fullname };
 }

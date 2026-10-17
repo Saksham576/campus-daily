@@ -1,9 +1,11 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
+import { syncMoodle } from "@/lib/server/moodleSync";
 import { isAuthorizedIngest } from "@/lib/ingest";
 import { getAdminClient } from "@/lib/server/admin";
 import { saveMoodleKey } from "@/lib/server/moodleConnect";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 /**
  * POST /api/moodle/agent-connect { email, key }  (x-ingest-secret)
@@ -32,6 +34,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const { name } = await saveMoodleKey(admin, sub.user_id, key);
+    // Full first read (notices, files, deadlines) in the background; the new connection goes first.
+    after(() => syncMoodle(admin, Date.now() + 50_000).catch(() => null));
     return NextResponse.json({ ok: true, name });
   } catch {
     return NextResponse.json({ error: "Moodle didn't accept that key." }, { status: 400 });
