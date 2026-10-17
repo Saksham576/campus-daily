@@ -246,7 +246,9 @@ setInterval(() => {
 
 setInterval(() => watched.size && catchUp("periodic"), 20 * 60_000);
 setInterval(heartbeat, 10 * 60_000);
-setInterval(refreshWatched, 6 * 3600_000);
+// Pick up newly joined groups quickly: on join, and every 10 minutes.
+setInterval(refreshWatched, 10 * 60_000);
+client.on("group_join", () => setTimeout(refreshWatched, 5000));
 
 console.log(`Starting bridge (browser: ${executablePath || "bundled"})…`);
 client.initialize().catch((e) => console.error("Could not start WhatsApp:", e?.message || e));
