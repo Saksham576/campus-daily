@@ -1,8 +1,8 @@
 /**
  * Campus Daily — free email ingestion (no paid services, no shared secret).
  *
- * Runs on campusdaily.ingest@gmail.com, which receives students' IITB mail via webmail forwarding
- * rules (each student forwards to campusdaily.ingest+<their token>@gmail.com — see Settings → IITB mail).
+ * Runs on campusdaily.inbox@gmail.com, which receives students' IITB mail via webmail forwarding
+ * rules (each student forwards to campusdaily.inbox+<their token>@gmail.com — see Settings → IITB mail).
  * Every 10 minutes it sends new inbox mail to Campus Daily with:
  *   - the headers that say whose forward it is and whether it's list mail (Delivered-To, To, Cc, List-Id),
  *   - document attachments (PDF, Word, PowerPoint, Excel), uploaded straight to private storage.

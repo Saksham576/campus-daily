@@ -2,7 +2,8 @@ import assert from "node:assert";
 import { forwardAddress, forwardToken, isPersonalMail, newForwardToken } from "./src/lib/forwarding.ts";
 
 console.log("Webmail forwarding tests...");
-assert.strictEqual(forwardAddress("k7f2qabcde"), "campusdaily.ingest+k7f2qabcde@gmail.com");
+assert.strictEqual(forwardAddress("k7f2qabcde"), "campusdaily.inbox+k7f2qabcde@gmail.com");
+assert.strictEqual(forwardToken({ deliveredTo: "campusdaily.inbox+abcdefgh23@gmail.com" }), "abcdefgh23");
 assert.strictEqual(forwardToken({ deliveredTo: "campusdaily.ingest+K7F2QABCDE@gmail.com" }), "k7f2qabcde");
 assert.strictEqual(forwardToken({ deliveredTo: "campusdaily.ingest@gmail.com", to: "student-notices@iitb.ac.in" }), null);
 const t = newForwardToken();

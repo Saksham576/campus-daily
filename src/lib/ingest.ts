@@ -47,11 +47,12 @@ export function isAuthorizedIngest(provided: string | null, secret: string | und
  */
 export async function isGoogleIngestIdentity(
   authHeader: string | null,
-  expectedEmail: string,
+  expectedEmail: string | string[],
   fetchImpl: typeof fetch = fetch
 ): Promise<boolean> {
   const m = authHeader?.match(/^Bearer\s+([A-Za-z0-9._-]+)$/);
-  if (!m || !expectedEmail) return false;
+  const allowed = (Array.isArray(expectedEmail) ? expectedEmail : [expectedEmail]).map((e) => e.trim().toLowerCase()).filter(Boolean);
+  if (!m || allowed.length === 0) return false;
   try {
     const res = await fetchImpl(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(m[1])}`);
     if (!res.ok) return false;
@@ -62,7 +63,7 @@ export async function isGoogleIngestIdentity(
       fromGoogle &&
       notExpired &&
       (info.email_verified === true || info.email_verified === "true") &&
-      String(info.email).toLowerCase() === expectedEmail.toLowerCase()
+      allowed.includes(String(info.email).toLowerCase())
     );
   } catch {
     return false;
