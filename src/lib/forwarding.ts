@@ -1,16 +1,17 @@
 /**
  * Webmail forwarding: every student gets a private forwarding address
- * (campusdaily.ingest+<token>@gmail.com). The "+token" tells us whose inbox a mail came from;
+ * (campusdaily.inbox+<token>@gmail.com). The "+token" tells us whose inbox a mail came from;
  * mail addressed to that student (not a mailing list) stays visible to them alone.
  */
-export const INGEST_INBOX = "campusdaily.ingest@gmail.com";
+export const INGEST_INBOX = "campusdaily.inbox@gmail.com";
 
 export function forwardAddress(token: string): string {
   const [user, domain] = INGEST_INBOX.split("@");
   return `${user}+${token}@${domain}`;
 }
 
-const TOKEN_RE = /campusdaily\.ingest\+([a-z0-9]{6,16})@gmail\.com/i;
+// Old address (campusdaily.ingest) still recognised for students who set up forwarding before the move.
+const TOKEN_RE = /campusdaily\.(?:inbox|ingest)\+([a-z0-9]{6,16})@gmail\.com/i;
 
 /** The forwarding token in Delivered-To / To / Cc, if any. */
 export function forwardToken(h: { deliveredTo?: string; to?: string; cc?: string }): string | null {

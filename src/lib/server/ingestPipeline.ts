@@ -55,7 +55,7 @@ async function processNotice(email: InboundEmail): Promise<{ status: number; bod
     if (count) return { status: 200, body: { ok: true, skipped: "already from Moodle" } };
   }
 
-  // Whose inbox is this from? (campusdaily.ingest+<token>@gmail.com — see Settings → IITB mail)
+  // Whose inbox is this from? (campusdaily.inbox+<token>@gmail.com — see Settings → IITB mail)
   const token = forwardToken(email);
   let owner: string | null = null;
   if (token) {

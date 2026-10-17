@@ -69,7 +69,7 @@ export default async function AdminPage() {
         </div>
         <div className="board-row" style={{ gridTemplateColumns: "140px 1fr auto" }}>
           <span className="c">EMAIL</span>
-          <span className="n">campusdaily.ingest@gmail.com · checked every 10 min</span>
+          <span className="n">campusdaily.inbox@gmail.com · checked every 10 min</span>
           <span className="status go">On</span>
         </div>
         {wa.groups && wa.groups.length > 0 && <div className="board-empty">Groups: {wa.groups.join(" · ")}</div>}

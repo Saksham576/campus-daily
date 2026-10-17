@@ -108,6 +108,8 @@ assert.strictEqual(await isGoogleIngestIdentity("Bearer abc.def.ghi", "campusdai
 assert.strictEqual(await isGoogleIngestIdentity("Bearer abc.def.ghi", "campusdaily.ingest@gmail.com", tokeninfo({ ...goodInfo, exp: "1" })), false);
 assert.strictEqual(await isGoogleIngestIdentity("Bearer abc.def.ghi", "campusdaily.ingest@gmail.com", tokeninfo({ ...goodInfo, iss: "evil.com" })), false);
 assert.strictEqual(await isGoogleIngestIdentity("Basic xyz", "campusdaily.ingest@gmail.com", tokeninfo(goodInfo)), false);
+assert.strictEqual(await isGoogleIngestIdentity("Bearer abc.def.ghi", ["campusdaily.inbox@gmail.com", "campusdaily.ingest@gmail.com"], tokeninfo(goodInfo)), true, "old inbox accepted during the move");
+assert.strictEqual(await isGoogleIngestIdentity("Bearer abc.def.ghi", ["campusdaily.inbox@gmail.com"], tokeninfo(goodInfo)), false);
 assert.strictEqual(await isGoogleIngestIdentity(null, "campusdaily.ingest@gmail.com", tokeninfo(goodInfo)), false);
 assert.strictEqual(await isGoogleIngestIdentity("Bearer x", "campusdaily.ingest@gmail.com", async () => ({ ok: false })), false);
 
