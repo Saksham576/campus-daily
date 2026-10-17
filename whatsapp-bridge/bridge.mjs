@@ -15,7 +15,8 @@
  * since the last message it handled (and every 20 minutes as a safety net).
  */
 import "dotenv/config";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, readdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import qrcode from "qrcode-terminal";
 import pkg from "whatsapp-web.js";
 import { toIngestPayload, isRelevant, parseGroups, isAllowedGroup, shouldWatch } from "./lib.mjs";
@@ -222,7 +223,7 @@ client.on("change_state", async (s) => {
 
 client.on("disconnected", (r) => {
   console.error("Disconnected:", r, "— restarting in 60s");
-  setTimeout(() => client.initialize(), 60000);
+  setTimeout(() => (clearStaleLocks(), client.initialize()), 60000);
 });
 
 client.on("message", async (msg) => {
@@ -250,5 +251,27 @@ setInterval(heartbeat, 10 * 60_000);
 setInterval(refreshWatched, 10 * 60_000);
 client.on("group_join", () => setTimeout(refreshWatched, 5000));
 
+/**
+ * A browser that was stopped uncleanly (container restart, update) leaves Singleton* lock files in the
+ * WhatsApp profile; the next start then refuses ("profile appears to be in use"). Only this bridge
+ * uses the profile, so clear them before every start.
+ */
+function clearStaleLocks() {
+  const root = `${DATA_DIR}/.wwebjs_auth`;
+  if (!existsSync(root)) return;
+  for (const dir of readdirSync(root)) {
+    for (const f of ["SingletonLock", "SingletonSocket", "SingletonCookie"]) {
+      try {
+        rmSync(join(root, dir, f), { force: true });
+      } catch {}
+    }
+  }
+}
+
+clearStaleLocks();
 console.log(`Starting bridge (browser: ${executablePath || "bundled"})…`);
-client.initialize().catch((e) => console.error("Could not start WhatsApp:", e?.message || e));
+client.initialize().catch((e) => {
+  console.error("Could not start WhatsApp:", e?.message || e);
+  // Exit so the service manager (Docker / scheduled task) restarts us cleanly.
+  setTimeout(() => process.exit(1), 30_000);
+});
