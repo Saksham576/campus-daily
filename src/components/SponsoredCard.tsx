@@ -17,7 +17,7 @@ export function SponsoredCard({ card }: { card: Sponsored }) {
       {card.body && <p>{card.body}</p>}
       {card.link && (
         <a href={`/api/sponsored/click?id=${encodeURIComponent(card.id)}`} target="_blank" rel="noopener sponsored">
-          Learn more ↗
+          Learn more
         </a>
       )}
     </article>

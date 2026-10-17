@@ -169,7 +169,7 @@ function SettingsContent() {
       const { error } = await supabase.from("subscribers").upsert(payload, { onConflict: "email" });
       if (error) setErrorMsg(error.message);
       else {
-        setSuccessMsg("✓ Saved");
+        setSuccessMsg("Saved");
         if (isOnboarding) {
           router.refresh();
           router.push("/");

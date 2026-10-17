@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ItemCard, type FeedItem } from "@/components/ItemCard";
 import { SponsoredCard, type Sponsored } from "@/components/SponsoredCard";
+import { Bookmark, Search } from "lucide-react";
 
 type Key = "action" | "exams" | "courses" | "events" | "opportunities" | "campus" | "saved" | "all";
 
@@ -80,14 +81,11 @@ export function FeedView({
 
       <div className="search">
         <span className="search-ico" aria-hidden>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-            <circle cx="11" cy="11" r="7" />
-            <path d="m20 20-3.5-3.5" />
-          </svg>
+          <Search width={16} height={16} />
         </span>
         <input
           type="search"
-          placeholder="Search notices — CH111 quiz, scholarship, H16…"
+          placeholder="Search notices"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           aria-label="Search notices"
@@ -102,7 +100,7 @@ export function FeedView({
             }}
             aria-pressed={tab === k}
           >
-            {k === "saved" ? "★ Saved" : "All"} <span className="count">{sections[k].length}</span>
+            {k === "saved" ? <><Bookmark aria-hidden /> Saved</> : "All"} <span className="count">{sections[k].length}</span>
           </button>
         ))}
       </div>

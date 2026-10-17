@@ -1,11 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Archivo, Doto, Noto_Sans_Devanagari } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { ServiceWorker } from "@/components/ServiceWorker";
 
-const sans = Archivo({ subsets: ["latin"], variable: "--f-sans", display: "swap" });
-const led = Doto({ subsets: ["latin"], variable: "--f-led", display: "swap" });
-const deva = Noto_Sans_Devanagari({ subsets: ["devanagari"], variable: "--f-deva", display: "swap" });
+const sans = Inter({ subsets: ["latin"], variable: "--f-sans", display: "swap" });
 
 export const metadata: Metadata = {
   title: "Campus Daily",
@@ -16,7 +14,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f5f4f0",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fafafa" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b0b0c" },
+  ],
 };
 
 export default function RootLayout({
@@ -25,7 +26,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${sans.variable} ${led.variable} ${deva.variable}`}>
+    <html lang="en" className={sans.variable}>
       <body>
         {children}
         <ServiceWorker />
