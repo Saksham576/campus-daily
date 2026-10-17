@@ -76,3 +76,10 @@ assert.strictEqual(claimFrom({ id: "f3", subject: "CH 111-2026-1-D3: Crib sessio
 import { updateFromNotice } from "./src/lib/timetable/updates.ts";
 assert.strictEqual(updateFromNotice("CS 101 Quiz", "Quiz details are on Moodle.", "n", now), null, "no written date → no timetable change");
 console.log("✓ Passed: files, doubt-forum posts, crib sessions and undated notices don't become events");
+
+// General notices never change a timetable (room names aren't courses)
+const club = claimFrom({ id: "g1", sender: "GS <g@iitb.ac.in>", subject: "[S.Events] Literati | Wordgames 101 | 13th October | LC101 | 6:30 pm", body: "Wordgames quiz on 13th October at 6:30 PM in LC 101", received_at: "2026-10-12T05:00:00Z" }, new Date("2026-10-12T06:00:00Z"));
+assert.ok(club, "still an event");
+assert.strictEqual(club.course_code, null);
+assert.strictEqual(eventCourseUpdate("g1", { course_code: club.course_code, kind: club.kind, on_date: club.on_date }, resolveClaims([club]), false), null);
+console.log("✓ Passed: only course rules change timetables");

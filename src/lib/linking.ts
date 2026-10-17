@@ -136,8 +136,10 @@ export function claimFrom(item: LinkItem, now = new Date()): Claim | null {
   if (on_date < istDate(at)) return null; // about the past
   return {
     ...base,
-    course_code: ev?.course_code || null,
-    kind: ev?.slot_type === "quiz" || ev?.slot_type === "exam" ? "assessment" : "event",
+    // Only the strict course rules above may name a course (and so change a timetable): the general
+    // parser reads room names like "LA 001" as course codes.
+    course_code: null,
+    kind: "event",
     on_date,
     start: ev?.start_time || null,
     end: ev?.end_time || null,

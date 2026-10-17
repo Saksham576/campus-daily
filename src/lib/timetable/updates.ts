@@ -47,6 +47,7 @@ const POSTED_LINE_RE =
 // Follow-ups about a past assessment, not a new event.
 const AFTERMATH_RE =
   /\b(solutions?|answer\s*(?:keys?|sheets?|scripts?)|answersheets?|results?|marks|grades?|graded|uploaded|released|feedback|re-?evaluation|crib|paper viewing|viewing session)\b/i;
+const ROOM_RE = /^(LA|LC|LH|LT|CC|SIC|MB)\s\d/;
 // The event parser falls back to "today" when no date is written; a timetable change needs a real one.
 const DATE_WORDS_RE =
   /\b(\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?|\d{1,2}[/.-]\d{1,2}(?:[/.-]\d{2,4})?|\d{4}-\d{2}-\d{2}|today|tonight|tomorrow|(?:mon|tues|wednes|thurs|fri|satur|sun)day)\b/i;
@@ -61,6 +62,8 @@ export function updateFromNotice(
   const body = rawBody.replace(POSTED_LINE_RE, " ");
   const ev = extractEventDetails(subject, body);
   if (!ev || !ev.course_code) return null;
+  // Lecture halls ("LA 001", "LC 101", "LH 302"…) look like course codes but aren't; club/event lists aren't course notices.
+  if (ROOM_RE.test(ev.course_code) || /^\s*\[(s\.events|student-notices)\]/i.test(subject)) return null;
   const text = `${subject}\n${body}`;
   if (!DATE_WORDS_RE.test(text)) return null;
   const hasTime = extractTimeFromText(text) !== null;
