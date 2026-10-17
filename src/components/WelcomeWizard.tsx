@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Logo } from "@/components/Logo";
 import { CoursesEditor } from "@/components/CoursesEditor";
+import { CoursePicker } from "@/components/CoursePicker";
 import { MoodleConnect } from "@/components/MoodleConnect";
 import { PushToggle } from "@/components/PushToggle";
 import { DigestPicker } from "@/components/DigestPicker";
@@ -204,8 +205,12 @@ export function WelcomeWizard({ demo = false }: { demo?: boolean }) {
             <MoodleConnect />
           </div>
           <div className="welcome-block">
-            <h2>Or add courses yourself</h2>
-            <CoursesEditor />
+            <h2>Or pick your courses</h2>
+            <CoursePicker division={form.division} department={form.department} />
+            <details className="more-courses">
+              <summary>A course isn&apos;t listed? Add it by code</summary>
+              <CoursesEditor />
+            </details>
           </div>
         </section>
       )}
