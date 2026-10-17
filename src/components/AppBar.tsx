@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CalendarDays, House, LibraryBig, Settings } from "lucide-react";
 import { Logo } from "@/components/Logo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const istClock = () =>
   new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" });
@@ -46,9 +47,12 @@ export function AppBar() {
             );
           })}
         </nav>
-        <span className="clock" aria-label="Time in IST">
-          {clock && `${clock} IST`}
-        </span>
+        <div className="appbar-foot">
+          <ThemeToggle />
+          <span className="clock" aria-label="Time in IST">
+            {clock && `${clock} IST`}
+          </span>
+        </div>
       </div>
     </header>
   );

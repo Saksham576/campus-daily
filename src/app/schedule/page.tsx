@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppBar } from "@/components/AppBar";
+import { TimetableView } from "@/components/TimetableView";
+import { Download, Pencil, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { generateMultiEventIcs } from "@/lib/events";
@@ -43,13 +45,16 @@ async function loadMergedSchedule(
   const { data: courses } = await supabase
     .from("user_courses")
     .select("course_code, title, division, lecture_slots, tutorial_slots, venue");
-  const baseline = buildWeek((courses || []) as UserCourse[]).map((s) => ({
+  // On weekends, show the coming week.
+  const ref = new Date();
+  if (ref.getDay() === 6 || ref.getDay() === 0) ref.setDate(ref.getDate() + (ref.getDay() === 6 ? 2 : 1));
+  const baseline = buildWeek((courses || []) as UserCourse[], ref).map((s) => ({
     ...s,
     user_id: userId,
     is_cancelled: false,
   })) as ScheduleItem[];
   // This week's course updates (Mon–Sun, IST dates), applied to the course classes first…
-  const monday = new Date();
+  const monday = new Date(ref);
   monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
@@ -72,7 +77,6 @@ async function loadMergedSchedule(
 export default function SchedulePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [selectedDay, setSelectedDay] = useState<number>(0); // 0 = Mon, 4 = Fri
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
   const [userDivision, setUserDivision] = useState<string>("D1");
   const [userHasmed, setUserHasmed] = useState<string | null>(null);
@@ -251,209 +255,111 @@ export default function SchedulePage() {
     URL.revokeObjectURL(url);
   }
 
-  // Filter slots for the selected day (0 = Mon .. 4 = Fri)
-  const currentDaySlots = schedules.filter((s) => {
-    try {
-      const d = new Date(s.start_time);
-      const dayIndex = d.getDay(); // 0 is Sun, 1 is Mon, 5 is Fri
-      const mondayZeroIndexed = dayIndex === 0 ? 6 : dayIndex - 1;
-      return mondayZeroIndexed === selectedDay;
-    } catch {
-      return false;
-    }
-  });
-
   if (loading) {
     return (
-      <main className="wrap narrow">
-        <p className="muted">Loading your timetable…</p>
-      </main>
+      <>
+        <AppBar />
+        <main className="wrap">
+          <p className="muted">Loading your timetable…</p>
+        </main>
+      </>
     );
   }
 
   return (
     <>
-    <AppBar />
-    <main className="wrap">
-      <div className="page-head">
-        <div>
-          <p className="eyebrow">Class times from ResoBin · updates itself from notices</p>
-          <h1>Your timetable</h1>
-        </div>
-        <Link href="/settings#courses" className="navlink">Edit courses</Link>
-      </div>
-      {!loading && schedules.length === 0 && (
-        <p className="note">
-          No classes yet. Add your courses in <Link href="/settings#courses">Settings → My courses</Link> and your timetable appears here.
-        </p>
-      )}
-
-      {statusNotification && (
-        <p className="note" style={{ borderColor: "var(--accent)", marginBottom: 16 }}>
-          {statusNotification}
-        </p>
-      )}
-
-      {/* Weekday Selector Tabs */}
-      <div className="schedule-tabs">
-        {DAYS.map((dayName, idx) => (
-          <button
-            key={dayName}
-            onClick={() => setSelectedDay(idx)}
-            className={`schedule-tab ${selectedDay === idx ? "active" : ""}`}
-          >
-            {dayName}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-        <h2>
-          {DAYS[selectedDay]}
-        </h2>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button
-            onClick={() => setShowAddModal(!showAddModal)}
-            className="small"
-          >
-            + Add Slot
-          </button>
-          <button
-            onClick={handleExportWeekIcs}
-            className="small accent"
-            title="Download full semester recurring .ics calendar file"
-          >
-            Export .ics
-          </button>
-        </div>
-      </div>
-
-      {/* Quick Add Slot Modal / Inline Form */}
-      {showAddModal && (
-        <form onSubmit={handleAddSlot} className="note pform" style={{ marginTop: 0, marginBottom: 20 }}>
-          <h4 style={{ fontWeight: 600 }}>Add Custom Slot / Study Block</h4>
-          <div className="row2">
-            <label>
-              Title / Course Code
-              <input
-                type="text"
-                required
-                placeholder="e.g. MA 105 Extra Tutorial"
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-              />
-            </label>
-            <label>
-              Location / Venue
-              <input
-                type="text"
-                placeholder="e.g. LA 201 or Online"
-                value={newLocation}
-                onChange={(e) => setNewLocation(e.target.value)}
-              />
-            </label>
+      <AppBar />
+      <main className="wrap">
+        <div className="page-head">
+          <div>
+            <p className="eyebrow">{[0, 6].includes(new Date().getDay()) ? "Coming week" : "This week"} · updates itself from notices</p>
+            <h1>Timetable</h1>
           </div>
-          <div className="row2">
-            <label>
-              Day
-              <select
-                value={newDay}
-                onChange={(e) => setNewDay(Number(e.target.value))}
-              >
-                {DAYS.map((d, i) => (
-                  <option key={d} value={i + 1}>{d}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Slot Type
-              <select
-                value={newSlotType}
-                onChange={(e) => setNewSlotType(e.target.value as any)}
-              >
-                <option value="lecture">Lecture</option>
-                <option value="lab">Lab</option>
-                <option value="quiz">Quiz</option>
-                <option value="exam">Exam</option>
-                <option value="deadline">Deadline</option>
-                <option value="custom">Custom</option>
-              </select>
-            </label>
+          <div className="nav-links">
+            <button type="button" onClick={() => setShowAddModal(!showAddModal)}>
+              <Plus aria-hidden />
+              Add slot
+            </button>
+            <button type="button" onClick={handleExportWeekIcs} title="Download a calendar file for Google / Apple / Outlook">
+              <Download aria-hidden />
+              Export
+            </button>
+            <Link href="/settings#courses" className="navlink">
+              <Pencil aria-hidden width={14} height={14} />
+              Courses
+            </Link>
           </div>
-          <div className="row2">
-            <label>
-              Start Time
-              <input
-                type="time"
-                value={newStartTime}
-                onChange={(e) => setNewStartTime(e.target.value)}
-              />
-            </label>
-            <label>
-              End Time
-              <input
-                type="time"
-                value={newEndTime}
-                onChange={(e) => setNewEndTime(e.target.value)}
-              />
-            </label>
-          </div>
-          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            <button type="submit" className="primary" style={{ padding: "8px 16px" }}>Save Slot</button>
-            <button type="button" onClick={() => setShowAddModal(false)} className="link">Cancel</button>
-          </div>
-        </form>
-      )}
-
-      {/* Slots List */}
-      {currentDaySlots.length === 0 ? (
-        <div className="note" style={{ textAlign: "center", padding: 30 }}>
-          <p className="muted">No classes or deadlines scheduled for {DAYS[selectedDay]}. Enjoy your free slot!</p>
         </div>
-      ) : (
-        <div className="timetable-grid">
-          {currentDaySlots.map((slot) => {
-            const startD = new Date(slot.start_time);
-            const endD = slot.end_time ? new Date(slot.end_time) : null;
-            const timeStr = `${startD.toLocaleTimeString("en-IN", {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: true,
-              timeZone: "Asia/Kolkata",
-            })}${endD ? ` – ${endD.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" })}` : ""}`;
 
-            return (
-              <div
-                key={slot.id}
-                className={`slot-card ${slot.slot_type} ${slot.is_cancelled ? "cancelled" : ""}`}
-              >
-                <div className="slot-info">
-                  <h4>{slot.title}</h4>
-                  <div className="slot-time">
-                    <span className={`slot-pill ${slot.is_cancelled ? "cancelled" : slot.slot_type}`}>
-                      {slot.is_cancelled ? "Cancelled" : slot.slot_type}
-                    </span>
-                    <span>⏰ {timeStr}</span>
-                    {slot.location && <span>· 📍 {slot.location}</span>}
-                  </div>
-                </div>
+        {schedules.length === 0 && (
+          <div className="empty" style={{ marginBottom: 16 }}>
+            No classes yet. Add your courses in <Link href="/settings#courses">Settings → My courses</Link> and your week appears here.
+          </div>
+        )}
 
-                <div className="actions" style={{ marginTop: 0 }}>
-                  <button
-                    onClick={() => handleToggleCancellation(slot.id, slot.is_cancelled)}
-                    className="link small"
-                    style={{ color: slot.is_cancelled ? "var(--green)" : "var(--accent)" }}
-                    title={slot.is_cancelled ? "Mark as active" : "Mark as cancelled"}
-                  >
-                    {slot.is_cancelled ? "Restore" : "Cancel Class"}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </main>
+        {statusNotification && <p className="note" style={{ marginTop: 0, marginBottom: 16 }}>{statusNotification}</p>}
+
+        {showAddModal && (
+          <form onSubmit={handleAddSlot} className="panel pform" style={{ marginBottom: 20 }}>
+            <div className="panel-head" style={{ marginBottom: 0 }}>
+              <h2 className="panel-title">Add a slot</h2>
+            </div>
+            <div className="row2">
+              <label>
+                Title
+                <input type="text" required placeholder="e.g. MA 105 extra tutorial" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
+              </label>
+              <label>
+                Venue
+                <input type="text" placeholder="e.g. LA 201" value={newLocation} onChange={(e) => setNewLocation(e.target.value)} />
+              </label>
+            </div>
+            <div className="row2">
+              <label>
+                Day
+                <select value={newDay} onChange={(e) => setNewDay(Number(e.target.value))}>
+                  {DAYS.map((d, i) => (
+                    <option key={d} value={i + 1}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Type
+                <select value={newSlotType} onChange={(e) => setNewSlotType(e.target.value as any)}>
+                  <option value="lecture">Lecture</option>
+                  <option value="lab">Lab</option>
+                  <option value="quiz">Quiz</option>
+                  <option value="exam">Exam</option>
+                  <option value="deadline">Deadline</option>
+                  <option value="custom">Other</option>
+                </select>
+              </label>
+            </div>
+            <div className="row2">
+              <label>
+                Starts
+                <input type="time" value={newStartTime} onChange={(e) => setNewStartTime(e.target.value)} />
+              </label>
+              <label>
+                Ends
+                <input type="time" value={newEndTime} onChange={(e) => setNewEndTime(e.target.value)} />
+              </label>
+            </div>
+            <div className="actions">
+              <button type="submit" className="primary">
+                Save slot
+              </button>
+              <button type="button" onClick={() => setShowAddModal(false)} className="ghost">
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+
+        <TimetableView slots={schedules} onToggle={handleToggleCancellation} />
+      </main>
     </>
   );
 }

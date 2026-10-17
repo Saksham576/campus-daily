@@ -6,6 +6,32 @@ import { ArrowUp, Check, Sparkles, X } from "lucide-react";
 
 const SUGGESTIONS = ["When is my next quiz?", "What's due this week?", "Send my digest by email"];
 
+/** Plain answer text; lines starting with "- " become a list. */
+function AnswerText({ text }: { text: string }) {
+  const blocks: { list: boolean; lines: string[] }[] = [];
+  for (const line of text.split("\n").map((l) => l.trim()).filter(Boolean)) {
+    const list = line.startsWith("- ");
+    const last = blocks[blocks.length - 1];
+    if (last && last.list === list && list) last.lines.push(line.slice(2));
+    else blocks.push({ list, lines: [list ? line.slice(2) : line] });
+  }
+  return (
+    <div className="ask-a">
+      {blocks.map((b, i) =>
+        b.list ? (
+          <ul key={i}>
+            {b.lines.map((l, k) => (
+              <li key={k}>{l}</li>
+            ))}
+          </ul>
+        ) : (
+          <p key={i}>{b.lines[0]}</p>
+        )
+      )}
+    </div>
+  );
+}
+
 type Proposed = { action: Record<string, unknown>; label: string; state?: "busy" | "done" | "skipped" | "error" };
 type Reply = { q: string; answer: string; sources: { n: number; id: string; subject: string }[]; actions: Proposed[] };
 
@@ -96,7 +122,7 @@ export function AskBox() {
       {reply && (
         <div className="ask-reply" aria-live="polite">
           <p className="ask-q">{reply.q}</p>
-          <p className="ask-a">{reply.answer}</p>
+          <AnswerText text={reply.answer} />
           {reply.sources.length > 0 && (
             <ul className="ask-src">
               {reply.sources.map((s) => (
