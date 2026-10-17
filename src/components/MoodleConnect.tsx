@@ -28,11 +28,23 @@ export function MoodleConnect() {
 
   useEffect(() => {
     load();
-    // The extension marks the page (content script runs at document_start).
-    setHasExt(document.documentElement.dataset.cdConnect === "1");
+    // Detect the extension: it marks <html> and also answers a ping (the mark can be lost while the page loads).
+    const seen = () => setHasExt(true);
+    if (document.documentElement.dataset.cdConnect) seen();
+    const onMsg = (e: MessageEvent) => {
+      if (e.source === window && e.data?.type === "cd-connect-pong") seen();
+    };
+    window.addEventListener("message", onMsg);
+    window.postMessage({ type: "cd-connect-ping" }, window.location.origin);
+    const recheck = setTimeout(() => {
+      if (document.documentElement.dataset.cdConnect) seen();
+      window.postMessage({ type: "cd-connect-ping" }, window.location.origin);
+    }, 1200);
     const m = new URLSearchParams(window.location.search).get("moodle");
     if (m) setMsg(m);
     return () => {
+      window.removeEventListener("message", onMsg);
+      clearTimeout(recheck);
       if (poll.current) clearInterval(poll.current);
     };
   }, []);
@@ -51,6 +63,10 @@ export function MoodleConnect() {
       if (d || tries > 100) {
         if (poll.current) clearInterval(poll.current);
         setWaiting(false);
+      } else if (tries === 40) {
+        setMsg(
+          "Still waiting. Finish the IITB sign-in in the Moodle tab. If you already did and nothing happened, open chrome://extensions, check that Campus Daily Connect is switched on (version 1.1.0 or newer), then try again."
+        );
       }
     }, 3000);
   }
@@ -112,13 +128,18 @@ export function MoodleConnect() {
             </li>
             <li>
               Open <code>chrome://extensions</code>, switch on <b>Developer mode</b> (top right), click <b>Load unpacked</b> and pick the
-              unzipped folder.
+              unzipped folder (the one with <code>manifest.json</code> inside).
             </li>
             <li>Reload this page — a one-click Connect Moodle button appears here.</li>
           </ol>
           <p className="help" style={{ marginTop: 8 }}>
             The extension only watches Moodle&apos;s app-login page. Your password stays on IITB&apos;s sign-in page.
           </p>
+          <div className="actions" style={{ marginTop: 12 }}>
+            <button type="button" onClick={connect} disabled={waiting}>
+              {waiting ? "Waiting for Moodle sign-in…" : "Installed it? Connect Moodle"}
+            </button>
+          </div>
         </>
       )}
       {msg && <p className="note">{msg}</p>}
