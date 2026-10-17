@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Campus Daily Connect",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Connects your IIT Bombay Moodle to Campus Daily in one click. Your password stays on IITB's sign-in page.",
   "permissions": ["webRequest", "tabs"],
   "host_permissions": ["https://moodle.iitb.ac.in/*", "https://campusdaily.nexuspulsetech.com/*"],
