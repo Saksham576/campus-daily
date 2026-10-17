@@ -19,3 +19,9 @@ const r2 = parseAskReply('Sure: {"answer":"See [2] and [9]","sources":[]}', noti
 assert.deepStrictEqual(r2.sources.map((s) => s.n), [2], "out-of-range citations dropped");
 assert.strictEqual(parseAskReply("plain text", notices).answer, "plain text");
 console.log("✓ Passed: ask prompt, citations and reply parsing");
+
+import { plainAnswer } from "./src/lib/ask.ts";
+assert.strictEqual(plainAnswer("**Quiz**: Friday 23 Oct [1]. **Venue**: LA 201"), "Quiz: Friday 23 Oct [1]. Venue: LA 201");
+assert.strictEqual(plainAnswer("## Due\n* CS 101 lab\n* MA 105 quiz"), "Due\n- CS 101 lab\n- MA 105 quiz");
+assert.strictEqual(plainAnswer("It is **tomorrow** at 5 PM"), "It is tomorrow at 5 PM");
+console.log("✓ Passed: answers are plain text");
