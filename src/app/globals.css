@@ -2530,3 +2530,12 @@ button.chip.on:hover:not(:disabled) {
   line-height: 1.45;
   color: var(--muted);
 }
+.ext-line {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+}
+.ext-line .btn-link {
+  justify-self: start;
+  padding-left: 0;
+}
