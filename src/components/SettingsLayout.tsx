@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AtSign, Bell, BookOpen, GraduationCap, Heart, Mail, Palette, Shield, User, type LucideIcon } from "lucide-react";
+import { Bell, BookOpen, GraduationCap, Heart, Mail, Palette, Shield, User, type LucideIcon } from "lucide-react";
 
 export const SETTINGS_SECTIONS: { id: string; label: string; Icon: LucideIcon }[] = [
   { id: "profile", label: "Profile", Icon: User },
   { id: "courses", label: "My courses", Icon: BookOpen },
   { id: "moodle", label: "Moodle", Icon: GraduationCap },
-  { id: "mail", label: "IITB mail", Icon: AtSign },
   { id: "interests", label: "Interests", Icon: Heart },
   { id: "delivery", label: "Delivery", Icon: Mail },
   { id: "alerts", label: "Alerts & calendar", Icon: Bell },
