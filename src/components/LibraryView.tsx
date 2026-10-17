@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { DocHits, MyRows } from "@/components/DocSearch";
 
 export type LibFile = {
   course_id: number;
@@ -93,7 +94,7 @@ export function LibraryView({ files }: { files: LibFile[] }) {
         </span>
         <input
           type="search"
-          placeholder="Search all course files — tutorial 5, wavefunction…"
+          placeholder="Search files and what’s inside them — grading, syllabus, mess dues…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           aria-label="Search course files"
@@ -104,8 +105,10 @@ export function LibraryView({ files }: { files: LibFile[] }) {
         {" · "}Files open on Moodle.
       </p>
 
+      {q.trim() ? <DocHits q={q} /> : course === "recent" ? <MyRows /> : null}
+
       {shown.length === 0 ? (
-        <div className="empty">Nothing matches that search.</div>
+        q.trim() ? null : <div className="empty">Nothing here yet.</div>
       ) : (
         groups.map((g) => (
           <section key={g.title || "all"} className="lib-group">

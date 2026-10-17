@@ -4,6 +4,8 @@ import { decryptSecret } from "@/lib/server/crypto";
 import { publishNotice } from "@/lib/server/publish";
 import { takesCourse } from "@/lib/timetable/courses";
 import { coursesFromShortnames } from "@/lib/timetable/catalog";
+import { docKind } from "@/lib/docs/extract";
+import { docId } from "@/lib/server/docWorker";
 import { updateFromNotice } from "@/lib/timetable/updates";
 import {
   MOODLE_URL,
@@ -104,6 +106,32 @@ export async function syncEnrolments(admin: SupabaseClient, userId: string, mood
   const add = coursesFromShortnames(enrolments.map((e) => e.shortname)).filter((c) => !have.has(c.course_code));
   if (add.length) await admin.from("user_courses").insert(add.map((c) => ({ ...c, user_id: userId })));
   return { courses: enrolments.length, addedToTimetable: add.length };
+}
+
+/** Queue a course's files for reading (document library); changed files are read again. */
+async function queueDocuments(
+  admin: SupabaseClient,
+  files: { course_id: number; course_code: string | null; file_url: string; name: string; mimetype: string | null; view_url: string | null; modified_at: string | null }[]
+) {
+  const readable = files.filter((f) => docKind(f.name, f.mimetype));
+  if (!readable.length) return;
+  const rows = readable.map((f) => ({
+    id: docId("mdl", f.file_url),
+    source: "moodle",
+    course_id: f.course_id,
+    course_code: f.course_code,
+    name: f.name,
+    mime: f.mimetype,
+    file_url: f.file_url,
+    view_url: f.view_url,
+    modified_at: f.modified_at,
+  }));
+  const { data: existing } = await admin.from("documents").select("id, modified_at").in("id", rows.map((r) => r.id));
+  const known = new Map((existing || []).map((r) => [r.id, r.modified_at]));
+  const fresh = rows.filter((r) => !known.has(r.id));
+  const changed = rows.filter((r) => known.has(r.id) && r.modified_at && known.get(r.id) !== r.modified_at && new Date(r.modified_at) > new Date(known.get(r.id) || 0));
+  if (fresh.length) await admin.from("documents").insert(fresh);
+  for (const r of changed) await admin.from("documents").update({ ...r, status: "pending", tries: 0 }).eq("id", r.id);
 }
 
 export async function syncMoodle(admin: SupabaseClient, deadlineMs: number) {
@@ -234,6 +262,7 @@ export async function syncMoodle(admin: SupabaseClient, deadlineMs: number) {
         if (sections.length) {
           await admin.from("course_files").delete().eq("course_id", course.id);
           for (let i = 0; i < library.length; i += 500) await admin.from("course_files").insert(library.slice(i, i + 500));
+          await queueDocuments(admin, library as any[]);
         }
         const alreadyFiles = await seen(admin, files.map((f) => f.key));
         const fresh = files.filter((f) => !alreadyFiles.has(f.key));

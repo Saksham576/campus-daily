@@ -1,0 +1,90 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { FileText, UserRound } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+
+type Hit = { doc_id: string; name: string; course_code: string | null; page: number | null; snippet: string; view_url: string | null };
+type Row = { doc_id: string; page: number | null; line: string; name?: string };
+
+/** "<<word>>" markers from the database → highlighted text (no HTML from documents is ever rendered). */
+function Snippet({ text }: { text: string }) {
+  const parts = text.split(/(<<[^>]*>>)/g);
+  return (
+    <span className="doc-snippet">
+      {parts.map((p, i) => (p.startsWith("<<") ? <mark key={i}>{p.slice(2, -2)}</mark> : <span key={i}>{p}</span>))}
+    </span>
+  );
+}
+
+/** Matches inside course documents for the Library search box. */
+export function DocHits({ q }: { q: string }) {
+  const [hits, setHits] = useState<Hit[] | null>(null);
+  useEffect(() => {
+    const query = q.trim();
+    if (query.length < 3) return setHits(null);
+    const t = setTimeout(async () => {
+      const { data } = await createClient().rpc("search_docs", { q: query, lim: 20, mode: "all" });
+      setHits((data || []) as Hit[]);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  if (!hits || hits.length === 0) return null;
+  return (
+    <section className="lib-group">
+      <h2 className="lib-title">Inside files</h2>
+      <ul className="lib-list">
+        {hits.map((h, i) => (
+          <li key={`${h.doc_id}-${h.page}-${i}`}>
+            <a href={h.view_url || "#"} target="_blank" rel="noopener noreferrer" className="doc-hit">
+              <span className="doc-hit-head">
+                <FileText aria-hidden />
+                <b>{h.name}</b>
+                <span className="from">
+                  {h.course_code ? `${h.course_code} · ` : ""}
+                  {h.page ? `page ${h.page}` : ""}
+                </span>
+              </span>
+              <Snippet text={h.snippet} />
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** Your own lines in class lists (mess dues, marks, seating) — nobody else's. */
+export function MyRows() {
+  const [rows, setRows] = useState<Row[]>([]);
+  useEffect(() => {
+    (async () => {
+      const supabase = createClient();
+      const { data } = await supabase.from("personal_rows").select("doc_id, page, line").limit(30);
+      if (!data?.length) return;
+      const { data: docs } = await supabase.from("documents").select("id, name").in("id", [...new Set(data.map((r) => r.doc_id))]);
+      const nameOf = new Map((docs || []).map((d) => [d.id, d.name]));
+      setRows(data.map((r) => ({ ...r, name: nameOf.get(r.doc_id) || "Class list" })));
+    })();
+  }, []);
+  if (!rows.length) return null;
+  return (
+    <section className="lib-group">
+      <h2 className="lib-title">Your entries in class lists</h2>
+      <ul className="lib-list">
+        {rows.map((r, i) => (
+          <li key={`${r.doc_id}-${i}`} className="doc-hit">
+            <span className="doc-hit-head">
+              <UserRound aria-hidden />
+              <b>{r.name}</b>
+              {r.page ? <span className="from">page {r.page}</span> : null}
+            </span>
+            <span className="doc-snippet mono">{r.line}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="help" style={{ marginTop: 6 }}>Only your own row is kept from shared lists — never anyone else&apos;s.</p>
+    </section>
+  );
+}
