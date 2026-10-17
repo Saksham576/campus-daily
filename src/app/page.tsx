@@ -96,7 +96,7 @@ export default async function HomePage() {
     .select("onboarded_at, name, last_seen_at, muted_senders")
     .eq("email", user.email)
     .single();
-  if (!profile?.onboarded_at) redirect("/settings?onboarding=1");
+  if (!profile?.onboarded_at) redirect("/welcome");
 
   const now = new Date();
   // 21 days so deadlines and upcoming events announced earlier stay on the board.

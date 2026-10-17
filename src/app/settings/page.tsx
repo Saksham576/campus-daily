@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { PushToggle } from "@/components/PushToggle";
 import { DigestPicker } from "@/components/DigestPicker";
-import { ForwardingSetup } from "@/components/ForwardingSetup";
 import { Panel, SettingsRail, ThemePicker } from "@/components/SettingsLayout";
 import { CoursesEditor } from "@/components/CoursesEditor";
 import { MoodleConnect } from "@/components/MoodleConnect";
@@ -273,10 +272,6 @@ function SettingsContent() {
               sub="Connect once: announcements, slides and PDFs (like seating plans) from your courses reach your board automatically."
             >
               <MoodleConnect />
-            </Panel>
-
-            <Panel id="mail" title="IITB mail" sub="Forward a copy of your IITB inbox so course mail, personal notices and attachments reach your board.">
-              <ForwardingSetup />
             </Panel>
 
             <Panel id="interests" title="Interests" sub="Topics you care about rank higher. Keywords can be clubs, sports or anything else.">
