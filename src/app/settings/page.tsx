@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { PushToggle } from "@/components/PushToggle";
 import { DigestPicker } from "@/components/DigestPicker";
+import { Panel, SettingsRail, ThemePicker } from "@/components/SettingsLayout";
 import { CoursesEditor } from "@/components/CoursesEditor";
 import { MoodleConnect } from "@/components/MoodleConnect";
 import { CalendarLink } from "@/components/CalendarLink";
@@ -22,34 +23,11 @@ import {
   type Profile,
 } from "@/lib/constants";
 
-const RAIL = [
-  ["01", "profile", "Profile"],
-  ["02", "courses", "My courses"],
-  ["03", "moodle", "Moodle"],
-  ["04", "interests", "Interests"],
-  ["05", "delivery", "Delivery"],
-  ["06", "alerts", "Alerts & calendar"],
-  ["07", "privacy", "Data & privacy"],
-] as const;
-
 const DELIVERY = [
   ["app", "Board only", "Read here whenever you like."],
   ["email", "Evening email digest", "One email at 6 PM with what matters."],
   ["both", "Board + evening email", "Both."],
 ] as const;
-
-function Panel({ n, id, title, sub, children }: { n: string; id: string; title: string; sub: string; children: React.ReactNode }) {
-  return (
-    <section className="panel" id={id}>
-      <div className="panel-head">
-        <span className="num">{n}</span>
-        <h2 className="panel-title">{title}</h2>
-      </div>
-      <p className="panel-sub">{sub}</p>
-      {children}
-    </section>
-  );
-}
 
 function SettingsContent() {
   const router = useRouter();
@@ -232,17 +210,10 @@ function SettingsContent() {
         {errorMsg && <p className="err">{errorMsg}</p>}
 
         <div className="settings">
-          <nav className="rail" aria-label="Settings sections">
-            {RAIL.map(([n, id, label]) => (
-              <a key={id} href={`#${id}`}>
-                <span>{n}</span>
-                {label}
-              </a>
-            ))}
-          </nav>
+          <SettingsRail />
 
           <form onSubmit={handleSubmit} className="panels">
-            <Panel n="01" id="profile" title="Profile" sub="Used to pick notices meant for you — department, year and hostel.">
+            <Panel id="profile" title="Profile" sub="Used to pick notices meant for you — department, year and hostel.">
               <div className="row2">
                 <label className="field">
                   Department
@@ -291,12 +262,11 @@ function SettingsContent() {
               </div>
             </Panel>
 
-            <Panel n="02" id="courses" title="My courses" sub="Your timetable is built from these. Pick your division and the slots fill in from ResoBin.">
+            <Panel id="courses" title="My courses" sub="Your timetable is built from these. Pick your division and the slots fill in from ResoBin.">
               <CoursesEditor />
             </Panel>
 
             <Panel
-              n="03"
               id="moodle"
               title="Moodle"
               sub="Connect once: announcements, slides and PDFs (like seating plans) from your courses reach your board automatically."
@@ -304,7 +274,7 @@ function SettingsContent() {
               <MoodleConnect />
             </Panel>
 
-            <Panel n="04" id="interests" title="Interests" sub="Topics you care about rank higher. Keywords can be clubs, sports or anything else.">
+            <Panel id="interests" title="Interests" sub="Topics you care about rank higher. Keywords can be clubs, sports or anything else.">
               <div className="chips">
                 {CATEGORIES.map((cat) => {
                   const on = form.categories.includes(cat);
@@ -340,7 +310,7 @@ function SettingsContent() {
               </label>
             </Panel>
 
-            <Panel n="05" id="delivery" title="Delivery" sub="Where you want your notices.">
+            <Panel id="delivery" title="Delivery" sub="Where you want your notices.">
               {DELIVERY.map(([v, title, sub]) => (
                 <label key={v} className="choice">
                   <input
@@ -369,7 +339,7 @@ function SettingsContent() {
               </label>
             </Panel>
 
-            <Panel n="06" id="alerts" title="Alerts & calendar" sub="Phone alerts for cancellations and top-priority notices, and a live calendar link.">
+            <Panel id="alerts" title="Alerts & calendar" sub="Phone alerts for cancellations and top-priority notices, and a live calendar link.">
               <PushToggle />
               <DigestPicker />
               <div style={{ marginTop: 16 }}>
@@ -377,7 +347,11 @@ function SettingsContent() {
               </div>
             </Panel>
 
-            <Panel n="07" id="privacy" title="Data & privacy" sub="Download everything we store about you, or delete your account.">
+            <Panel id="appearance" title="Appearance" sub="Light or dark. You can also switch from the sidebar.">
+              <ThemePicker />
+            </Panel>
+
+            <Panel id="privacy" title="Data & privacy" sub="Download everything we store about you, or delete your account.">
               <div className="list-row">
                 <span>
                   Export all my data (JSON) · <Link href="/privacy">privacy policy</Link>
@@ -393,8 +367,12 @@ function SettingsContent() {
                 </button>
               </div>
               <div className="list-row">
-                <span style={{ color: "var(--stop)" }}>Delete my account permanently</span>
-                <button type="button" onClick={handleDeleteAccount} style={{ borderColor: "var(--stop)", color: "var(--stop)" }}>
+                <span>
+                  <b>Delete my account</b>
+                  <br />
+                  <span className="help">Removes your profile, courses and Moodle connection for good.</span>
+                </span>
+                <button type="button" className="danger" onClick={handleDeleteAccount}>
                   Delete
                 </button>
               </div>

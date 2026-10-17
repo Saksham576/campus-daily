@@ -26,7 +26,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={sans.variable}>
+    <html lang="en" className={sans.variable} suppressHydrationWarning>
+      <head>
+        {/* Apply the saved light/dark choice before first paint */}
+        <script dangerouslySetInnerHTML={{ __html: "try{var t=localStorage.getItem('cd_theme');if(t)document.documentElement.dataset.theme=t}catch(e){}" }} />
+      </head>
       <body>
         {children}
         <ServiceWorker />
