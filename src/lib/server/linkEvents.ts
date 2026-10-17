@@ -93,9 +93,11 @@ export async function linkNotice(admin: SupabaseClient, item: LinkItem): Promise
   const memberIds = claims.map((c) => c.item_id);
   if (memberIds.length) await admin.from("course_updates").delete().in("notice_id", memberIds);
   const verified = claims.some((c) => c.trust >= 3);
-  const update = eventCourseUpdate(eventId!, { course_code: ev.course_code || claim.course_code, kind: ev.kind, on_date: ev.on_date }, r, verified);
-  if (update) await admin.from("course_updates").upsert(update, { onConflict: "notice_id" });
-  else await admin.from("course_updates").delete().eq("notice_id", `ev:${eventId}`);
+  const update = eventCourseUpdate(r.sources[0]?.item_id || item.id, { course_code: ev.course_code || claim.course_code, kind: ev.kind, on_date: ev.on_date }, r, verified);
+  if (update) {
+    const { error } = await admin.from("course_updates").upsert(update, { onConflict: "notice_id" });
+    if (error) console.error("link: timetable change failed", error.message);
+  }
 
   return { eventId: eventId!, joined, changed, update };
 }
