@@ -19,6 +19,8 @@ export const COURSE_CATALOG: Record<string, CatalogCourse> = {
   DE109: { title: "Introduction to Design", credits: 4, divisions: [{ d: "S1", l: ["12A", "12B", "12C"], t: [], v: "LC 302" }, { d: "S2", l: ["5A", "5B"], t: [], v: "LC 302" }] },
   EE103: { title: "Introduction to Electrical Engineering", credits: 6, divisions: [{ d: "Core", l: ["11A", "11B"], t: [], v: "LH 301" }, { d: "D4", l: ["11A", "11B"], t: [], v: "LH 301" }] },
   EN110: { title: "Energy Engineering Fundamentals", credits: 6, divisions: [{ d: "Core", l: ["1A", "1B", "1C"], t: [], v: "" }, { d: "D1", l: ["1A", "1B", "1C"], t: [], v: "" }] },
+  // SOM101 (HASMED): not in the ResoBin copy; slots follow the shared HASMED pattern (S1 = 12A/B/C, S2 = 5A/B). Venue unknown.
+  SOM101: { title: "Introduction to Management", credits: 4, divisions: [{ d: "S1", l: ["12A", "12B", "12C"], t: [], v: "" }, { d: "S2", l: ["5A", "5B"], t: [], v: "" }] },
   ENT101: { title: "Introduction to Innovation & Entrepreneurship", credits: 4, divisions: [{ d: "Core", l: ["5A", "5B"], t: [], v: "LH 301" }] },
   ES101: { title: "Introduction to Environmental Science & Engineering", credits: 6, divisions: [{ d: "Core", l: ["1A", "1B", "1C"], t: [], v: "LT 305" }, { d: "D1", l: ["1A", "1B", "1C"], t: [], v: "LT 305" }] },
   HS108: { title: "Doing Sociology", credits: 4, divisions: [{ d: "S1", l: ["12A", "12B", "12C"], t: [], v: "LC 201" }, { d: "S2", l: ["5A", "5B"], t: [], v: "LC 201" }] },
