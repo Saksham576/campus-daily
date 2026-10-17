@@ -8,6 +8,7 @@ import { FeedView } from "@/components/FeedView";
 import { HomeHead } from "@/components/HomeHead";
 import { AskBox } from "@/components/AskBox";
 import { buildSections } from "@/lib/sections";
+import { groupByEvent } from "@/lib/linking";
 import { buildWeek, formatCourseCode, type UserCourse } from "@/lib/timetable/slots";
 import { applyCourseUpdates, istDate, withPersonalOverrides, type CourseUpdate } from "@/lib/timetable/updates";
 
@@ -113,7 +114,16 @@ export default async function HomePage() {
   ]);
 
   const muted = new Set<string>(profile?.muted_senders || []);
-  const items = ((feedRes.data || []) as FeedItem[]).filter((i) => !i.from_address || !muted.has(i.from_address));
+  let items = ((feedRes.data || []) as FeedItem[]).filter((i) => !i.from_address || !muted.has(i.from_address));
+
+  // One card per real event: notices about the same quiz/class/talk from Moodle, email and WhatsApp.
+  if (items.length) {
+    const { data: links } = await supabase.from("event_items").select("item_id, event_id").in("item_id", items.map((i) => i.id));
+    if (links?.length) {
+      const { data: evs } = await supabase.from("events").select("id, resolved").in("id", [...new Set(links.map((l) => l.event_id))]);
+      items = groupByEvent(items, links, (evs || []) as any) as FeedItem[];
+    }
+  }
 
   // Your seat from seating plans (RLS: each student reads only their own roll's rows).
   if (items.length) {

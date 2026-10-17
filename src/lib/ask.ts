@@ -10,6 +10,8 @@ export type AskContext = {
   deadlines: { course_code?: string | null; name: string; kind?: string | null; due_at: string }[];
   files: { course_code?: string | null; name: string; module?: string | null }[];
   settings?: { digest?: string | null; muted?: string[]; keywords?: string | null; categories?: string[] };
+  /** Events already reconciled across Moodle / email / WhatsApp. */
+  events?: { title: string; course_code?: string | null; start?: string | null; venue?: string | null; cancelled?: boolean; sources: string; conflicts?: string }[];
 };
 
 export const ASK_DAILY_LIMIT = 40;
@@ -40,6 +42,9 @@ Reply as JSON: {"answer": "<text with [n] citations>", "sources": [<notice numbe
 QUESTION: ${question.slice(0, 500)}
 
 STUDENT'S SETTINGS: digest=${ctx.settings?.digest || "push"}; following=${(ctx.settings?.categories || []).join(", ") || "(none)"}; keywords=${ctx.settings?.keywords || "(none)"}; muted senders=${(ctx.settings?.muted || []).join(" | ") || "(none)"}
+
+UPCOMING EVENTS (already reconciled across sources — trust these over single notices; mention conflicts if relevant):
+${(ctx.events || []).map((e) => `- ${e.course_code ? e.course_code + " " : ""}${e.title}: ${e.cancelled ? "CANCELLED" : [e.start ? ist(e.start) : "", e.venue || ""].filter(Boolean).join(", ")} [from ${e.sources}]${e.conflicts ? ` (other reports: ${e.conflicts})` : ""}`).join("\n") || "(none)"}
 
 THIS WEEK'S CLASSES:
 ${classes || "(none)"}

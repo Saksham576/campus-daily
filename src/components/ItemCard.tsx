@@ -9,6 +9,7 @@ import {
   type ExtractedEvent,
 } from "@/lib/events";
 import { cleanSubject, senderName, sourceLabel } from "@/lib/display";
+import type { Linked } from "@/lib/linking";
 import {
   ArrowUpRight,
   BellOff,
@@ -50,7 +51,21 @@ export type FeedItem = {
   myCourse?: string | null;
   /** Your seat, when a seating plan mentions your roll number. */
   seat?: string | null;
+  /** Set when several sources reported the same event (see lib/linking). */
+  linked?: Linked;
 };
+
+const SOURCE_NAME: Record<string, string> = { moodle: "Moodle", email: "Email", whatsapp: "WhatsApp", bodhitree: "Bodhitree" };
+
+/** "Moodle · Email · WhatsApp ×2" */
+function sourcesLine(l: Linked): string {
+  const counts = new Map<string, number>();
+  for (const s of l.sources) counts.set(s.source, (counts.get(s.source) || 0) + 1);
+  return [...counts.entries()].map(([k, n]) => `${SOURCE_NAME[k] || k}${n > 1 ? ` ×${n}` : ""}`).join(" · ");
+}
+
+const shortTime = (iso: string) =>
+  new Date(iso).toLocaleString("en-IN", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" });
 
 function formatHost(u: string): string {
   try {
@@ -292,6 +307,24 @@ export function ItemCard({
 
       <h3 title={item.subject}>{cleanSubject(item.subject)}</h3>
       {item.summary && <p className="summary">{item.summary}</p>}
+
+      {item.linked && item.linked.sources.length > 1 && (
+        <div className="linked">
+          <span className="linked-src">Reported on {sourcesLine(item.linked)}</span>
+          {(item.linked.cancelled || item.linked.start || item.linked.venue) && (
+            <span className="linked-now">
+              {item.linked.cancelled
+                ? "Latest: cancelled"
+                : `Latest: ${[item.linked.start ? shortTime(item.linked.start) : "", item.linked.venue || ""].filter(Boolean).join(", ")}`}
+            </span>
+          )}
+          {item.linked.conflicts.slice(0, 2).map((c, i) => (
+            <span key={i} className="linked-conflict">
+              {SOURCE_NAME[c.source] || c.source} said {c.field === "start" ? shortTime(c.value) : c.value} ({ago(c.at)})
+            </span>
+          ))}
+        </div>
+      )}
 
       {(when || item.seat) && (
         <div className="actions" style={{ marginTop: 10 }}>

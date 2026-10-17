@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CourseUpdate } from "@/lib/timetable/updates";
 import { takesCourse } from "@/lib/timetable/courses";
 import { pushToEmails } from "@/lib/server/push";
+import { linkNotice, type LinkResult } from "@/lib/server/linkEvents";
 
 export type Sub = {
   email: string;
@@ -55,14 +56,26 @@ export async function publishNotice(
     if (uiErr) console.error("publish: user_items upsert failed", uiErr.message);
   }
 
-  if (update) {
+  // Link this notice to the event it describes (same quiz/class/talk from Moodle, email, WhatsApp…).
+  // The event — not each notice — owns the timetable change, resolved by source trust then recency.
+  let link: LinkResult | null = null;
+  try {
+    link = await linkNotice(admin, row as any);
+  } catch (e) {
+    console.error("publish: linking failed", e instanceof Error ? e.message : e);
+  }
+  if (link) update = link.update;
+  else if (update) {
     const { error: upErr } = await admin.from("course_updates").upsert(update, { onConflict: "notice_id" });
     if (upErr) console.error("publish: course update failed", upErr.message);
   }
+  // Another source repeating what we already knew: no second buzz.
+  const repeat = Boolean(link?.joined && !link.changed);
 
   // Push: timetable changes go to students taking the course; other notices only if urgent.
-  const recipients =
-    update && update.kind !== "added"
+  const recipients = repeat
+    ? []
+    : update && update.kind !== "added"
       ? subs.filter((s) => takesCourse(s, update.course_code)).map((s) => s.email)
       : scores.filter((x) => x.score >= URGENT_SCORE).map((x) => x.sub.email);
   const title =
