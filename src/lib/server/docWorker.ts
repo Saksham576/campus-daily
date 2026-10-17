@@ -98,7 +98,7 @@ export async function processDocs(admin: SupabaseClient, deadlineMs: number) {
     .select("id, source, course_id, name, mime, file_url, storage_path, tries")
     .eq("status", "pending")
     .order("created_at", { ascending: false })
-    .limit(40);
+    .limit(100);
   const tokens = new Map<number, string | null>();
 
   for (const d of (data || []) as Doc[]) {

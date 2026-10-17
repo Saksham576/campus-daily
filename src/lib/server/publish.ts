@@ -26,7 +26,8 @@ export async function publishNotice(
   admin: SupabaseClient,
   row: { id: string; subject: string; summary?: string | null } & Record<string, unknown>,
   scoreFor: (sub: Sub) => number,
-  update: CourseUpdate | null
+  update: CourseUpdate | null,
+  opts?: { only?: string[] }
 ) {
   const { error } = await admin.from("items").upsert(row, { onConflict: "id" });
   if (error) throw new Error(`items upsert: ${error.message}`);
@@ -36,7 +37,9 @@ export async function publishNotice(
     .select("email, department, year, hostel, division, hasmed, keywords, user_id")
     .is("merged_into", null);
   if (subErr) console.error("publish: subscribers read failed", subErr.message);
-  const subs = (data || []) as Sub[];
+  // Personal notices go to their owner only.
+  const only = opts?.only?.map((e) => e.toLowerCase());
+  const subs = ((data || []) as Sub[]).filter((s) => !only || only.includes(s.email.toLowerCase()));
 
   // Attach each student's real courses (Settings → My courses) for course-targeted alerts.
   const ids = subs.map((s) => s.user_id).filter(Boolean) as string[];
@@ -60,7 +63,8 @@ export async function publishNotice(
   // The event — not each notice — owns the timetable change, resolved by source trust then recency.
   let link: LinkResult | null = null;
   try {
-    link = await linkNotice(admin, row as any);
+    // Personal mail stays out of shared events.
+    if (!only) link = await linkNotice(admin, row as any);
   } catch (e) {
     console.error("publish: linking failed", e instanceof Error ? e.message : e);
   }

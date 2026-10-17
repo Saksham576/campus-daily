@@ -1,5 +1,7 @@
 import { getAdminClient } from "@/lib/server/admin";
-import { scoreWithGemini, buildItemRow, personalizeScore, privateMailReason, type InboundEmail } from "@/lib/ingest";
+import { createHash } from "node:crypto";
+import { scoreWithGemini, buildItemRow, personalizeScore, privateMailReason, contentIdFor, type InboundEmail } from "@/lib/ingest";
+import { forwardToken, isPersonalMail } from "@/lib/forwarding";
 import { extractEventDetails } from "@/lib/events";
 import { updateFromNotice } from "@/lib/timetable/updates";
 import { publishNotice } from "@/lib/server/publish";
@@ -53,6 +55,22 @@ async function processNotice(email: InboundEmail): Promise<{ status: number; bod
     if (count) return { status: 200, body: { ok: true, skipped: "already from Moodle" } };
   }
 
+  // Whose inbox is this from? (campusdaily.ingest+<token>@gmail.com — see Settings → IITB mail)
+  const token = forwardToken(email);
+  let owner: string | null = null;
+  if (token) {
+    const { data } = await admin.from("subscribers").select("email").eq("forward_token", token).maybeSingle();
+    owner = data?.email || null;
+    if (owner) await admin.from("subscribers").update({ last_forward_at: new Date().toISOString() }).eq("email", owner);
+  }
+  const listMail = !owner || !isPersonalMail(email, owner);
+
+  // The same list mail arrives once per forwarding student: process it only the first time.
+  if (listMail) {
+    const { count } = await admin.from("items").select("id", { count: "exact", head: true }).eq("id", contentIdFor(email));
+    if (count) return { status: 200, body: { ok: true, duplicate: true } };
+  }
+
   let scored;
   try {
     scored = await scoreWithGemini(email, geminiKey);
@@ -63,16 +81,20 @@ async function processNotice(email: InboundEmail): Promise<{ status: number; bod
   }
   if (!scored) return { status: 422, body: { error: "Unscorable email" } };
 
+  // Personal mail (sent to this student, not a list) is shown to them alone, under its own id.
+  const personal = Boolean(owner) && isPersonalMail(email, owner!, scored.is_personal);
   const ev = extractEventDetails(email.subject, email.body);
-  const row = buildItemRow(email, scored, {
+  const base = buildItemRow(email, scored, {
     source: email.from.startsWith("WhatsApp:") ? "whatsapp" : "ingest-mail",
     venue: ev?.location ?? null,
     deadline_at: ev && ev.slot_type === "deadline" ? ev.start_time : null,
   });
-  const update = updateFromNotice(email.subject, email.body, row.id, new Date(email.date));
+  const row = personal ? { ...base, id: `${base.id}_${createHash("sha256").update(owner!).digest("hex").slice(0, 8)}`, is_personal: true } : base;
+  // A personal mail never changes everyone's timetable.
+  const update = personal ? null : updateFromNotice(email.subject, email.body, row.id, new Date(email.date));
 
   try {
-    const result = await publishNotice(admin, row, (s) => personalizeScore(scored, s), update);
+    const result = await publishNotice(admin, row, (s) => personalizeScore(scored, s), update, personal ? { only: [owner!] } : undefined);
     return { status: 200, body: { ok: true, id: row.id, score: scored.score, ...result, timetable_update: update?.kind ?? null } };
   } catch (err) {
     console.error("ingest:", err instanceof Error ? err.message : "publish failed");
