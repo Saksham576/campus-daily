@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { type FeedItem } from "@/components/ItemCard";
@@ -149,20 +148,19 @@ export default async function HomePage() {
 
         {feedRes.error && <p className="err">Could not load notices: {feedRes.error.message}</p>}
 
-        <DayBoard
-          title={board.title}
-          rows={board.rows}
-          emptyText={courses.length ? "No classes scheduled." : "Add your courses in Settings to see your classes here."}
-        />
-        {courses.length === 0 && (
-          <p className="section-note">
-            <Link href="/settings#courses">→ Add your courses</Link> to light up the board.
-          </p>
-        )}
-
-        <AskBox />
-
-        <FeedView sections={sections as any} sponsored={sponsored || null} />
+        <div className="home-grid">
+          <aside className="home-rail">
+            <DayBoard
+              title={board.title}
+              rows={board.rows}
+              emptyText={courses.length ? "No classes scheduled." : "Add your courses in Settings to see your classes here."}
+            />
+            <AskBox />
+          </aside>
+          <div className="home-main">
+            <FeedView sections={sections as any} sponsored={sponsored || null} />
+          </div>
+        </div>
       </main>
     </>
   );

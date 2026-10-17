@@ -4,6 +4,7 @@ import { buildAskPrompt, parseAskReply, ASK_DAILY_LIMIT, type AskNotice } from "
 import { buildWeek, type UserCourse } from "@/lib/timetable/slots";
 import { cleanSubject } from "@/lib/display";
 import { geminiJson } from "@/lib/server/gemini";
+import { validateAction, describeAction } from "@/lib/actions";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -27,12 +28,19 @@ export async function POST(req: NextRequest) {
   await supabase.from("ask_log").insert({ user_id: user.id });
 
   const now = new Date();
-  const [feed, courses, deadlines, files] = await Promise.all([
+  const [feed, courses, deadlines, files, profile] = await Promise.all([
     supabase.rpc("me_feed", { p_since: new Date(now.getTime() - 30 * 86400_000).toISOString(), p_min_score: 3 }),
     supabase.from("user_courses").select("course_code, title, division, lecture_slots, tutorial_slots, venue"),
     supabase.from("moodle_deadlines").select("course_code, name, kind, due_at").gte("due_at", now.toISOString()).order("due_at").limit(40),
     supabase.from("course_files").select("course_code, name, module").order("modified_at", { ascending: false }).limit(150),
+    supabase.from("subscribers").select("digest, muted_senders, keywords, categories").eq("email", (user.email || "").toLowerCase()).maybeSingle(),
   ]);
+  const settings = {
+    digest: profile.data?.digest,
+    muted: (profile.data?.muted_senders || []) as string[],
+    keywords: profile.data?.keywords,
+    categories: (profile.data?.categories || []) as string[],
+  };
 
   const notices: AskNotice[] = ((feed.data || []) as any[])
     .filter((i) => i.status !== "removed")
@@ -41,7 +49,7 @@ export async function POST(req: NextRequest) {
     .map((i) => ({ id: i.id, subject: i.subject, summary: i.summary, body: i.body, sender: i.from_address, received_at: i.received_at, deadline_at: i.deadline_at }));
   const classes = buildWeek((courses.data || []) as UserCourse[], now).map((s) => ({ when: s.start_time, title: s.title, venue: s.location }));
 
-  const prompt = buildAskPrompt(question, { now, notices, classes, deadlines: deadlines.data || [], files: files.data || [] });
+  const prompt = buildAskPrompt(question, { now, notices, classes, deadlines: deadlines.data || [], files: files.data || [], settings });
   const g = await geminiJson(prompt);
   if (!g.ok) {
     const busy = g.status === 429 || g.status === 503;
@@ -49,6 +57,12 @@ export async function POST(req: NextRequest) {
   }
   const text = g.text;
   const out = parseAskReply(text, notices);
-  return NextResponse.json({ answer: out.answer, sources: out.sources.map((s) => ({ ...s, subject: cleanSubject(s.subject) })) });
+  const ctx = { noticeIds: notices.map((n) => n.id), senders: notices.map((n) => n.sender || "").filter(Boolean), muted: settings.muted };
+  const title = (id: string) => cleanSubject(notices.find((n) => n.id === id)?.subject || "");
+  const actions = out.actions
+    .map((a) => validateAction(a, ctx))
+    .filter(Boolean)
+    .map((a) => ({ action: a!, label: describeAction(a!, title) }));
+  return NextResponse.json({ answer: out.answer, sources: out.sources.map((s) => ({ ...s, subject: cleanSubject(s.subject) })), actions });
 }
 

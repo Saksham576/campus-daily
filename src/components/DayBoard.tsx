@@ -23,24 +23,12 @@ function statusOf(r: BoardRow, now: number): { text: string; cls: string; phase:
   if (e < now) return { text: "Done", cls: "done", phase: "past" };
   if (s <= now) return { text: "Now", cls: "go", phase: "now" };
   const mins = Math.round((s - now) / 60000);
-  if (r.moved) return { text: "Moved", cls: "moved", phase: "next" };
+  if (r.moved) return { text: "Changed", cls: "moved", phase: "next" };
   if (mins <= 45) return { text: `In ${mins} min`, cls: "soon", phase: "next" };
-  return { text: "On time", cls: "go", phase: "next" };
+  return { text: "", cls: "", phase: "next" };
 }
 
-/** Split-flap countdown to the next class. */
-function Flaps({ text }: { text: string }) {
-  return (
-    <span className="flaps" aria-label={text}>
-      {text.split("").map((ch, i) => (
-        <span key={`${text}-${i}`} className="flap">
-          {ch === " " ? " " : ch}
-        </span>
-      ))}
-    </span>
-  );
-}
-
+/** Today's classes as a quiet timeline; the current one is highlighted. */
 export function DayBoard({ title, rows, emptyText }: { title: string; rows: BoardRow[]; emptyText: string }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -50,48 +38,50 @@ export function DayBoard({ title, rows, emptyText }: { title: string; rows: Boar
 
   const next = rows.find((r) => !r.cancelled && new Date(r.end).getTime() >= now);
   const nextIn = next ? Math.max(0, Math.round((new Date(next.start).getTime() - now) / 60000)) : null;
-  const countdown =
+  const nextText =
     next && nextIn !== null
       ? nextIn === 0
-        ? "NOW"
+        ? "on now"
         : nextIn < 60
-        ? `${nextIn}M`
-        : `${Math.floor(nextIn / 60)}H${String(nextIn % 60).padStart(2, "0")}`
+        ? `in ${nextIn} min`
+        : nextIn < 24 * 60
+        ? `in ${Math.floor(nextIn / 60)} h ${nextIn % 60 ? `${nextIn % 60} min` : ""}`.trim()
+        : `at ${hhmm(next.start)}`
       : null;
 
   return (
-    <section className="board" aria-label={title}>
-      <div className="board-head">
-        <div className="board-title">
-          {title} <span>▸</span>
-        </div>
-        {countdown && next && (
-          <div className="small" style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--board-dim)" }}>
-            <span className="mono">NEXT {next.code}</span>
-            <Flaps text={countdown} />
-          </div>
+    <section className="today" aria-label={title}>
+      <div className="today-head">
+        <span className="today-title">{title}</span>
+        {next && nextText && (
+          <span className="today-next">
+            <b>{next.code}</b> {nextText}
+          </span>
         )}
       </div>
-      <div className="board-cols" aria-hidden>
-        <span>TIME</span>
-        <span>COURSE</span>
-        <span>NAME</span>
-        <span>VENUE</span>
-        <span>STATUS</span>
-      </div>
-      {rows.length === 0 && <div className="board-empty">{emptyText}</div>}
-      {rows.map((r) => {
-        const st = statusOf(r, now);
-        return (
-          <div key={r.id} className={`board-row ${st.phase === "past" ? "past" : st.phase === "now" ? "now" : ""}`}>
-            <span className="t">{hhmm(r.start)}</span>
-            <span className="c">{r.code}</span>
-            <span className="n">{r.name}</span>
-            <span className="v">{r.venue || "—"}</span>
-            <span className={`status ${st.cls}`}>{st.text}</span>
-          </div>
-        );
-      })}
+      {rows.length === 0 ? (
+        <div className="board-empty">{emptyText}</div>
+      ) : (
+        <ul className="today-list">
+          {rows.map((r) => {
+            const st = statusOf(r, now);
+            return (
+              <li key={r.id} className={`today-row ${st.phase} ${r.cancelled ? "cancelled" : ""}`}>
+                <span className="t">{hhmm(r.start)}</span>
+                <span className="bar" aria-hidden />
+                <span className="what">
+                  <span className="c">{r.code}</span>
+                  <span className="n">
+                    {r.name}
+                    {r.venue ? ` · ${r.venue}` : ""}
+                  </span>
+                </span>
+                {st.text ? <span className={`status ${st.cls}`}>{st.text}</span> : <span />}
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </section>
   );
 }

@@ -240,7 +240,6 @@ function LoginForm() {
   return (
     <main className="wrap narrow">
       <StationSign />
-      <h1 style={{ fontSize: 28, marginTop: 22 }}>Your campus, in one feed.</h1>
       <div className="auth-tabs" role="tablist" aria-label="Log in or sign up">
         {(["login", "signup"] as const).map((m) => (
           <button
@@ -261,16 +260,16 @@ function LoginForm() {
         ))}
       </div>
 
-      <p className="muted">
+      <p className="muted small" style={{ marginBottom: 4 }}>
         {mode === "login"
-          ? "Welcome back! Enter your IITB email and we’ll send a 6-digit code and a one-tap link."
-          : "New here? Create your account with your IITB email (@iitb.ac.in). We’ll send a 6-digit code and a one-tap link."}
+          ? "Enter your IITB email. We’ll send a 6-digit code and a one-tap sign-in link."
+          : "Create your account with your @iitb.ac.in email. We’ll send a 6-digit code and a one-tap sign-in link."}
       </p>
 
       {step === "email" ? (
         <form onSubmit={handleSendCode} className="login">
           <label htmlFor="iitb-email" className="muted small">
-            IIT Bombay Email Address
+            IITB email
           </label>
           <input
             id="iitb-email"
@@ -290,15 +289,13 @@ function LoginForm() {
               onChange={(e) => handleRememberChange(e.target.checked)}
             />
             <span className="login-remember-text">
-              <strong>Remember this device</strong> (stay signed in for 1 year)
-              <small>
-                Keep checked on your phone/laptop. Uncheck if on a shared or lab PC.
-              </small>
+              <strong>Keep me signed in</strong>
+              <small>For a year on this device. Turn off on shared or lab computers.</small>
             </span>
           </label>
 
-          <button type="submit" disabled={status === "sending"}>
-            {status === "sending" ? "Sending…" : mode === "login" ? "Log in" : "Sign up"}
+          <button type="submit" className="primary" disabled={status === "sending"}>
+            {status === "sending" ? "Sending…" : "Continue"}
           </button>
 
           {status === "error" && <p className="err">{errorMsg}</p>}
@@ -339,9 +336,10 @@ function LoginForm() {
 
             <button
               type="submit"
+              className="primary"
               disabled={status === "verifying" || otpCode.length !== 6}
             >
-              {status === "verifying" ? "Verifying code…" : "Verify & Enter"}
+              {status === "verifying" ? "Verifying code…" : "Verify and continue"}
             </button>
 
             {status === "error" && <p className="err">{errorMsg}</p>}
@@ -388,8 +386,7 @@ export default function LoginPage() {
       fallback={
         <main className="wrap narrow">
           <StationSign />
-          <h1 style={{ fontSize: 28, marginTop: 22 }}>Your campus, in one feed.</h1>
-          <p className="muted">Loading sign-in…</p>
+              <p className="muted">Loading sign-in…</p>
         </main>
       }
     >

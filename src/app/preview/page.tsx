@@ -42,9 +42,15 @@ export default function Preview() {
       <AppBar />
       <main className="wrap">
         <HomeHead name={"Saksham Tiwari"} now={now} action={sections.action} exams={sections.exams} />
-        <DayBoard title={late ? "Tomorrow" : "Today"} rows={rows} emptyText="No classes scheduled." />
-        <AskBox />
-        <FeedView sections={sections as any} sponsored={null} />
+        <div className="home-grid">
+          <aside className="home-rail">
+            <DayBoard title={late ? "Tomorrow" : "Today"} rows={rows} emptyText="No classes scheduled." />
+            <AskBox />
+          </aside>
+          <div className="home-main">
+            <FeedView sections={sections as any} sponsored={null} />
+          </div>
+        </div>
       </main>
     </>
   );

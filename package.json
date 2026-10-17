@@ -8,11 +8,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node test_suite.mjs && node test_ingest.mjs && node test_timetable.mjs && node test_launch.mjs && node test_sections.mjs && node test_moodle.mjs && node test_display.mjs && node test_digest.mjs && node test_ask.mjs"
+    "test": "node test_suite.mjs && node test_ingest.mjs && node test_timetable.mjs && node test_launch.mjs && node test_sections.mjs && node test_moodle.mjs && node test_display.mjs && node test_digest.mjs && node test_ask.mjs && node test_actions.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.10",
+    "lucide-react": "^0.468.0",
     "next": "^16.4.0",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",

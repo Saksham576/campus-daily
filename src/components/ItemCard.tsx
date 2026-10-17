@@ -9,6 +9,23 @@ import {
   type ExtractedEvent,
 } from "@/lib/events";
 import { cleanSubject, senderName, sourceLabel } from "@/lib/display";
+import {
+  ArrowUpRight,
+  BellOff,
+  Bookmark,
+  BookmarkCheck,
+  CalendarPlus,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Download,
+  EyeOff,
+  GraduationCap,
+  Mail,
+  MessageCircle,
+  MoreHorizontal,
+} from "lucide-react";
 
 export type FeedItem = {
   id: string;
@@ -33,15 +50,6 @@ export type FeedItem = {
   myCourse?: string | null;
   /** Your seat, when a seating plan mentions your roll number. */
   seat?: string | null;
-};
-
-const STUB: Record<string, { code: string; whenLabel: string }> = {
-  action: { code: "Action", whenLabel: "Due" },
-  exams: { code: "Exam", whenLabel: "When" },
-  courses: { code: "Course", whenLabel: "When" },
-  events: { code: "Event", whenLabel: "Starts" },
-  opportunities: { code: "Opportunity", whenLabel: "Posted" },
-  campus: { code: "Campus", whenLabel: "Posted" },
 };
 
 function formatHost(u: string): string {
@@ -79,21 +87,16 @@ function formatDate(isoDate?: string | null): string {
   }
 }
 
-/** "TODAY 17:00" / "FRI 23:59" / "21 OCT" — board style. */
-function stubWhen(iso?: string | null): { text: string; hot: boolean } {
-  if (!iso) return { text: "—", hot: false };
+/** "today 17:00" / "tomorrow 23:59" / "Fri 17:15" / "23 Oct" */
+function friendlyWhen(iso: string): { text: string; hot: boolean } {
   const d = new Date(iso);
   const day = (x: Date) => x.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
   const time = d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" });
   const diffDays = Math.round((new Date(day(d)).getTime() - new Date(day(new Date())).getTime()) / 86400000);
-  if (diffDays === 0) return { text: `TODAY ${time}`, hot: true };
-  if (diffDays === 1) return { text: `TMRW ${time}`, hot: true };
-  if (diffDays > 1 && diffDays < 7)
-    return { text: `${d.toLocaleDateString("en-IN", { weekday: "short", timeZone: "Asia/Kolkata" }).toUpperCase()} ${time}`, hot: false };
-  return {
-    text: d.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }).toUpperCase(),
-    hot: false,
-  };
+  if (diffDays === 0) return { text: "today " + time, hot: true };
+  if (diffDays === 1) return { text: "tomorrow " + time, hot: true };
+  if (diffDays > 1 && diffDays < 7) return { text: d.toLocaleDateString("en-IN", { weekday: "short", timeZone: "Asia/Kolkata" }) + " " + time, hot: false };
+  return { text: d.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }), hot: false };
 }
 
 export function ItemCard({
@@ -248,7 +251,7 @@ export function ItemCard({
   if (status === "removed" || status === "done") {
     return (
       <div className="card removed">
-        <span>{status === "done" ? "✓ Marked done" : "Hidden from your board"}</span>
+        <span>{status === "done" ? "Marked done" : "Hidden from your board"}</span>
         <button onClick={() => updateItemStatus("new")} className="link">
           Undo
         </button>
@@ -267,113 +270,130 @@ export function ItemCard({
   }
 
   const sec = item.section || "campus";
-  const stub = STUB[sec];
-  const when = stubWhen(item.when || (sec === "opportunities" || sec === "campus" ? item.received_at : null));
+  const when = item.when && (sec === "action" || sec === "exams" || sec === "events" || sec === "courses") ? friendlyWhen(item.when) : null;
+  const SrcIcon = item.source === "whatsapp" ? MessageCircle : item.source === "moodle" ? GraduationCap : Mail;
 
   return (
-    <article className={`ticket sec-${sec} ${status === "kept" ? "kept" : ""}`}>
-      <div className="stub">
-        <span className="sec">{item.myCourse ? item.myCourse.replace(" ", "") : stub.code}</span>
-        <span className="when-k">{stub.whenLabel}</span>
-        <span className={`when-v ${when.hot ? "hot" : ""}`}>{when.text}</span>
-        {item.seat && <span className="seat">Seat {item.seat}</span>}
+    <article className={`notice sec-${sec} ${status === "kept" ? "kept" : ""}`}>
+      <div className="meta">
+        <span className={`src src-${item.source || "mail"}`} title={item.from_address || ""}>
+          <SrcIcon aria-hidden />
+          {sourceLabel(item)}
+        </span>
+        {item.received_at && (
+          <time className="from" dateTime={item.received_at} title={formatDate(item.received_at)}>
+            {ago(item.received_at)}
+          </time>
+        )}
+        {item.is_verified && <span className="tag verified">Instructor</span>}
+        {item.score >= 8 && <span className="tag high">Priority</span>}
+        {event?.is_cancelled && <span className="tag event high">Class cancelled</span>}
       </div>
 
-      <div className="ticket-main">
-        <div className="meta">
-          <span className={`src src-${item.source || "mail"}`} title={item.from_address || ""}>
-            {sourceLabel(item)}
-          </span>
-          {item.received_at && (
-            <time className="from" dateTime={item.received_at} title={formatDate(item.received_at)}>
-              {ago(item.received_at)}
-            </time>
+      <h3 title={item.subject}>{cleanSubject(item.subject)}</h3>
+      {item.summary && <p className="summary">{item.summary}</p>}
+
+      {(when || item.seat) && (
+        <div className="actions" style={{ marginTop: 10 }}>
+          {when && (
+            <span className={`when-chip ${when.hot ? "hot" : ""}`}>
+              <Clock aria-hidden />
+              {sec === "action" ? "Due " : ""}
+              {when.text}
+            </span>
           )}
-          {item.is_verified && <span className="tag verified">✓ Instructor</span>}
-          {item.score >= 8 && <span className="tag high">Priority</span>}
-          {event?.is_cancelled && <span className="tag event high">Class cancelled</span>}
+          {item.seat && <span className="when-chip seat">Seat {item.seat}</span>}
         </div>
+      )}
 
-        <h3 title={item.subject}>{cleanSubject(item.subject)}</h3>
-        {item.summary && <p className="summary">{item.summary}</p>}
-
-        {event && sec !== "action" && sec !== "opportunities" && sec !== "campus" && (
-          <div className="event-banner">
-            <div>
-              <strong>{cleanSubject(event.title)}</strong>
-              {event.location && <span> · {event.location}</span>}
-              <span> · {formatDate(event.start_time)}</span>
-            </div>
-            <div className="actions" style={{ marginTop: 8 }}>
-              <button onClick={() => handleAddToTimetable(event)} disabled={addingToTimetable || timetableAdded}>
-                {timetableAdded ? "✓ In your timetable" : addingToTimetable ? "Adding…" : "+ Add to timetable"}
-              </button>
-              <button onClick={() => handleDownloadIcs(event)} title="Download .ics for Apple/Outlook/Google Calendar">
-                .ics
-              </button>
-              <a
-                href={getGoogleCalendarUrl({
-                  title: event.title,
-                  description: item.summary || item.subject,
-                  location: event.location,
-                  start_time: event.start_time,
-                  end_time: event.end_time,
-                })}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => logInteraction("add_to_calendar")}
-                className="btn-link"
-              >
-                Google Calendar ↗
-              </a>
-            </div>
+      {event && sec !== "action" && sec !== "opportunities" && sec !== "campus" && (
+        <div className="event-banner">
+          <div>
+            <strong>{cleanSubject(event.title)}</strong>
+            {event.location && <span> · {event.location}</span>}
+            <span> · {formatDate(event.start_time)}</span>
           </div>
-        )}
-
-        {linksArray.length > 0 && (
-          <div className="links" style={{ marginTop: 8 }}>
-            {linksArray.map((l, idx) => (
-              <a key={idx} href={l} target="_blank" rel="noopener noreferrer">
-                {formatHost(l)} ↗
-              </a>
-            ))}
+          <div className="actions">
+            <button onClick={() => handleAddToTimetable(event)} disabled={addingToTimetable || timetableAdded}>
+              {timetableAdded ? <Check aria-hidden /> : <CalendarPlus aria-hidden />}
+              {timetableAdded ? "In your timetable" : addingToTimetable ? "Adding…" : "Add to timetable"}
+            </button>
+            <button className="ghost" onClick={() => handleDownloadIcs(event)} title="Download for Apple / Outlook calendar">
+              <Download aria-hidden />
+              .ics
+            </button>
+            <a
+              href={getGoogleCalendarUrl({
+                title: event.title,
+                description: item.summary || item.subject,
+                location: event.location,
+                start_time: event.start_time,
+                end_time: event.end_time,
+              })}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => logInteraction("add_to_calendar")}
+              className="btn-link"
+            >
+              Google Calendar
+              <ArrowUpRight aria-hidden />
+            </a>
           </div>
-        )}
+        </div>
+      )}
 
+      {linksArray.length > 0 && (
+        <div className="links">
+          {linksArray.map((l, idx) => (
+            <a key={idx} href={l} target="_blank" rel="noopener noreferrer">
+              {formatHost(l)}
+              <ArrowUpRight aria-hidden />
+            </a>
+          ))}
+        </div>
+      )}
+
+      {showBody && item.body && <div className="body">{item.body}</div>}
+
+      <div className="actions ticket-actions">
+        {sec === "action" && (
+          <button className="accent" onClick={() => updateItemStatus("done")}>
+            <Check aria-hidden />
+            Done
+          </button>
+        )}
         {item.body && (
-          <>
-            <button onClick={() => setShowBody(!showBody)} className="link small" style={{ marginTop: 6 }}>
-              {showBody ? "Hide full notice" : "Read full notice"}
-            </button>
-            {showBody && <div className="body">{item.body}</div>}
-          </>
+          <button className="ghost" onClick={() => setShowBody(!showBody)} aria-expanded={showBody}>
+            {showBody ? <ChevronUp aria-hidden /> : <ChevronDown aria-hidden />}
+            {showBody ? "Less" : "Full notice"}
+          </button>
         )}
-
-        <div className="actions ticket-actions">
-          {sec === "action" && (
-            <button className="accent" style={{ padding: "7px 12px", fontSize: 12 }} onClick={() => updateItemStatus("done")}>
-              ✓ Done
+        <span className="spacer" />
+        <button
+          className={`ghost ${status === "kept" ? "on" : ""}`}
+          onClick={() => updateItemStatus(status === "kept" ? "new" : "kept")}
+          aria-pressed={status === "kept"}
+        >
+          {status === "kept" ? <BookmarkCheck aria-hidden /> : <Bookmark aria-hidden />}
+          {status === "kept" ? "Saved" : "Save"}
+        </button>
+        <details className="more">
+          <summary aria-label="More options">
+            <MoreHorizontal aria-hidden width={18} height={18} />
+          </summary>
+          <div className="more-menu">
+            <button onClick={() => updateItemStatus("removed")}>
+              <EyeOff aria-hidden />
+              Hide this notice
             </button>
-          )}
-          <button
-            className={`ghost ${status === "kept" ? "on" : ""}`}
-            onClick={() => updateItemStatus(status === "kept" ? "new" : "kept")}
-            aria-pressed={status === "kept"}
-          >
-            {status === "kept" ? "★ Saved" : "☆ Save"}
-          </button>
-          <button className="ghost" onClick={() => updateItemStatus("removed")}>
-            Hide
-          </button>
-          {item.from_address && (
-            <details className="more">
-              <summary aria-label="More options">⋯</summary>
-              <div className="more-menu">
-                <button onClick={muteSender}>Stop showing {senderName(item.from_address) || "this sender"}</button>
-              </div>
-            </details>
-          )}
-        </div>
+            {item.from_address && (
+              <button onClick={muteSender}>
+                <BellOff aria-hidden />
+                Stop showing {senderName(item.from_address) || "this sender"}
+              </button>
+            )}
+          </div>
+        </details>
       </div>
     </article>
   );
