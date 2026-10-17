@@ -1,12 +1,13 @@
+import { RESOBIN_AUTUMN_2026 } from "./catalog-autumn-2026.ts";
 /**
  * Autumn 2026 timetable for first-year-level courses, copied from ResoBin on 2026-10-15.
  * d = division / batch, l = lecture slots, t = tutorial slots, v = venue.
  * Courses not listed here can still be added with their slot codes from ResoBin / ASC.
  */
 export type CatalogDivision = { d: string; l: string[]; t: string[]; v: string };
-export type CatalogCourse = { title: string; credits: number; divisions: CatalogDivision[] };
+export type CatalogCourse = { title: string; credits: number; dept?: string; divisions: CatalogDivision[] };
 
-export const COURSE_CATALOG: Record<string, CatalogCourse> = {
+const HAND_CATALOG: Record<string, CatalogCourse> = {
   AE103: { title: "A historical perspective of Aerospace Engineering", credits: 6, divisions: [{ d: "Core", l: ["11A", "11B"], t: [], v: "" }, { d: "D2", l: ["11A", "11B"], t: [], v: "" }] },
   AE152: { title: "Introduction to Aerospace Engg.", credits: 6, divisions: [{ d: "Core", l: ["5A", "5B"], t: [], v: "" }] },
   AE153: { title: "Introduction to Aerospace Engg.", credits: 6, divisions: [{ d: "Minor", l: ["5A", "5B"], t: [], v: "" }] },
@@ -35,6 +36,9 @@ export const COURSE_CATALOG: Record<string, CatalogCourse> = {
   PH114: { title: "Thermal Physics", credits: 6, divisions: [{ d: "Core", l: ["1A", "1B", "1C"], t: [], v: "LH 301" }] },
   PH117: { title: "Physics Lab", credits: 3, divisions: [{ d: "P13", l: ["L1"], t: [], v: "" }, { d: "P14", l: ["L2"], t: [], v: "" }, { d: "P15", l: ["L3"], t: [], v: "" }, { d: "P16", l: ["L4"], t: [], v: "" }, { d: "P19", l: ["1A", "2A", "3A"], t: [], v: "" }, { d: "P20", l: ["1B", "2B", "3B"], t: [], v: "" }, { d: "P21", l: ["1C", "2C", "3C"], t: [], v: "" }, { d: "P22", l: ["6B", "7B"], t: [], v: "" }] },
 };
+
+/** Every autumn-2026 course from ResoBin (all departments and years); hand entries fill gaps. */
+export const COURSE_CATALOG: Record<string, CatalogCourse> = { ...HAND_CATALOG, ...RESOBIN_AUTUMN_2026 };
 
 export function catalogKey(code: string): string {
   return code.toUpperCase().replace(/\s+/g, "");

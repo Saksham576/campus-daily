@@ -35,3 +35,34 @@ chrome.webRequest.onHeadersReceived.addListener(
   ["responseHeaders", "extraHeaders"]
 );
 chrome.webRequest.onBeforeRedirect.addListener((d) => send(d.url, d.redirectUrl, d.tabId), FILTER);
+
+// ---- ResoBin timetable import (only when Campus Daily asks, with a one-time passport) ----
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  if (!msg || msg.type !== "resobin-import") return;
+  const from = sender.origin || (sender.url ? new URL(sender.url).origin : "");
+  if (from !== APP && from !== "http://localhost:3000") return reply({ ok: false, error: "Not from Campus Daily." });
+  (async () => {
+    const sem = /^[a-z]+-\d{4}$/.test(msg.semester) ? msg.semester : "autumn-2026";
+    let rows;
+    try {
+      const r = await fetch(`https://resobin.gymkhana.iitb.ac.in/api/accounts/profile/semester/${sem}/timetable`, { credentials: "include" });
+      if (r.status === 401 || r.status === 403) return reply({ ok: false, needSignIn: true, error: "Sign in to ResoBin in this browser first, then try again." });
+      if (!r.ok) return reply({ ok: false, error: `ResoBin answered ${r.status}.` });
+      rows = await r.json();
+    } catch {
+      return reply({ ok: false, error: "Couldn't reach ResoBin." });
+    }
+    try {
+      const res = await fetch(`${APP}/api/resobin/import`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ passport: msg.passport, timetable: rows }),
+      });
+      const j = await res.json().catch(() => ({}));
+      reply(res.ok ? { ok: true, count: j.count } : { ok: false, error: j.error || "Campus Daily couldn't save it." });
+    } catch {
+      reply({ ok: false, error: "Couldn't reach Campus Daily." });
+    }
+  })();
+  return true; // async reply
+});

@@ -33,15 +33,34 @@ const isElective = (key: string) => HASMED_EXTRA.includes(key) || COURSE_CATALOG
  * Setup step without Moodle: build the timetable from the course catalog (ResoBin data).
  * Division courses come pre-ticked; labs and HASMED electives ask for your batch / section.
  */
-export function CoursePicker({ division, department, onSaved }: { division: string; department?: string | null; onSaved?: (n: number) => void }) {
-  const [showAll, setShowAll] = useState(false);
+const level = (key: string) => (key.match(/d/) || [""])[0]; // CL205 → "2"
+
+export function CoursePicker({
+  division,
+  department,
+  year,
+  onSaved,
+}: {
+  division: string;
+  department?: string | null;
+  year?: string | null;
+  onSaved?: (n: number) => void;
+}) {
+  const [q, setQ] = useState("");
+  const firstYear = !year || String(year) === "1";
   const prefixes = DEPT_PREFIX.find(([re]) => re.test(department || ""))?.[1] || [];
   const common = useMemo(() => coursesForDivision(division).map((c) => c.course_code), [division]);
-  const labs = useMemo(() => Object.keys(COURSE_CATALOG).filter(isLab), []);
-  const electives = useMemo(() => Object.keys(COURSE_CATALOG).filter(isElective), []);
-  const others = useMemo(
-    () => Object.keys(COURSE_CATALOG).filter((k) => !common.includes(k) && !isLab(k) && !isElective(k)),
-    [common]
+  // First-year labs / Makerspace and HASMED (100-level courses only).
+  const labs = useMemo(() => Object.keys(COURSE_CATALOG).filter((k) => level(k) === "1" && isLab(k)), []);
+  const electives = useMemo(() => Object.keys(COURSE_CATALOG).filter((k) => level(k) === "1" && isElective(k)), []);
+  // Your department's courses at your year's level (CL2xx for a 2nd-year Chemical student).
+  const deptCourses = useMemo(
+    () =>
+      Object.keys(COURSE_CATALOG).filter(
+        (k) => prefixes.some((x) => k.startsWith(x)) && level(k) === String(year || "1") && !common.includes(k) && !labs.includes(k) && !electives.includes(k)
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [department, year, common]
   );
 
   const [pick, setPick] = useState<Pick>({});
@@ -142,23 +161,40 @@ export function CoursePicker({ division, department, onSaved }: { division: stri
         </p>
       )}
 
-      <h3>Labs and Makerspace</h3>
-      <p className="help">These run by batch. Your batch is on your lab schedule or Moodle (e.g. P16). Leave unticked if you don&apos;t have it this semester.</p>
-      {labs.map((k) => row(k, opts(k), "Batch"))}
+      {firstYear && (
+        <>
+          <h3>Labs and Makerspace</h3>
+          <p className="help">These run by batch. Your batch is on your lab schedule or Moodle (e.g. P16). Leave unticked if you don&apos;t have it this semester.</p>
+          {labs.map((k) => row(k, opts(k), "Batch"))}
 
-      <h3>Your HASMED</h3>
-      <p className="help">Tick the one you were allotted and pick its section (S1 or S2).</p>
-      {electives.map((k) => row(k, opts(k), "Section"))}
-
-      <h3>Department and other courses</h3>
-      {others.filter((k) => prefixes.some((x) => k.startsWith(x)) || pick[k]).map((k) => row(k, opts(k)))}
-      {!showAll ? (
-        <button type="button" className="link" onClick={() => setShowAll(true)}>
-          Show courses from other departments
-        </button>
-      ) : (
-        others.filter((k) => !prefixes.some((x) => k.startsWith(x)) && !pick[k]).map((k) => row(k, opts(k)))
+          <h3>Your HASMED</h3>
+          <p className="help">Tick the one you were allotted and pick its section (S1 or S2).</p>
+          {electives.map((k) => row(k, opts(k), "Section"))}
+        </>
       )}
+
+      {deptCourses.length > 0 && (
+        <>
+          <h3>Your department{year ? ` (${year}00-level)` : ""}</h3>
+          {deptCourses.map((k) => row(k, opts(k)))}
+        </>
+      )}
+
+      {/* Anything you've picked that isn't in a list above */}
+      {Object.keys(pick)
+        .filter((k) => pick[k] && COURSE_CATALOG[k] && !common.includes(k) && !labs.includes(k) && !electives.includes(k) && !deptCourses.includes(k))
+        .map((k) => row(k, opts(k)))}
+
+      <h3>Find any course</h3>
+      <input type="search" placeholder="Search by code or name — e.g. CL205, Thermodynamics" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search courses" />
+      {q.trim().length >= 2 &&
+        (() => {
+          const n = q.trim().toLowerCase().replace(/s+/g, "");
+          const hits = Object.keys(COURSE_CATALOG)
+            .filter((k) => !pick[k] && (k.toLowerCase().includes(n) || COURSE_CATALOG[k].title.toLowerCase().replace(/s+/g, "").includes(n)))
+            .slice(0, 12);
+          return hits.length ? <div style={{ marginTop: 8 }}>{hits.map((k) => row(k, opts(k)))}</div> : <p className="help" style={{ marginTop: 8 }}>No autumn-2026 course matches. You can still add it by code below.</p>;
+        })()}
 
       <p className="help" style={{ marginTop: 10 }} aria-live="polite">
         {busy ? "Saving…" : saved || "Changes save automatically."}

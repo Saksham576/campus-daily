@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Logo } from "@/components/Logo";
 import { CoursesEditor } from "@/components/CoursesEditor";
 import { CoursePicker } from "@/components/CoursePicker";
+import { ResobinImport } from "@/components/ResobinImport";
 import { MoodleConnect } from "@/components/MoodleConnect";
 import { PushToggle } from "@/components/PushToggle";
 import { DigestPicker } from "@/components/DigestPicker";
@@ -22,6 +23,7 @@ export function WelcomeWizard({ demo = false }: { demo?: boolean }) {
   const [ready, setReady] = useState(demo);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [imported, setImported] = useState(0); // remount the picker after a ResoBin import
   const [name, setName] = useState("");
   const [form, setForm] = useState({
     department: "",
@@ -205,8 +207,12 @@ export function WelcomeWizard({ demo = false }: { demo?: boolean }) {
             <MoodleConnect />
           </div>
           <div className="welcome-block">
+            <h2>Or bring them from ResoBin</h2>
+            <ResobinImport onDone={() => setImported((x) => x + 1)} />
+          </div>
+          <div className="welcome-block">
             <h2>Or pick your courses</h2>
-            <CoursePicker division={form.division} department={form.department} />
+            <CoursePicker key={imported} division={form.division} department={form.department} year={form.year} />
             <details className="more-courses">
               <summary>A course isn&apos;t listed? Add it by code</summary>
               <CoursesEditor />
