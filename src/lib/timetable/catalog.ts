@@ -37,3 +37,24 @@ export const COURSE_CATALOG: Record<string, CatalogCourse> = {
 export function catalogKey(code: string): string {
   return code.toUpperCase().replace(/\s+/g, "");
 }
+
+/**
+ * Courses to add to a student's timetable from their Moodle course shortnames
+ * ("CH 111-2026-1-D3", "PH 117-2026-1-P16", "ENT101-2026-1"). Only when the catalog knows that division
+ * (or the course has a single "Core" offering); "-ALL" umbrella pages are skipped.
+ */
+export function coursesFromShortnames(shortnames: string[]): { course_code: string; title: string; division: string; lecture_slots: string[]; tutorial_slots: string[]; venue: string | null }[] {
+  const out = new Map<string, { course_code: string; title: string; division: string; lecture_slots: string[]; tutorial_slots: string[]; venue: string | null }>();
+  for (const sn of shortnames) {
+    const m = sn.toUpperCase().match(/^\s*([A-Z]{2,3})\s?(\d{3}[A-Z]?)-\d{4}-\d(?:-([A-Z0-9]+))?/);
+    if (!m) continue;
+    const key = `${m[1]}${m[2]}`;
+    const course = COURSE_CATALOG[key];
+    if (!course) continue;
+    const div = m[3] && m[3] !== "ALL" ? course.divisions.find((d) => d.d.toUpperCase() === m[3]) : course.divisions.length === 1 ? course.divisions[0] : undefined;
+    if (!div || (div.l.length === 0 && div.t.length === 0)) continue;
+    if (out.has(key) && !m[3]) continue; // a specific division wins over the umbrella guess
+    out.set(key, { course_code: key, title: course.title, division: div.d, lecture_slots: div.l, tutorial_slots: div.t, venue: div.v || null });
+  }
+  return [...out.values()];
+}

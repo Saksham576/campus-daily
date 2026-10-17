@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { decryptSecret } from "@/lib/server/crypto";
 import { publishNotice } from "@/lib/server/publish";
 import { takesCourse } from "@/lib/timetable/courses";
+import { coursesFromShortnames } from "@/lib/timetable/catalog";
 import { updateFromNotice } from "@/lib/timetable/updates";
 import {
   MOODLE_URL,
@@ -72,6 +73,39 @@ function courseScore(code: string | null, high: number) {
   return (s: { courses?: string[]; keywords?: string | null }) => (code && takesCourse(s, code) ? high : 2);
 }
 
+/**
+ * What a student is enrolled in on Moodle (and their tutorial / lab groups). Classmates' course files
+ * become visible to them through this (course_files RLS), so it runs right when someone connects.
+ * Also fills in their timetable courses from their Moodle divisions (D3, P16…) if they haven't added them.
+ */
+export async function syncEnrolments(admin: SupabaseClient, userId: string, moodleUserId: number, token: string, known?: Course[]) {
+  const courses = known || (await moodleCall<Course[]>(token, "core_enrol_get_users_courses", { userid: moodleUserId }));
+  const enrolments = await Promise.all(
+    courses.map(async (course) => {
+      const g = await moodleCall<any>(token, "core_group_get_course_user_groups", { courseid: course.id, userid: moodleUserId }).catch(() => ({ groups: [] }));
+      return {
+        user_id: userId,
+        course_id: course.id,
+        course_code: courseCodeFromShortname(course.shortname),
+        shortname: htmlToText(course.shortname).trim(),
+        fullname: htmlToText(course.fullname || "").trim(),
+        groups: (g?.groups || []).map((x: any) => htmlToText(String(x.name || "")).trim()).filter(Boolean),
+        updated_at: new Date().toISOString(),
+      };
+    })
+  );
+  if (enrolments.length) {
+    await admin.from("moodle_enrolments").delete().eq("user_id", userId).not("course_id", "in", `(${enrolments.map((e) => e.course_id).join(",")})`);
+    await admin.from("moodle_enrolments").upsert(enrolments);
+  }
+  // Timetable: add courses the student hasn't added yet (never overwrite their own choices).
+  const { data: mine } = await admin.from("user_courses").select("course_code").eq("user_id", userId);
+  const have = new Set((mine || []).map((r: { course_code: string }) => r.course_code.replace(/\s+/g, "").toUpperCase()));
+  const add = coursesFromShortnames(enrolments.map((e) => e.shortname)).filter((c) => !have.has(c.course_code));
+  if (add.length) await admin.from("user_courses").insert(add.map((c) => ({ ...c, user_id: userId })));
+  return { courses: enrolments.length, addedToTimetable: add.length };
+}
+
 export async function syncMoodle(admin: SupabaseClient, deadlineMs: number) {
   const apiKey = process.env.GEMINI_API_KEY || "";
   const stats = { connections: 0, courses: 0, notices: 0, files: 0, seatingPlans: 0, deadlines: 0, errors: [] as string[] };
@@ -93,25 +127,7 @@ export async function syncMoodle(admin: SupabaseClient, deadlineMs: number) {
       const courses = await moodleCall<Course[]>(token, "core_enrol_get_users_courses", { userid: c.moodle_userid });
       const now = Math.floor(Date.now() / 1000);
 
-      // What this student is enrolled in, and their groups (tutorial / lab batch) in each course.
-      const enrolments = await Promise.all(
-        courses.map(async (course) => {
-          const g = await moodleCall<any>(token, "core_group_get_course_user_groups", { courseid: course.id, userid: c.moodle_userid }).catch(() => ({ groups: [] }));
-          return {
-            user_id: c.user_id,
-            course_id: course.id,
-            course_code: courseCodeFromShortname(course.shortname),
-            shortname: htmlToText(course.shortname).trim(),
-            fullname: htmlToText(course.fullname || "").trim(),
-            groups: (g?.groups || []).map((x: any) => htmlToText(String(x.name || "")).trim()).filter(Boolean),
-            updated_at: new Date().toISOString(),
-          };
-        })
-      );
-      if (enrolments.length) {
-        await admin.from("moodle_enrolments").delete().eq("user_id", c.user_id).not("course_id", "in", `(${enrolments.map((e) => e.course_id).join(",")})`);
-        await admin.from("moodle_enrolments").upsert(enrolments);
-      }
+      await syncEnrolments(admin, c.user_id, c.moodle_userid, token, courses);
 
       // This student's own upcoming deadlines (what Moodle's Timeline shows). Submitted ones drop off.
       const timeline = await moodleCall<any>(token, "core_calendar_get_action_events_by_timesort", {

@@ -1,8 +1,10 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
+import { syncMoodle } from "@/lib/server/moodleSync";
 import { getAdminClient } from "@/lib/server/admin";
 import { saveMoodleKey, tokenFromLaunchRedirect } from "@/lib/server/moodleConnect";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 /**
  * POST /api/moodle/extension-connect { passport, redirect }
@@ -29,6 +31,8 @@ export async function POST(req: NextRequest) {
   if (!key) return NextResponse.json({ error: "Moodle's answer didn't check out." }, { status: 400 });
   try {
     const { name } = await saveMoodleKey(admin, nonce.user_id, key);
+    // Full first read (notices, files, deadlines) in the background; the new connection goes first.
+    after(() => syncMoodle(admin, Date.now() + 50_000).catch(() => null));
     return NextResponse.json({ ok: true, name });
   } catch {
     return NextResponse.json({ error: "Moodle didn't accept the key." }, { status: 400 });
