@@ -117,3 +117,10 @@ const realCh = extractEventDetails(
 assert.strictEqual(realCh.start_time, "2026-10-16T11:45:00.000Z", "Fri 16 Oct 17:15 IST");
 assert.strictEqual(realCh.end_time, "2026-10-16T12:45:00.000Z", "ends 18:15 IST");
 console.log("✓ Passed: posting time is never taken as the event date");
+
+// A quiz is only added when the subject names one
+const ref = new Date("2026-10-17T06:00:00Z");
+assert.strictEqual(updateFromNotice("HS 109-2026-1-S1: Reading about Kant", "Read before the quiz on 29 October 2026 at 2 PM.", "k", ref), null);
+assert.strictEqual(updateFromNotice("CS 105-2026-1-D3: Tutorial sheet on posets", "Practice for the quiz on 25 October 2026 at 9 AM.", "p", ref), null);
+assert.strictEqual(updateFromNotice("MA 105 Quiz 3", "Quiz 3 on 23 October 2026 at 2 PM in LA 201.", "q", ref).kind, "added");
+console.log("✓ Passed: only notices that name a quiz/exam add one to the timetable");

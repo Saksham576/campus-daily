@@ -76,7 +76,12 @@ export function updateFromNotice(
     return { ...base, kind: "cancelled", match_start: hasTime ? ev.start_time : null };
   }
   if (AFTERMATH_RE.test(subject) || !startsLater) return null;
-  if (ev.slot_type === "quiz" || ev.slot_type === "exam" || ev.slot_type === "deadline") {
+  // Adding something to a timetable needs the subject itself to name it ("Reading about Kant" mentioning a quiz isn't one).
+  const namesIt =
+    ev.slot_type === "deadline"
+      ? /\b(deadline|due|submission|submit|last date)\b/i.test(subject)
+      : /\b(quiz(?:zes)?|exams?|tests?|viva|mid-?sems?|end-?sems?|re-?exam)\b/i.test(subject);
+  if ((ev.slot_type === "quiz" || ev.slot_type === "exam" || ev.slot_type === "deadline") && namesIt) {
     return {
       ...base,
       kind: "added",
