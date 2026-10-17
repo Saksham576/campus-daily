@@ -1861,6 +1861,28 @@ input[type="radio"] {
   min-width: 0;
 }
 
+/* ---------- Linked sources (one event, several notices) ---------- */
+.linked {
+  display: grid;
+  gap: 2px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.linked-src {
+  color: var(--muted);
+}
+.linked-now {
+  color: var(--ink);
+  font-weight: 600;
+}
+.linked-conflict {
+  color: var(--muted);
+}
+
 /* ---------- Theme toggle (sidebar foot / top bar) ---------- */
 .appbar-foot {
   display: flex;
