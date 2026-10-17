@@ -80,6 +80,8 @@ async function processNotice(email: InboundEmail): Promise<{ status: number; bod
     return { status: 502, body: { error: "Scoring unavailable" } };
   }
   if (!scored) return { status: 422, body: { error: "Unscorable email" } };
+  // Personal mail from a forward we can't attribute (old rule without +token): never show it to everyone.
+  if (!owner && scored.is_personal && !email.from.startsWith("WhatsApp:")) return { status: 200, body: { ok: true, skipped: "personal mail without owner" } };
 
   // Personal mail (sent to this student, not a list) is shown to them alone, under its own id.
   const personal = Boolean(owner) && isPersonalMail(email, owner!, scored.is_personal);
