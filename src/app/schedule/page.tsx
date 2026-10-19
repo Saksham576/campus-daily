@@ -61,7 +61,7 @@ async function loadMergedSchedule(
   const { data: updates } = await supabase
     .from("course_updates")
     .select("*")
-    .gte("on_date", istDate(monday.toISOString()))
+    .gte("until_date", istDate(monday.toISOString()))
     .lte("on_date", istDate(sunday.toISOString()))
     .order("created_at", { ascending: true });
   const week = applyCourseUpdates(baseline, (updates || []) as CourseUpdate[]) as ScheduleItem[];

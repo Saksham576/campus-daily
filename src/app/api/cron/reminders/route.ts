@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const today = new Date(now.getTime() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
-  const { data: updates } = await admin.from("course_updates").select("*").eq("on_date", today);
+  const { data: updates } = await admin.from("course_updates").select("*").lte("on_date", today).gte("until_date", today);
   const week = new Date(now.getTime() + 7 * 86400_000).toISOString();
   const fortnight = new Date(now.getTime() + 14 * 86400_000).toISOString();
 

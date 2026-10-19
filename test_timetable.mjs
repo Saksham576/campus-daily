@@ -131,3 +131,27 @@ assert.deepStrictEqual(coursesForDivision("D1").map((c) => c.course_code).sort()
 assert.deepStrictEqual(coursesForDivision("S1"), []);
 assert.deepStrictEqual(coursesForDivision(null), []);
 console.log("✓ Passed: a division's common first-year courses fill the timetable");
+
+// ---- Buffer week: one notice switches off a whole stretch of classes ----
+{
+  const recv = new Date("2026-10-19T05:14:00Z"); // Monday
+  const buf = updateFromNotice(
+    "DE 109-2026-1-S1: Buffer Week | No regular classses this week",
+    "Please note that this week is designated as the 2nd buffer week, meaning there will be no regular lectures scheduled (No Classes).\n\nYour next regular class will be on:\n 27/10/2026 \n 5:05 pm \n LH301",
+    "buf",
+    recv
+  );
+  assert.ok(buf, "buffer week notice recognised");
+  assert.strictEqual(buf.kind, "cancelled");
+  assert.strictEqual(buf.course_code, "DE 109");
+  assert.strictEqual(buf.on_date, "2026-10-19");
+  assert.strictEqual(buf.until_date, "2026-10-26", "runs to the day before the next class");
+  const mk = (id, d, t) => ({ id, title: "DE 109: Visual design", start_time: `${d}T${t}:00+05:30`, slot_type: "lecture" });
+  const slots = [mk("a", "2026-10-19", "09:00"), mk("b", "2026-10-22", "09:00"), mk("c", "2026-10-27", "17:05"), { id: "x", title: "MA 105: Calculus", start_time: "2026-10-20T08:30:00+05:30", slot_type: "lecture" }];
+  const out = applyCourseUpdates(slots, [buf]);
+  assert.deepStrictEqual(out.map((s) => !!s.is_cancelled), [true, true, false, false], "DE 109 off all week, others and the next class untouched");
+  const next = updateFromNotice("PH 108: No classes next week", "No regular lectures next week.", "nw", recv);
+  assert.strictEqual(next.on_date, "2026-10-26");
+  assert.strictEqual(next.until_date, "2026-11-01");
+  assert.strictEqual(updateFromNotice("Hostel 5 buffer week mess menu", "No classes this week for anyone", "z", recv), null, "no course, no change");
+}

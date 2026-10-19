@@ -30,7 +30,7 @@ export type TodayClass = { time: string; course: string; title: string; location
 export function todaysClasses(courses: UserCourse[], updates: CourseUpdate[], now = new Date()): TodayClass[] {
   const date = new Date(now.getTime() + IST_MS).toISOString().slice(0, 10);
   const slots = buildWeek(courses, now).filter((x) => istDateOf(x.start_time) === date);
-  const todays = updates.filter((u) => u.on_date === date);
+  const todays = updates.filter((u) => u.on_date <= date && (u.until_date || u.on_date) >= date);
   const out: TodayClass[] = slots.map((x) => {
     const code = x.title.split(":")[0].replace(" (Tutorial)", "");
     const c: TodayClass = {

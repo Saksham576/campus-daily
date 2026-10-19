@@ -33,6 +33,8 @@ export type Claim = {
   end: string | null;
   venue: string | null;
   cancelled: boolean;
+  /** Last day of a multi-day cancellation (a buffer week). */
+  until?: string | null;
   title: string;
   tokens: string[];
 };
@@ -43,6 +45,7 @@ export type Resolved = {
   end: string | null;
   venue: string | null;
   cancelled: boolean;
+  until?: string | null;
   /** Field → the claim that decided it. */
   decidedBy: Partial<Record<"start" | "venue" | "cancelled", { item_id: string; source: string; at: string }>>;
   /** Other values sources reported for the same field (shown as "WhatsApp said LH 101"). */
@@ -120,6 +123,7 @@ export function claimFrom(item: LinkItem, now = new Date()): Claim | null {
       end: u.new_end || null,
       venue: u.new_location || null,
       cancelled: u.kind === "cancelled",
+      until: u.until_date || null,
     };
   }
 
@@ -198,6 +202,7 @@ export function resolveClaims(claims: Claim[]): Resolved {
     end: startBy?.end || null,
     venue: venueBy?.venue || null,
     cancelled,
+    until: cancelled ? cancelBy?.until || null : null,
     decidedBy: { start: who(startBy), venue: who(venueBy), cancelled: cancelled ? who(cancelBy) : undefined },
     conflicts,
     sources: sorted.map((c) => ({ item_id: c.item_id, source: c.source, at: c.at })),
@@ -217,7 +222,7 @@ export function eventCourseUpdate(primaryNoticeId: string, e: { course_code: str
     if (!r.start) return null;
     return { course_code: e.course_code, kind: "added", on_date: e.on_date, new_start: r.start, new_end: r.end, new_location: r.venue, slot_type: "quiz", title: r.title, notice_id, verified };
   }
-  if (r.cancelled) return { course_code: e.course_code, kind: "cancelled", on_date: e.on_date, match_start: r.start, notice_id, verified };
+  if (r.cancelled) return { course_code: e.course_code, kind: "cancelled", on_date: e.on_date, until_date: r.until || null, match_start: r.start, notice_id, verified };
   if (r.venue || r.start) return { course_code: e.course_code, kind: "moved", on_date: e.on_date, new_location: r.venue, new_start: r.start, new_end: r.end, notice_id, verified };
   return null;
 }
