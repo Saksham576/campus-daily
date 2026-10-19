@@ -45,7 +45,8 @@ export function buildExtractPrompt(name: string, url: string, text: string, now 
 Today is ${now.toISOString().slice(0, 10)} (IST). Return ONLY JSON: {"items":[{"title":string,"summary":string,"when":string|null,"venue":string|null,"url":string|null}]}.
 Rules:
 - One item per distinct announcement, event, talk, circular, deadline or opening. Max 12, newest or soonest first.
-- Only items posted in the last 21 days or happening/due in the future. Skip menus, contacts, old archive entries and general descriptions of the institute.
+- Only items posted in the last 21 days or happening/due in the future. If the page shows no posting dates, the list is newest-first: take the first 6. Skip menus, contacts, archive entries, recaps of events that already happened, and general descriptions of the institute.
+- Skip items meant only for faculty, staff, PhD or prospective applicants unless they also concern current undergraduates.
 - "title": the item's own headline (max 120 chars). "summary": one plain sentence (max 40 words). No markdown.
 - "when": the start date/time of an event or the deadline as ISO 8601 with +05:30, only if the page states it; otherwise null. Never guess a date.
 - "venue": only if stated. "url": the item's own link from the text, else null.
