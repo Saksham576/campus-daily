@@ -26,6 +26,7 @@ export function cleanSubject(subject: string): string {
 export function senderName(from?: string | null): string {
   if (!from) return "";
   if (from.startsWith("WhatsApp:")) return from.slice(9).trim();
+  if (from.startsWith("Web:")) return from.slice(4).trim();
   const m = from.match(/^\s*"?([^"<]+?)"?\s*<[^>]+>\s*$/);
   let name = m ? m[1] : from;
   name = name.replace(/\s*\(via [^)]*\)\s*/i, "").trim();

@@ -9,6 +9,8 @@ export type InboundEmail = {
   from: string;
   date: string; // ISO
   body: string;
+  /** Venue already known by the sender (web-page items). */
+  venue?: string | null;
   /** Files already uploaded to the private attachments bucket (see /api/ingest/upload-url). */
   attachments?: Attachment[];
   /** Mail headers used to tell list mail from personal mail, and whose forward it was. */
@@ -295,7 +297,7 @@ export function personalizeScore(scored: ScoredNotice, sub: SubscriberTarget): n
  * WhatsApp-bridge posts are exempt (they come from chosen groups).
  */
 export function privateMailReason(email: Pick<InboundEmail, "from" | "subject">): string | null {
-  if (email.from.startsWith("WhatsApp:")) return null;
+  if (email.from.startsWith("WhatsApp:") || email.from.startsWith("Web:")) return null;
   if (/(supabase|signin@campusdaily|@campusdaily\.nexuspulsetech\.com|accounts\.google|no-?reply@google|noreply-cc@iitb)/i.test(email.from)) {
     return "auth sender";
   }
