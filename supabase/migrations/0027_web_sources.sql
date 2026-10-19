@@ -19,7 +19,6 @@ alter table public.web_sources enable row level security;
 
 insert into public.web_sources (name, url) values
   ('IIT Bombay · Announcements', 'https://www.iitb.ac.in/announcements'),
-  ('IIT Bombay · News', 'https://www.iitb.ac.in/news'),
   ('Academic Office · Circulars', 'https://acad.iitb.ac.in/circulars')
 on conflict (url) do nothing;
 
