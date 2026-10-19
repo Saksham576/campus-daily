@@ -87,8 +87,8 @@ async function processNotice(email: InboundEmail): Promise<{ status: number; bod
   const personal = Boolean(owner) && isPersonalMail(email, owner!, scored.is_personal);
   const ev = extractEventDetails(email.subject, email.body);
   const base = buildItemRow(email, scored, {
-    source: email.from.startsWith("WhatsApp:") ? "whatsapp" : "ingest-mail",
-    venue: ev?.location ?? null,
+    source: email.from.startsWith("WhatsApp:") ? "whatsapp" : email.from.startsWith("Web:") ? "web" : "ingest-mail",
+    venue: ev?.location ?? email.venue ?? null,
     deadline_at: ev && ev.slot_type === "deadline" ? ev.start_time : null,
   });
   const row = personal ? { ...base, id: `${base.id}_${createHash("sha256").update(owner!).digest("hex").slice(0, 8)}`, is_personal: true } : base;

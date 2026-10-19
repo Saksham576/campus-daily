@@ -207,7 +207,9 @@ export function extractEventDetails(
     Boolean(course_code) ||
     (slot_type !== "event" && (hasTiming || hasDate || Boolean(location))) ||
     (is_cancelled && isAcademicContext) ||
-    (Boolean(location) && hasTiming && hasDate);
+    (Boolean(location) && hasTiming && hasDate) ||
+    // Web-page items carry an explicit "When: 24 October 2026, 10:00 AM" line.
+    (hasTiming && hasDate && /^When: /m.test(rawBody));
 
   if (!isEventNotice) {
     return null;
