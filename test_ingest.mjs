@@ -126,3 +126,10 @@ assert.strictEqual(privateMailReason({ from: "cbssbi.cas@alerts.sbi.co.in", subj
 assert.strictEqual(privateMailReason({ from: '"Bharat Adsul (via IITB Moodle)" <noreply@moodle.iitb.ac.in>', subject: "CS 105: Midsem solutions" }), null);
 assert.strictEqual(privateMailReason({ from: "WhatsApp: Hostel 16", subject: "[WhatsApp · Hostel 16] Mess timing change" }), null);
 console.log("✓ Passed: sign-in codes and personal mail are never published");
+
+// Someone's digest of campus mail, replied to by a student, is not a notice.
+assert.strictEqual(privateMailReason({ from: "Ansh Goyal <26b2415@iitb.ac.in>", subject: "Re: Your Campus Mail Digest — October 18, 2026, evening" }), "digest");
+assert.strictEqual(privateMailReason({ from: "Ansh Goyal <26b2415@iitb.ac.in>", subject: "Re: lab partner for PH 117?" }), "student reply");
+assert.strictEqual(privateMailReason({ from: "Dean AP <dean.ap@iitb.ac.in>", subject: "Re: [Btech1] AC shutdown on Sat 17" }), null, "staff replies on lists stay");
+assert.strictEqual(privateMailReason({ from: "Ansh Goyal <26b2415@iitb.ac.in>", subject: "Fwd: Quiz 2 rescheduled" }), null, "a student's forward of a real notice stays");
+console.log("✓ Passed: digests and student replies are not published");

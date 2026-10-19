@@ -308,6 +308,10 @@ export function privateMailReason(email: Pick<InboundEmail, "from" | "subject">)
   ) {
     return "auth subject";
   }
+  // Someone else's digest of campus mail (or our own), forwarded or replied to: its notices are already in the feed.
+  if (/\b(campus\s+(mail\s+)?digest|mail\s+digest|your\s+(morning|evening|daily)\s+(digest|summary)|(morning|evening)\s+edition)\b/i.test(email.subject)) return "digest";
+  // A student replying to someone ("Re: …" from a roll-number address) is a conversation, not a notice.
+  if (/^\s*re:/i.test(email.subject) && /\b\d{2}[a-z]\d{3,5}@(?:[a-z.]+\.)?iitb\.ac\.in/i.test(email.from)) return "student reply";
   if (!/iitb\.ac\.in/i.test(email.from)) return "not IITB";
   return null;
 }
