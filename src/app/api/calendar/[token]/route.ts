@@ -24,7 +24,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tok
   const now = new Date();
   const [{ data: courses }, { data: updates }, { data: custom }] = await Promise.all([
     admin.from("user_courses").select("course_code, title, division, lecture_slots, tutorial_slots, venue").eq("user_id", owner.user_id),
-    admin.from("course_updates").select("*").gte("on_date", istDate(new Date(now.getTime() - 7 * 86400_000).toISOString())),
+    admin.from("course_updates").select("*").gte("until_date", istDate(new Date(now.getTime() - 7 * 86400_000).toISOString())),
     admin.from("user_schedules").select("id, title, location, start_time, end_time, is_cancelled").eq("user_id", owner.user_id).gte("start_time", new Date(now.getTime() - 7 * 86400_000).toISOString()),
   ]);
 

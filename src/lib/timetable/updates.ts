@@ -4,6 +4,7 @@ export type CourseUpdate = {
   course_code: string;
   kind: "cancelled" | "moved" | "added";
   on_date: string; // YYYY-MM-DD (IST)
+  until_date?: string | null; // last day of a multi-day change (a buffer week); null = just on_date
   match_start?: string | null;
   new_start?: string | null;
   new_end?: string | null;
@@ -52,6 +53,37 @@ const ROOM_RE = /^(LA|LC|LH|LT|CC|SIC|MB)\s\d/;
 const DATE_WORDS_RE =
   /\b(\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?|\d{1,2}[/.-]\d{1,2}(?:[/.-]\d{2,4})?|\d{4}-\d{2}-\d{2}|today|tonight|tomorrow|(?:mon|tues|wednes|thurs|fri|satur|sun)day)\b/i;
 
+// "Buffer week", "no regular classes this week": every class of the course in that stretch is off.
+const WEEK_OFF_RE =
+  /\b(buffer\s+week|no\s+(?:regular\s+)?(?:classes|lectures)\s+(?:are\s+)?(?:scheduled\s+)?(?:this|next)\s+week|(?:classes|lectures)\s+(?:are\s+)?(?:suspended|off|not\s+(?:be\s+)?held)\s+(?:this|next)\s+week)\b/i;
+const NEXT_CLASS_RE = /next\s+(?:regular\s+)?(?:class|lecture)[^0-9]{0,40}(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})/i;
+
+const addDays = (ymd: string, n: number) => new Date(Date.parse(ymd + "T00:00:00Z") + n * 86400000).toISOString().slice(0, 10);
+
+/** A whole stretch with no classes for one course, or null. Runs from the notice day (or next Monday) to the end of the week or the day before the stated next class. */
+function weekOffFromNotice(subject: string, body: string, noticeId: string | undefined, receivedAt: Date): CourseUpdate | null {
+  const text = `${subject}
+${body}`;
+  if (!WEEK_OFF_RE.test(text) || /^\s*\[(s\.events|student-notices)\]/i.test(subject)) return null;
+  const code = courseCodeOf(subject);
+  if (!code || ROOM_RE.test(code)) return null;
+  const today = istDate(receivedAt.toISOString());
+  const dow = (new Date(today + "T00:00:00Z").getUTCDay() + 6) % 7; // Monday = 0
+  const nextWeek = /next\s+week/i.test(text) && !/this\s+week/i.test(text);
+  const monday = addDays(today, -dow + (nextWeek ? 7 : 0));
+  const from = nextWeek ? monday : today;
+  let until = addDays(monday, 6);
+  const m = text.match(NEXT_CLASS_RE);
+  if (m) {
+    const back = `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(back) && back > from) {
+      const lastOff = addDays(back, -1);
+      if (lastOff > until && lastOff <= addDays(from, 14)) until = lastOff;
+    }
+  }
+  return { course_code: code, kind: "cancelled", on_date: from, until_date: until, match_start: null, notice_id: noticeId ?? null };
+}
+
 /** Turn a notice into a course-level timetable change, or null if it isn't one. */
 export function updateFromNotice(
   subject: string,
@@ -60,6 +92,8 @@ export function updateFromNotice(
   receivedAt: Date = new Date()
 ): CourseUpdate | null {
   const body = rawBody.replace(POSTED_LINE_RE, " ");
+  const weekOff = weekOffFromNotice(subject, body, noticeId, receivedAt);
+  if (weekOff) return weekOff;
   const ev = extractEventDetails(subject, body);
   if (!ev || !ev.course_code) return null;
   // Lecture halls ("LA 001", "LC 101", "LH 302"…) look like course codes but aren't; club/event lists aren't course notices.
@@ -133,9 +167,11 @@ export function applyCourseUpdates(slots: Slot[], updates: CourseUpdate[]): Slot
       continue;
     }
 
-    const sameDay = out.filter(
-      (s) => courseCodeOf(s.title) === u.course_code && istDate(s.start_time) === u.on_date && s.slot_type !== "quiz" && s.slot_type !== "exam"
-    );
+    const last = u.until_date && u.until_date > u.on_date ? u.until_date : u.on_date;
+    const sameDay = out.filter((s) => {
+      const d = istDate(s.start_time);
+      return courseCodeOf(s.title) === u.course_code && d >= u.on_date && d <= last && s.slot_type !== "quiz" && s.slot_type !== "exam";
+    });
     const exact = u.match_start ? sameDay.filter((s) => s.start_time === u.match_start) : [];
     const targets = exact.length > 0 ? exact : sameDay;
 

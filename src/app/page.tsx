@@ -126,7 +126,7 @@ export default async function HomePage() {
   const [feedRes, coursesRes, updatesRes, cardsRes, savedRes, enrolRes, dueRes, moodleRes] = await Promise.all([
     supabase.rpc("me_feed", { p_since: since, p_min_score: MIN_SCORE }),
     supabase.from("user_courses").select("course_code, title, division, lecture_slots, tutorial_slots, venue"),
-    supabase.from("course_updates").select("*").gte("on_date", today).lte("on_date", istDate(new Date(now.getTime() + 8 * 86400_000).toISOString())),
+    supabase.from("course_updates").select("*").gte("until_date", today).lte("on_date", istDate(new Date(now.getTime() + 8 * 86400_000).toISOString())),
     supabase.from("sponsored_cards").select("id, sponsor, title, body, link, ends_on").lte("starts_on", today).order("created_at", { ascending: false }).limit(5),
     supabase.from("user_schedules").select("id, title, location, start_time, end_time, slot_type, is_cancelled, notice_id").gte("start_time", new Date(now.getTime() - 86400_000).toISOString()).lte("start_time", new Date(now.getTime() + 9 * 86400_000).toISOString()),
     supabase.from("moodle_enrolments").select("course_code"),
