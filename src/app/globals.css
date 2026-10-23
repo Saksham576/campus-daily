@@ -2583,3 +2583,49 @@ button.chip.on:hover:not(:disabled) {
     mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
   }
 }
+
+/* ---------- Timetable: week navigation ---------- */
+.week-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  flex-wrap: wrap;
+}
+.week-nav .ghost {
+  height: 34px;
+  width: 34px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+}
+.week-nav .ghost .lucide {
+  width: 16px;
+  height: 16px;
+}
+.week-nav-label {
+  font: 600 15px/1.2 var(--font-sans);
+  min-width: 0;
+}
+.week-nav-label .muted {
+  font-weight: 450;
+}
+
+/* ---------- Loading skeleton ---------- */
+.skel {
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
+  background-size: 200% 100%;
+  animation: skel 1.4s ease-in-out infinite;
+  border: 1px solid var(--rule);
+}
+.skel-title { height: 34px; width: 55%; margin: 28px 0 18px; }
+.skel-card { height: 150px; margin-bottom: 16px; }
+.skel-row { height: 78px; margin-bottom: 10px; }
+@keyframes skel {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skel { animation: none; }
+}

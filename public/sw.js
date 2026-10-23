@@ -1,5 +1,5 @@
 /* Campus Daily service worker: offline timetable + feed, and push alerts. */
-const VERSION = "cd-v1";
+const VERSION = "cd-v2";
 const PAGES = "pages-" + VERSION;
 const DATA = "data-" + VERSION;
 const STATIC = "static-" + VERSION;
@@ -13,12 +13,19 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-async function networkFirst(req, cacheName) {
+// Network first, but on a slow connection show the last saved copy after `waitMs` instead of a blank screen.
+async function networkFirst(req, cacheName, waitMs) {
   const cache = await caches.open(cacheName);
   try {
-    const res = await fetch(req);
-    if (res.ok && !res.redirected) cache.put(req, res.clone());
-    return res;
+    const net = fetch(req).then((res) => {
+      if (res.ok && !res.redirected) cache.put(req, res.clone());
+      return res;
+    });
+    if (!waitMs) return await net;
+    net.catch(() => {});
+    const cached = await cache.match(req, { ignoreVary: true });
+    if (!cached) return await net;
+    return await Promise.race([net, new Promise((resolve) => setTimeout(() => resolve(cached), waitMs))]);
   } catch {
     const hit = await cache.match(req, { ignoreVary: true });
     if (hit) return hit;
@@ -34,7 +41,7 @@ self.addEventListener("fetch", (event) => {
   // Pages students need in lecture halls with no signal
   if (req.mode === "navigate" && url.origin === self.location.origin && (url.pathname === "/" || url.pathname === "/schedule")) {
     event.respondWith(
-      networkFirst(req, PAGES).catch(
+      networkFirst(req, PAGES, 2500).catch(
         () => new Response("<h1>Offline</h1><p>Open Campus Daily once while online to save your timetable.</p>", { headers: { "content-type": "text/html" } })
       )
     );

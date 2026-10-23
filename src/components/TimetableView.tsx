@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Clock, MapPin, RotateCcw, XCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, MapPin, RotateCcw, XCircle } from "lucide-react";
+import { SEMESTER, WEEKS_AHEAD, WEEKS_BACK, addDays, weekInfo } from "@/lib/timetable/range";
+import { istDate } from "@/lib/timetable/updates";
 
 export type Slot = {
   id: string;
@@ -35,25 +37,39 @@ const hhmm = (iso: string) =>
 const codeOf = (title: string) => title.split(": ")[0].replace(" (Tutorial)", " · Tut");
 const nameOf = (title: string) => (title.includes(": ") ? title.split(": ").slice(1).join(": ").replace(" (Tutorial)", "") : "");
 
-/** Mon–Fri dates of the week the slots belong to (IST), for the column headers. */
-function weekDates(slots: Slot[]): Date[] {
-  const ref = slots[0] ? ist(slots[0].start_time) : ist(new Date().toISOString());
-  const monday = new Date(Date.UTC(ref.getUTCFullYear(), ref.getUTCMonth(), ref.getUTCDate() - ((ref.getUTCDay() + 6) % 7)));
-  return DAYS.map((_, i) => new Date(monday.getTime() + i * 86400_000));
-}
-
 /**
  * Desktop: a Mon–Fri week calendar with classes placed by time.
  * Phones: one day at a time as a list. Cancel / Restore on every class.
  */
 export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (id: string, cancelled?: boolean) => void }) {
   const wd = (ist(new Date().toISOString()).getUTCDay() + 6) % 7;
-  const todayIdx = wd > 4 ? 0 : wd; // weekends open on Monday of the coming week
-  const [day, setDay] = useState(todayIdx);
-  const dates = useMemo(() => weekDates(slots), [slots]);
+  const weekend = wd > 4;
+  // Weekends, and weeks whose classes are all over, open on the coming week.
+  const [offset, setOffset] = useState(() => {
+    if (weekend) return 1;
+    const w = weekInfo(0);
+    const left = slots.some((s) => istDate(s.start_time) >= w.monday && istDate(s.start_time) <= w.sunday && dayIndex(s.start_time) >= wd && dayIndex(s.start_time) < 5);
+    return left || !slots.some((s) => istDate(s.start_time) > w.sunday) ? 0 : 1;
+  });
+  const info = useMemo(() => weekInfo(offset), [offset]);
   const todayKey = ist(new Date().toISOString()).toISOString().slice(0, 10);
+  const dates = useMemo(() => DAYS.map((_, i) => new Date(Date.parse(addDays(info.monday, i) + "T00:00:00Z"))), [info.monday]);
+  const inWeek = useMemo(() => slots.filter((s) => istDate(s.start_time) >= info.monday && istDate(s.start_time) <= info.sunday), [slots, info]);
 
-  const weekday = slots.filter((s) => dayIndex(s.start_time) < 5);
+  // On the phone: today's tab, or the first day this week that still has classes.
+  const firstBusyDay = (from: number) => {
+    for (let i = from; i < 5; i++) if (inWeek.some((s) => dayIndex(s.start_time) === i)) return i;
+    return Math.min(from, 4);
+  };
+  const [pickedDay, setPickedDay] = useState<number | null>(null);
+  const day = pickedDay ?? (offset === 0 ? firstBusyDay(weekend ? 0 : wd) : firstBusyDay(0));
+  const move = (n: number) => {
+    setOffset((o) => Math.max(-WEEKS_BACK, Math.min(WEEKS_AHEAD, o + n)));
+    setPickedDay(null);
+  };
+  const label = `${dates[0].getUTCDate()} ${dates[0].toLocaleString("en-IN", { month: "short", timeZone: "UTC" })} – ${dates[4].getUTCDate()} ${dates[4].toLocaleString("en-IN", { month: "short", timeZone: "UTC" })}`;
+
+  const weekday = inWeek.filter((s) => dayIndex(s.start_time) < 5);
   // Fit the grid to the hours that actually have classes (an all-afternoon week starts at 14:00), at least 6 hours tall.
   const firstH = weekday.length ? Math.min(...weekday.map((s) => Math.floor(minutesOf(s.start_time) / 60))) : 8;
   const lastH = weekday.length ? Math.max(...weekday.map((s) => Math.ceil(minutesOf(s.end_time || s.start_time) / 60))) : 18;
@@ -63,10 +79,45 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
 
   const daySlots = weekday.filter((s) => dayIndex(s.start_time) === day);
 
+  const nav = (
+    <div className="week-nav">
+      <button type="button" className="ghost" onClick={() => move(-1)} disabled={offset <= -WEEKS_BACK} aria-label="Previous week">
+        <ChevronLeft aria-hidden />
+      </button>
+      <b className="week-nav-label">
+        {offset === 0 ? "This week" : offset === 1 ? "Next week" : offset === -1 ? "Last week" : `In ${offset} weeks`}
+        <span className="muted"> · {label}</span>
+      </b>
+      <button type="button" className="ghost" onClick={() => move(1)} disabled={offset >= WEEKS_AHEAD} aria-label="Next week">
+        <ChevronRight aria-hidden />
+      </button>
+      {offset !== 0 && (
+        <button type="button" className="link" onClick={() => { setOffset(0); setPickedDay(null); }}>
+          Today
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <>
+      {nav}
+      {info.tentative && !info.afterLectures && (
+        <p className="note" style={{ marginTop: 0 }}>
+          Tentative. This follows the official slot chart; cancellations, holidays, quizzes and room changes are added here as notices arrive.
+        </p>
+      )}
+      {info.afterLectures && (
+        <div className="empty" style={{ marginBottom: 16 }}>
+          Lectures end on 6 Nov. End-semester exams run 9–21 Nov. The Academic Office publishes the exam timetable on 28 Oct —{" "}
+          <a href={SEMESTER.examTimetableUrl} target="_blank" rel="noopener noreferrer">
+            check it here
+          </a>
+          .
+        </div>
+      )}
       {/* Week calendar (desktop) */}
-      <div className="week" role="grid" aria-label="This week">
+      <div className="week" role="grid" aria-label="Week calendar">
         <div className="week-head">
           <span />
           {dates.map((d, i) => {
@@ -131,13 +182,13 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
       <div className="dayview">
         <div className="schedule-tabs" role="tablist">
           {DAYS.map((d, i) => (
-            <button key={d} role="tab" aria-selected={day === i} className={`schedule-tab ${day === i ? "active" : ""}`} onClick={() => setDay(i)}>
+            <button key={d} role="tab" aria-selected={day === i} className={`schedule-tab ${day === i ? "active" : ""}`} onClick={() => setPickedDay(i)}>
               {d} <span className="muted">{dates[i].getUTCDate()}</span>
             </button>
           ))}
         </div>
         {daySlots.length === 0 ? (
-          <div className="empty">Nothing scheduled on {DAYS[day]}.</div>
+          info.afterLectures ? null : <div className="empty">Nothing scheduled on {DAYS[day]}.</div>
         ) : (
           <div className="timetable-grid">
             {daySlots.map((s) => (
