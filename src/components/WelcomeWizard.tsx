@@ -15,6 +15,17 @@ import { coursesForDivision } from "@/lib/timetable/catalog";
 import { CATEGORIES, DEPARTMENTS, DIVISIONS, HASMED, HOSTELS, PROGRAM_YEARS } from "@/lib/constants";
 
 const STEPS = ["About you", "Your courses", "Interests", "Alerts"] as const;
+const NOT_SURE = "?";
+
+/** "26b2405@iitb.ac.in" -> "1" in the 2026-27 academic year (it starts in July). */
+function yearFromRoll(email?: string | null): string | null {
+  const m = (email || "").match(/^(\d{2})[a-z]\d/i);
+  if (!m) return null;
+  const now = new Date();
+  const acadStart = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+  const y = acadStart - (2000 + Number(m[1])) + 1;
+  return y >= 1 && y <= 5 ? String(y) : null;
+}
 
 /** First sign-in: a short guided setup. Finishing it marks the student as onboarded. */
 export function WelcomeWizard({ demo = false }: { demo?: boolean }) {
@@ -50,12 +61,15 @@ export function WelcomeWizard({ demo = false }: { demo?: boolean }) {
         setForm((f) => ({
           ...f,
           department: sub.department || "",
-          year: sub.year ? String(sub.year) : f.year,
+          year: sub.year ? String(sub.year) : yearFromRoll(user.email) || f.year,
           division: sub.division || "",
           hostel: sub.hostel || "",
           categories: Array.isArray(sub.categories) && sub.categories.length ? sub.categories : f.categories,
           keywords: sub.keywords || "",
         }));
+      } else {
+        const y = yearFromRoll(user.email);
+        if (y) setForm((f) => ({ ...f, year: y }));
       }
       setReady(true);
     })();
@@ -80,7 +94,7 @@ export function WelcomeWizard({ demo = false }: { demo?: boolean }) {
         user_id: user.id,
         department: form.department,
         year: form.year,
-        division: form.year === "1" ? form.division : null,
+        division: form.year === "1" && form.division !== NOT_SURE ? form.division : null,
         hostel: form.hostel,
         hasmed: form.year === "1" ? form.hasmed : null,
         hasmed1: form.year === "1" ? form.hasmed : null,
@@ -97,7 +111,7 @@ export function WelcomeWizard({ demo = false }: { demo?: boolean }) {
         // Show everything straight away: the division common courses (if none yet) and recent notices.
         const { count } = await supabase.from("user_courses").select("course_code", { count: "exact", head: true });
         if (!count && form.year === "1") {
-          const rows = coursesForDivision(form.division).map((c) => ({ ...c, user_id: user.id }));
+          const rows = coursesForDivision(division).map((c) => ({ ...c, user_id: user.id }));
           if (rows.length) await supabase.from("user_courses").upsert(rows, { onConflict: "user_id,course_code", ignoreDuplicates: true });
         }
         await supabase.rpc("backfill_my_feed");
@@ -111,6 +125,7 @@ export function WelcomeWizard({ demo = false }: { demo?: boolean }) {
     }
   }
 
+  const division = form.division === NOT_SURE ? "" : form.division;
   const aboutOk = !!form.department && !!form.hostel && (form.year !== "1" || !!form.division);
 
   async function next() {
@@ -190,6 +205,7 @@ export function WelcomeWizard({ demo = false }: { demo?: boolean }) {
                     {DIVISIONS.map((d) => (
                       <option key={d}>{d}</option>
                     ))}
+                    <option value={NOT_SURE}>Not sure yet</option>
                   </select>
                 </label>
               )}
@@ -201,33 +217,35 @@ export function WelcomeWizard({ demo = false }: { demo?: boolean }) {
       {step === 1 && (
         <section className="welcome-card">
           <h1>Your courses</h1>
-          <p className="muted">Connecting Moodle fills in your courses, timetable, slides and deadlines for you. Or add courses by hand below.</p>
+          <p className="muted">Tick what you take this semester. This builds your timetable. You can change it anytime in Settings.</p>
           <div className="welcome-block">
-            <h2>Connect Moodle (recommended)</h2>
-            <MoodleConnect />
-          </div>
-          <div className="welcome-block">
-            <h2>Or bring them from ResoBin</h2>
-            <ResobinImport onDone={() => setImported((x) => x + 1)} />
-          </div>
-          <div className="welcome-block">
-            <h2>Or pick your courses</h2>
-            <CoursePicker key={imported} division={form.division} department={form.department} year={form.year} />
+            <CoursePicker key={imported} division={division} department={form.department} year={form.year} />
             <details className="more-courses">
               <summary>A course isn&apos;t listed? Add it by code</summary>
               <CoursesEditor />
             </details>
           </div>
+          <details className="welcome-block welcome-more">
+            <summary>
+              <b>On a laptop? Connect Moodle for an exact timetable</b>
+              <span className="help">Also brings slides and deadlines. Takes a minute, once. You can also do this later from Settings.</span>
+            </summary>
+            <MoodleConnect />
+            <div style={{ marginTop: 14 }}>
+              <ResobinImport onDone={() => setImported((x) => x + 1)} />
+            </div>
+          </details>
         </section>
       )}
 
       {step === 2 && (
         <section className="welcome-card">
           <h1>What do you care about?</h1>
-          <p className="muted">Notices on these topics rank higher. You can change this anytime in Settings.</p>
+          <p className="muted">Notices on ticked topics rank higher. All are on to start: tap the ones you don&apos;t care about to turn them off.</p>
           <div className="chips" style={{ marginTop: 16 }}>
             {CATEGORIES.map((c) => (
               <button key={c} type="button" className={`chip ${form.categories.includes(c) ? "on" : ""}`} aria-pressed={form.categories.includes(c)} onClick={() => toggle(c)}>
+                {form.categories.includes(c) && <Check aria-hidden className="chip-tick" />}
                 {c}
               </button>
             ))}
@@ -261,6 +279,8 @@ export function WelcomeWizard({ demo = false }: { demo?: boolean }) {
       )}
 
       {error && <p className="err">{error}</p>}
+
+      {step === 0 && !aboutOk && <p className="help welcome-hint">Pick your department, hostel{form.year === "1" ? " and division" : ""} to continue.</p>}
 
       <div className="welcome-nav">
         {step > 0 ? (
