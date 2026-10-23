@@ -33,7 +33,7 @@ const isElective = (key: string) => HASMED_EXTRA.includes(key) || COURSE_CATALOG
  * Setup step without Moodle: build the timetable from the course catalog (ResoBin data).
  * Division courses come pre-ticked; labs and HASMED electives ask for your batch / section.
  */
-const level = (key: string) => (key.match(/d/) || [""])[0]; // CL205 → "2"
+const level = (key: string) => (key.match(/\d/) || [""])[0]; // CL205 → "2"
 
 export function CoursePicker({
   division,
@@ -146,7 +146,8 @@ export function CoursePicker({
     );
   };
 
-  const opts = (key: string) => COURSE_CATALOG[key].divisions.map((d) => d.d);
+  const opts = (key: string) =>
+    COURSE_CATALOG[key].divisions.map((d) => d.d).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
   return (
     <div className="picker">
@@ -189,9 +190,9 @@ export function CoursePicker({
       <input type="search" placeholder="Search by code or name — e.g. CL205, Thermodynamics" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search courses" />
       {q.trim().length >= 2 &&
         (() => {
-          const n = q.trim().toLowerCase().replace(/s+/g, "");
+          const n = q.trim().toLowerCase().replace(/\s+/g, "");
           const hits = Object.keys(COURSE_CATALOG)
-            .filter((k) => !pick[k] && (k.toLowerCase().includes(n) || COURSE_CATALOG[k].title.toLowerCase().replace(/s+/g, "").includes(n)))
+            .filter((k) => !pick[k] && (k.toLowerCase().includes(n) || COURSE_CATALOG[k].title.toLowerCase().replace(/\s+/g, "").includes(n)))
             .slice(0, 12);
           return hits.length ? <div style={{ marginTop: 8 }}>{hits.map((k) => row(k, opts(k)))}</div> : <p className="help" style={{ marginTop: 8 }}>No autumn-2026 course matches. You can still add it by code below.</p>;
         })()}
