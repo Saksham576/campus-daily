@@ -116,7 +116,7 @@ export function chunkPages(pages: Page[], size = 1200): Chunk[] {
 }
 
 /** IITB roll numbers: 26b2477, 23D0123, 210100045. */
-const ROLL_RE = /\b(\d{2}[a-z]\d{4}|\d{9})\b/gi;
+const ROLL_RE = /\b(\d{2}[a-z]\d{4,6}|\d{9})\b/gi;
 
 /**
  * Lists with many students' rows (mess dues, marks, seating) are never stored whole: each student
@@ -138,7 +138,9 @@ export function rosterRows(pages: Page[]): RosterRow[] | null {
   const hasRoll = (t: string) => new RegExp(ROLL_RE.source, "i").test(t);
   // Title: the lines before the first student row (course, date, time), minus the column header.
   const firstRow = lines.findIndex((l) => hasRoll(l.line));
-  const head = lines.slice(0, Math.max(0, firstRow)).map((l) => l.line).filter(Boolean);
+  // Never let anything that looks like a student's table row into the shared title text.
+  const looksLikeRow = (t: string) => /^\d+\s+[A-Z]\d{1,3}\s/.test(t) || /\b[DP]\d\s*\/?\s*T?\d+\s*$/.test(t) || (/^\d+\s/.test(t) && t.split(/\s+/).length >= 4 && !/[:–-]/.test(t));
+  const head = lines.slice(0, Math.max(0, firstRow)).map((l) => l.line).filter((t) => t && !looksLikeRow(t));
   const columns = head.filter((t) => COLUMNS_RE.test(t)).pop() ?? null;
   const title = head.filter((t) => t !== columns && !HEADING_RE.test(t) && t.length > 2).join(" · ").replace(/\s+/g, " ").slice(0, 260) || null;
   const titleHasSection = head.filter((t) => t !== columns && HEADING_RE.test(t) && t.length <= 80).pop() ?? null;

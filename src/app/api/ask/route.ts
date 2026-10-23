@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { buildAskPrompt, parseAskReply, ASK_DAILY_LIMIT, type AskNotice } from "@/lib/ask";
 import { buildWeek, type UserCourse } from "@/lib/timetable/slots";
 import { cleanSubject } from "@/lib/display";
+import { summarizeRow } from "@/lib/docs/rows";
 import { geminiJson } from "@/lib/server/gemini";
 import { validateAction, describeAction } from "@/lib/actions";
 import { getAdminClient, isAdminEmail } from "@/lib/server/admin";
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
     const { data: names } = await supabase.from("documents").select("id, name").in("id", ids);
     const nameOf = new Map((names || []).map((d) => [d.id, d.name]));
     for (const r of ownRows.data) {
-      notices.push({ id: `row:${r.doc_id}:${r.page}`, subject: `Your row in “${nameOf.get(r.doc_id) || "a class list"}”`, body: [r.context ? `About this list: ${r.context}` : "", r.columns ? `Columns: ${r.columns}` : "", `Your row: ${r.line}`].filter(Boolean).join("\n") });
+      notices.push({ id: `row:${r.doc_id}:${r.page}`, subject: `Your row in “${nameOf.get(r.doc_id) || "a class list"}”`, body: [(() => { const s = summarizeRow({ line: r.line, context: r.context, columns: r.columns, docName: nameOf.get(r.doc_id) }); return s ? `In short: ${s.headline}${s.details.length ? " (" + s.details.join("; ") + ")" : ""}` : ""; })(), r.context ? `About this list: ${r.context}` : "", r.columns ? `Columns: ${r.columns}` : "", `Your row: ${r.line}`].filter(Boolean).join("\n") });
     }
   }
 

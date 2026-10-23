@@ -83,6 +83,15 @@ export function labSlotOptions(): { code: string; label: string }[] {
     .map(({ code, t }) => ({ code, label: `${DAY_NAMES[t.day]} ${t.start}–${t.end}` }));
 }
 
+/** Tutorial slots (X1, X2…) as readable choices. Which one is yours depends on your tutorial batch (T1, T8…). */
+export function tutorialSlotOptions(): { code: string; label: string }[] {
+  return ["X1", "X2", "X3", "XC", "XD", "XE"]
+    .filter((c) => S[c])
+    .map((code) => ({ code, t: slotTime(code)! }))
+    .sort((a, b) => a.t.day - b.t.day || a.t.start.localeCompare(b.t.start))
+    .map(({ code, t }) => ({ code, label: `${DAY_NAMES[t.day]} ${t.start}–${t.end}` }));
+}
+
 /** True for lab slot codes (L1…L9, LX). */
 export const isLabSlotCode = (code: string) => code.toUpperCase() in LABS;
 
@@ -140,6 +149,8 @@ export type WeekSlot = {
   start_time: string;
   end_time: string;
   slot_type: "lecture" | "lab";
+  /** The student's division for this course (D3, P16…), so notices aimed at one division can skip the others. */
+  division?: string | null;
 };
 
 /** A student's week built from their courses + the slot chart. */
@@ -164,6 +175,7 @@ export function buildWeek(courses: UserCourse[], now = new Date()): WeekSlot[] {
           start_time: new Date(`${date}T${s.start}:00+05:30`).toISOString(),
           end_time: new Date(`${date}T${s.end}:00+05:30`).toISOString(),
           slot_type: s.isLab || /lab/i.test(c.title || "") ? "lab" : "lecture",
+          division: c.division || null,
         });
       }
     }

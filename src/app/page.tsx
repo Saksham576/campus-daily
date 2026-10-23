@@ -7,6 +7,8 @@ import { AppBar } from "@/components/AppBar";
 import { DayBoard, type BoardRow } from "@/components/DayBoard";
 import { FeedView } from "@/components/FeedView";
 import { HomeHead } from "@/components/HomeHead";
+import { SetupNudges, type Nudge } from "@/components/SetupNudge";
+import { isLabSlotCode } from "@/lib/timetable/slots";
 import { AskBox } from "@/components/AskBox";
 import { buildSections } from "@/lib/sections";
 import { coursesForDivision } from "@/lib/timetable/catalog";
@@ -108,8 +110,8 @@ export default async function HomePage() {
   const emailLower = (user.email || "").toLowerCase();
 
   // Everything in one parallel round trip (the profile is only needed to decide where to send you).
-  const [profileRes, itemsCountRes, feedFirst, coursesFirst, updatesRes, cardsRes, savedRes, enrolRes, dueRes, moodleRes] = await Promise.all([
-    supabase.from("subscribers").select("onboarded_at, name, last_seen_at, muted_senders, year, division").eq("email", user.email).single(),
+  const [profileRes, itemsCountRes, feedFirst, coursesFirst, updatesRes, cardsRes, savedRes, enrolRes, dueRes, moodleRes, pushRes] = await Promise.all([
+    supabase.from("subscribers").select("onboarded_at, name, last_seen_at, muted_senders, year, division, keywords").eq("email", user.email).single(),
     supabase.from("user_items").select("item_id", { count: "exact", head: true }).eq("email", emailLower),
     supabase.rpc("me_feed", { p_since: since, p_min_score: MIN_SCORE }),
     supabase.from("user_courses").select("course_code, title, division, lecture_slots, tutorial_slots, venue"),
@@ -119,6 +121,7 @@ export default async function HomePage() {
     supabase.from("moodle_enrolments").select("course_code"),
     supabase.from("moodle_deadlines").select("event_id, course_code, name, kind, due_at, url").gte("due_at", new Date(now.getTime() - 3600_000).toISOString()).order("due_at"),
     supabase.from("moodle_connections").select("user_id", { count: "exact", head: true }),
+    supabase.from("push_subscriptions").select("endpoint", { count: "exact", head: true }),
   ]);
   const profile = profileRes.data;
   if (!profile?.onboarded_at) redirect("/welcome");
@@ -137,6 +140,24 @@ export default async function HomePage() {
       coursesRes = await supabase.from("user_courses").select("course_code, title, division, lecture_slots, tutorial_slots, venue");
     }
   }
+
+  // "Finish setting up": things new students are asked at sign-up that existing students never were.
+  const courseList = (coursesRes.data || []) as UserCourse[];
+  const has = (code: string) => courseList.find((c) => formatCourseCode(c.course_code) === code);
+  const nudges: Nudge[] = [];
+  const cs = has("CS 101");
+  const needsSlots =
+    (cs && !(cs.lecture_slots || []).some((x) => isLabSlotCode(x))) ||
+    ["MA 105", "CH 111"].some((c) => has(c) && !(has(c)!.tutorial_slots || []).length);
+  if (needsSlots)
+    nudges.push({ id: "slots-2026-10", title: "Add your lab and tutorial slots", body: "Lab and tutorial times differ for everyone. Pick yours so your timetable shows them and they update when a notice moves them.", href: "/settings#courses", cta: "Pick my slots" });
+  if (!pushRes.count)
+    nudges.push({ id: "alerts-2026-10", title: "Never walk to a cancelled class", body: "Turn on phone alerts: cancelled, moved and shifted classes reach you the moment they are announced.", href: "/settings#alerts", cta: "Turn on alerts" });
+  if (!(profile?.keywords || "").trim())
+    nudges.push({ id: "clubs-2026-10", title: "Follow clubs and events", body: "Pick the clubs and kinds of events you care about, so orientations, fests and hackathons for you rise to the top.", href: "/settings#interests", cta: "Choose" });
+  if (!moodleRes.count)
+    nudges.push({ id: "moodle-2026-10", title: "Connect Moodle on a laptop", body: "Exact class times, slides and deadlines, plus your seat and room in exam PDFs.", href: "/settings#moodle", cta: "See how" });
+  nudges.push({ id: "whatsnew-2026-10-23", title: "New: a month of timetable", body: "See the next five weeks, with holidays, buffer weeks and doubt sessions added from notices. Seat PDFs now show your room and seat in plain words.", href: "/schedule", cta: "Open timetable" });
 
   const muted = new Set<string>(profile?.muted_senders || []);
   let items = ((feedRes.data || []) as FeedItem[]).filter((i) => !i.from_address || !muted.has(i.from_address));
@@ -183,6 +204,7 @@ export default async function HomePage() {
       <AppBar />
       <main className="wrap">
         <HomeHead name={profile?.name} now={now} action={sections.action} exams={sections.exams} />
+        <SetupNudges nudges={nudges} />
 
         {feedRes.error && <p className="err">Could not load notices: {feedRes.error.message}</p>}
 

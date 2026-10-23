@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { COURSE_CATALOG, coursesForDivision } from "@/lib/timetable/catalog";
-import { formatCourseCode, isLabSlotCode, labSlotOptions } from "@/lib/timetable/slots";
+import { formatCourseCode, isLabSlotCode, labSlotOptions, tutorialSlotOptions } from "@/lib/timetable/slots";
 
 // Department name → course-code prefixes (IITB)
 const DEPT_PREFIX: [RegExp, string[]][] = [
@@ -25,6 +25,7 @@ const DEPT_PREFIX: [RegExp, string[]][] = [
 // Courses whose lab runs in a slot of each student's own (allotted in the first lab), not by division.
 const OWN_LAB = ["CS101"];
 const LAB_OPTIONS = labSlotOptions();
+const TUT_OPTIONS = tutorialSlotOptions();
 
 type Pick = Record<string, string>; // course key → division / batch / section ("" = not taking)
 
@@ -69,6 +70,7 @@ export function CoursePicker({
 
   const [pick, setPick] = useState<Pick>({});
   const [lab, setLab] = useState<Record<string, string>>({}); // course key -> lab slot code
+  const [tut, setTut] = useState<Record<string, string | null>>({}); // course key -> tutorial slot ('' = none); missing = catalog default
   const [saved, setSaved] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -76,17 +78,20 @@ export function CoursePicker({
   // Start from what's saved, else the division's courses.
   useEffect(() => {
     (async () => {
-      const { data } = await createClient().from("user_courses").select("course_code, division, lecture_slots");
+      const { data } = await createClient().from("user_courses").select("course_code, division, lecture_slots, tutorial_slots");
       const p: Pick = {};
       if (data?.length) {
         const labs: Record<string, string> = {};
+        const tuts: Record<string, string | null> = {};
         for (const r of data) {
           const key = r.course_code.replace(/\s+/g, "");
           p[key] = r.division || "";
+          tuts[key] = (r.tutorial_slots || [])[0] || "";
           const mine = (r.lecture_slots || []).find((x: string) => isLabSlotCode(x));
           if (mine) labs[key] = mine.toUpperCase();
         }
         setLab(labs);
+        setTut(tuts);
       } else for (const k of common) p[k] = division;
       setPick(p);
     })();
@@ -104,7 +109,7 @@ export function CoursePicker({
     const t = setTimeout(save, 500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pick, dirty, lab]);
+  }, [pick, dirty, lab, tut]);
 
   async function save() {
     setBusy(true);
@@ -120,7 +125,7 @@ export function CoursePicker({
         const div = c.divisions.find((x) => x.d === d) || c.divisions[0];
         // A personal lab slot rides along with the lecture slots (the timetable shows it as a Lab block).
         const own = OWN_LAB.includes(k) && lab[k] ? [lab[k]] : [];
-        return { user_id: user.id, course_code: k, title: c.title, division: div.d, lecture_slots: [...div.l.filter((x) => !isLabSlotCode(x)), ...own], tutorial_slots: div.t, venue: div.v || null };
+        return { user_id: user.id, course_code: k, title: c.title, division: div.d, lecture_slots: [...div.l.filter((x) => !isLabSlotCode(x)), ...own], tutorial_slots: tut[k] !== undefined ? (tut[k] ? [tut[k] as string] : []) : div.t, venue: div.v || null };
       });
     const drop = Object.entries(pick)
       .filter(([k, d]) => !d && COURSE_CATALOG[k])
@@ -172,6 +177,30 @@ export function CoursePicker({
           {common.map((k) => (
             <div key={k}>
               {row(k, [division])}
+              {pick[k] && !OWN_LAB.includes(k) && (
+                <label className="pick-lab">
+                  <span>
+                    Your {formatCourseCode(k)} tutorial
+                    <small className="help">Your tutorial slot depends on your tutorial batch (for example T8). Leave empty if you have none.</small>
+                  </span>
+                  <select
+                    value={tut[k] !== undefined ? tut[k] || "" : COURSE_CATALOG[k]?.divisions.find((d) => d.d === division)?.t[0] || ""}
+                    onChange={(e) => {
+                      setTut((t) => ({ ...t, [k]: e.target.value }));
+                      setSaved(null);
+                      setDirty(true);
+                    }}
+                    aria-label={`Tutorial slot for ${formatCourseCode(k)}`}
+                  >
+                    <option value="">No tutorial</option>
+                    {TUT_OPTIONS.map((o) => (
+                      <option key={o.code} value={o.code}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               {OWN_LAB.includes(k) && pick[k] && (
                 <label className="pick-lab">
                   <span>

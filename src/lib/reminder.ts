@@ -31,6 +31,7 @@ export function todaysClasses(courses: UserCourse[], updates: CourseUpdate[], no
   const date = new Date(now.getTime() + IST_MS).toISOString().slice(0, 10);
   const slots = buildWeek(courses, now).filter((x) => istDateOf(x.start_time) === date);
   const todays = updates.filter((u) => u.on_date <= date && (u.until_date || u.on_date) >= date);
+  const divOf = new Map(courses.map((c) => [formatCourseCode(c.course_code), (c.division || "").toUpperCase()]));
   const out: TodayClass[] = slots.map((x) => {
     const code = x.title.split(":")[0].replace(" (Tutorial)", "");
     const c: TodayClass = {
@@ -39,7 +40,7 @@ export function todaysClasses(courses: UserCourse[], updates: CourseUpdate[], no
       title: x.title.includes(":") ? x.title.split(": ").slice(1).join(": ") : "",
       location: x.location || "",
     };
-    for (const u of todays.filter((u) => u.course_code === code || u.course_code === "*")) {
+    for (const u of todays.filter((u) => (u.course_code === code || u.course_code === "*") && (!u.division || !divOf.get(code) || divOf.get(code) === u.division.toUpperCase()))) {
       if (u.kind === "cancelled") c.note = "Cancelled";
       if (u.kind === "moved" && u.new_location) {
         c.location = u.new_location;
@@ -50,7 +51,7 @@ export function todaysClasses(courses: UserCourse[], updates: CourseUpdate[], no
   });
   const mine = new Set(courses.map((c) => formatCourseCode(c.course_code)));
   for (const u of todays) {
-    if (u.kind === "added" && u.new_start && mine.has(u.course_code)) {
+    if (u.kind === "added" && u.new_start && mine.has(u.course_code) && (!u.division || !divOf.get(u.course_code) || divOf.get(u.course_code) === u.division.toUpperCase())) {
       out.push({ time: istTimeOf(u.new_start), course: u.course_code, title: (u.slot_type || "event").toUpperCase(), location: u.new_location || "", note: "New" });
     }
   }

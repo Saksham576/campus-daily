@@ -1,11 +1,14 @@
 import { extractEventDetails, extractTimeFromText } from "../events.ts";
 import { ALL_COURSES, holidayFromNotice } from "./holiday.ts";
+import { sessionUpdates } from "./sessions.ts";
 
 export type CourseUpdate = {
   course_code: string;
   kind: "cancelled" | "moved" | "added";
   on_date: string; // YYYY-MM-DD (IST)
   until_date?: string | null; // last day of a multi-day change (a buffer week); null = just on_date
+  /** Only students in this division (D3, D4…); null = everyone taking the course. */
+  division?: string | null;
   match_start?: string | null;
   new_start?: string | null;
   new_end?: string | null;
@@ -26,6 +29,7 @@ export type Slot = {
   is_cancelled?: boolean;
   notice_id?: string | null;
   verified?: boolean;
+  division?: string | null;
 };
 
 const IST_MS = 5.5 * 3600 * 1000;
@@ -85,6 +89,17 @@ ${body}`;
   return { course_code: code, kind: "cancelled", on_date: from, until_date: until, match_start: null, notice_id: noticeId ?? null };
 }
 
+/**
+ * Every timetable change a notice makes. Usually one; a forum post can say both "no more lectures"
+ * and "doubt session on Friday in KR-225".
+ */
+export function updatesFromNotice(subject: string, rawBody: string, noticeId?: string, receivedAt: Date = new Date()): CourseUpdate[] {
+  const session = sessionUpdates(subject, rawBody, noticeId, receivedAt);
+  if (session.length) return session;
+  const one = updateFromNotice(subject, rawBody, noticeId, receivedAt);
+  return one ? [one] : [];
+}
+
 /** Turn a notice into a course-level timetable change, or null if it isn't one. */
 export function updateFromNotice(
   subject: string,
@@ -93,6 +108,8 @@ export function updateFromNotice(
   receivedAt: Date = new Date()
 ): CourseUpdate | null {
   const body = rawBody.replace(POSTED_LINE_RE, " ");
+  const session = sessionUpdates(subject, rawBody, noticeId, receivedAt);
+  if (session.length) return session[0];
   const weekOff = weekOffFromNotice(subject, body, noticeId, receivedAt);
   if (weekOff) return weekOff;
   const holiday = holidayFromNotice(subject, body, noticeId, receivedAt);
@@ -146,6 +163,12 @@ export function updateFromNotice(
  * (same course, same IST day; same start time too if the update names one)
  * and adds quizzes/exams for courses the student takes.
  */
+/** True if the student's slots for this course are in that division (or their division isn't known). */
+function inDivision(slots: Slot[], course: string, division: string): boolean {
+  const mine = slots.filter((s) => courseCodeOf(s.title) === course && s.division);
+  return mine.length === 0 || mine.some((s) => s.division!.toUpperCase() === division.toUpperCase());
+}
+
 export function applyCourseUpdates(slots: Slot[], updates: CourseUpdate[]): Slot[] {
   const myCourses = new Set(slots.map((s) => courseCodeOf(s.title)).filter(Boolean) as string[]);
   const out = slots.map((s) => ({ ...s }));
@@ -153,6 +176,7 @@ export function applyCourseUpdates(slots: Slot[], updates: CourseUpdate[]): Slot
   for (const u of updates) {
     if (u.kind === "added") {
       if (!myCourses.has(u.course_code) || !u.new_start) continue;
+      if (u.division && !inDivision(out, u.course_code, u.division)) continue;
       const dup = out.some(
         (s) => courseCodeOf(s.title) === u.course_code && s.start_time === u.new_start && s.slot_type === (u.slot_type || "event")
       );
@@ -163,7 +187,7 @@ export function applyCourseUpdates(slots: Slot[], updates: CourseUpdate[]): Slot
         location: u.new_location,
         start_time: u.new_start,
         end_time: u.new_end,
-        slot_type: u.slot_type || "event",
+        slot_type: !u.slot_type || u.slot_type === "session" ? "event" : u.slot_type,
         notice_id: u.notice_id,
         verified: u.verified,
       });
@@ -173,7 +197,13 @@ export function applyCourseUpdates(slots: Slot[], updates: CourseUpdate[]): Slot
     const last = u.until_date && u.until_date > u.on_date ? u.until_date : u.on_date;
     const sameDay = out.filter((s) => {
       const d = istDate(s.start_time);
-      return (u.course_code === ALL_COURSES || courseCodeOf(s.title) === u.course_code) && d >= u.on_date && d <= last && s.slot_type !== "quiz" && s.slot_type !== "exam";
+      if (!(u.course_code === ALL_COURSES || courseCodeOf(s.title) === u.course_code) || d < u.on_date || d > last) return false;
+      if (s.slot_type === "quiz" || s.slot_type === "exam") return false;
+      // A notice for D4 leaves D3's classes alone (slots without a known division follow the notice).
+      if (u.division && s.division && s.division.toUpperCase() !== u.division.toUpperCase()) return false;
+      // "No more lectures" is about lectures, not the lab or the tutorial.
+      if (u.slot_type === "lecture" && (s.slot_type === "lab" || /\(Tutorial\)/.test(s.title))) return false;
+      return true;
     });
     const exact = u.match_start ? sameDay.filter((s) => s.start_time === u.match_start) : [];
     const targets = exact.length > 0 ? exact : sameDay;
