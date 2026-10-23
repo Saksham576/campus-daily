@@ -172,3 +172,23 @@ console.log("✓ Passed: a division's common first-year courses fill the timetab
   assert.strictEqual(updateFromNotice("CS 101: no classes for all on 20 October", "x", "c", recv)?.course_code === "*", false, "a course notice stays course-level");
   assert.strictEqual(updateFromNotice("Dussehra Pooja celebration", "Join us at 11 AM on 19 October 2026.", "d", recv), null, "a celebration is not a holiday");
 }
+
+// ---- A month of timetable ----
+import { buildRange, weekInfo, mondayOf, SEMESTER } from "./src/lib/timetable/range.ts";
+{
+  const courses = [{ course_code: "MA105", title: "Calculus", lecture_slots: ["1A", "1B", "1C"], tutorial_slots: [], venue: "LA 201" }];
+  const now = new Date("2026-10-23T10:00:00Z"); // Friday
+  const slots = buildRange(courses, [], [], now);
+  const days = [...new Set(slots.map((s) => istDate(s.start_time)))];
+  assert.ok(days.includes("2026-10-19"), "last week included");
+  assert.ok(days.includes("2026-11-02"), "two weeks ahead included");
+  assert.ok(days.every((d) => d <= SEMESTER.lecturesEnd), "no lectures after the last day of instruction");
+  assert.strictEqual(days[days.length - 1], "2026-11-05", "last class of the semester (MA 105 meets Mon, Tue, Thu)");
+  const off = buildRange(courses, [{ course_code: "*", kind: "cancelled", on_date: "2026-10-27", until_date: "2026-10-27", match_start: null }], [], now);
+  assert.strictEqual(off.filter((s) => istDate(s.start_time) === "2026-10-27").every((s) => s.is_cancelled), true, "a holiday switches off that day in a later week");
+  assert.strictEqual(mondayOf(now), "2026-10-19");
+  assert.strictEqual(weekInfo(1, now).tentative, true);
+  assert.strictEqual(weekInfo(3, now).afterLectures, true, "week of 9 Nov is after lectures");
+  assert.strictEqual(weekInfo(3, now).examWeek, true);
+}
+console.log("✓ Passed: a month of timetable with holidays, semester end and tentative weeks");

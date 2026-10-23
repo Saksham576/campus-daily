@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { type FeedItem } from "@/components/ItemCard";
 import { type Sponsored } from "@/components/SponsoredCard";
@@ -100,30 +101,16 @@ export default async function HomePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("subscribers")
-    .select("onboarded_at, name, last_seen_at, muted_senders, year, division")
-    .eq("email", user.email)
-    .single();
-  if (!profile?.onboarded_at) redirect("/welcome");
-
   const now = new Date();
   // 21 days so deadlines and upcoming events announced earlier stay on the board.
   const since = new Date(now.getTime() - 21 * 86400_000).toISOString();
   const today = istDate(now.toISOString());
+  const emailLower = (user.email || "").toLowerCase();
 
-  // New student with nothing yet: fill recent notices and the division's common courses right away.
-  const [{ count: haveItems }, { count: haveCourses }] = await Promise.all([
-    supabase.from("user_items").select("item_id", { count: "exact", head: true }).eq("email", (user.email || "").toLowerCase()),
-    supabase.from("user_courses").select("course_code", { count: "exact", head: true }),
-  ]);
-  if (!haveItems) await supabase.rpc("backfill_my_feed");
-  if (!haveCourses && String(profile?.year || "") === "1") {
-    const rows = coursesForDivision(profile?.division).map((c) => ({ ...c, user_id: user.id }));
-    if (rows.length) await supabase.from("user_courses").upsert(rows, { onConflict: "user_id,course_code", ignoreDuplicates: true });
-  }
-
-  const [feedRes, coursesRes, updatesRes, cardsRes, savedRes, enrolRes, dueRes, moodleRes] = await Promise.all([
+  // Everything in one parallel round trip (the profile is only needed to decide where to send you).
+  const [profileRes, itemsCountRes, feedFirst, coursesFirst, updatesRes, cardsRes, savedRes, enrolRes, dueRes, moodleRes] = await Promise.all([
+    supabase.from("subscribers").select("onboarded_at, name, last_seen_at, muted_senders, year, division").eq("email", user.email).single(),
+    supabase.from("user_items").select("item_id", { count: "exact", head: true }).eq("email", emailLower),
     supabase.rpc("me_feed", { p_since: since, p_min_score: MIN_SCORE }),
     supabase.from("user_courses").select("course_code, title, division, lecture_slots, tutorial_slots, venue"),
     supabase.from("course_updates").select("*").gte("until_date", today).lte("on_date", istDate(new Date(now.getTime() + 8 * 86400_000).toISOString())),
@@ -133,24 +120,42 @@ export default async function HomePage() {
     supabase.from("moodle_deadlines").select("event_id, course_code, name, kind, due_at, url").gte("due_at", new Date(now.getTime() - 3600_000).toISOString()).order("due_at"),
     supabase.from("moodle_connections").select("user_id", { count: "exact", head: true }),
   ]);
+  const profile = profileRes.data;
+  if (!profile?.onboarded_at) redirect("/welcome");
+
+  // New student with nothing yet: fill recent notices and the division's common courses right away.
+  let feedRes = feedFirst;
+  let coursesRes = coursesFirst;
+  if (!itemsCountRes.count) {
+    await supabase.rpc("backfill_my_feed");
+    feedRes = await supabase.rpc("me_feed", { p_since: since, p_min_score: MIN_SCORE });
+  }
+  if (!(coursesFirst.data || []).length && String(profile?.year || "") === "1") {
+    const rows = coursesForDivision(profile?.division).map((c) => ({ ...c, user_id: user.id }));
+    if (rows.length) {
+      await supabase.from("user_courses").upsert(rows, { onConflict: "user_id,course_code", ignoreDuplicates: true });
+      coursesRes = await supabase.from("user_courses").select("course_code, title, division, lecture_slots, tutorial_slots, venue");
+    }
+  }
 
   const muted = new Set<string>(profile?.muted_senders || []);
   let items = ((feedRes.data || []) as FeedItem[]).filter((i) => !i.from_address || !muted.has(i.from_address));
 
-  // One card per real event: notices about the same quiz/class/talk from Moodle, email and WhatsApp.
   if (items.length) {
-    const { data: links } = await supabase.from("event_items").select("item_id, event_id").in("item_id", items.map((i) => i.id));
+    const ids = items.map((i) => i.id);
+    const [linksRes, seatsRes] = await Promise.all([
+      supabase.from("event_items").select("item_id, event_id").in("item_id", ids),
+      // Your seat from seating plans (RLS: each student reads only their own roll's rows).
+      supabase.from("seat_assignments").select("item_id, seat").in("item_id", ids),
+    ]);
+    const seatBy = new Map((seatsRes.data || []).map((r) => [r.item_id, r.seat]));
+    for (const i of items) i.seat = seatBy.get(i.id) || null;
+    const links = linksRes.data;
+    // One card per real event: notices about the same quiz/class/talk from Moodle, email and WhatsApp.
     if (links?.length) {
       const { data: evs } = await supabase.from("events").select("id, resolved").in("id", [...new Set(links.map((l) => l.event_id))]);
       items = groupByEvent(items, links, (evs || []) as any) as FeedItem[];
     }
-  }
-
-  // Your seat from seating plans (RLS: each student reads only their own roll's rows).
-  if (items.length) {
-    const { data: seats } = await supabase.from("seat_assignments").select("item_id, seat").in("item_id", items.map((i) => i.id));
-    const seatBy = new Map((seats || []).map((r) => [r.item_id, r.seat]));
-    for (const i of items) i.seat = seatBy.get(i.id) || null;
   }
   const courses = (coursesRes.data || []) as UserCourse[];
   // Your timetable courses plus everything you're enrolled in on Moodle.
@@ -167,7 +172,9 @@ export default async function HomePage() {
 
   // Inactivity tracking for the reminder email (at most one write per hour)
   if (!profile?.last_seen_at || now.getTime() - new Date(profile.last_seen_at).getTime() > 3600_000) {
-    await supabase.from("subscribers").update({ last_seen_at: now.toISOString() }).eq("email", (user.email || "").toLowerCase());
+    after(async () => {
+      await supabase.from("subscribers").update({ last_seen_at: now.toISOString() }).eq("email", emailLower);
+    });
   }
 
 

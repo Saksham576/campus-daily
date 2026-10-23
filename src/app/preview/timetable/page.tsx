@@ -2,7 +2,8 @@
 
 import { AppBar } from "@/components/AppBar";
 import { TimetableView, type Slot } from "@/components/TimetableView";
-import { buildWeek, type UserCourse } from "@/lib/timetable/slots";
+import { type UserCourse } from "@/lib/timetable/slots";
+import { buildRange } from "@/lib/timetable/range";
 import { Download, Plus } from "lucide-react";
 
 /** Dev-only: the Timetable with real IITB slot times for sample courses. */
@@ -15,9 +16,7 @@ export default function PreviewTimetable() {
     { course_code: "PH117", title: "Physics Lab", division: "P16", lecture_slots: ["L2"], tutorial_slots: [], venue: "Physics Lab 2" },
     { course_code: "ENT101", title: "Innovation & Entrepreneurship", division: "Core", lecture_slots: ["14A"], tutorial_slots: [], venue: "LH 101" },
   ] as unknown as UserCourse[];
-  const ref = new Date();
-  if (ref.getDay() === 6 || ref.getDay() === 0) ref.setDate(ref.getDate() + (ref.getDay() === 6 ? 2 : 1));
-  const slots = buildWeek(courses, ref).map((s, i) => ({ ...s, is_cancelled: i === 3 })) as Slot[];
+  const slots = buildRange(courses, [{ course_code: "MA 105", kind: "cancelled", on_date: new Date(Date.now() + 19.5 * 3600_000 + 86400_000).toISOString().slice(0, 10), until_date: null }], [], new Date()) as unknown as Slot[];
   return (
     <>
       <AppBar />
