@@ -192,3 +192,17 @@ import { buildRange, weekInfo, mondayOf, SEMESTER } from "./src/lib/timetable/ra
   assert.strictEqual(weekInfo(3, now).examWeek, true);
 }
 console.log("✓ Passed: a month of timetable with holidays, semester end and tentative weeks");
+
+// ---- Personal lab slot (CS 101 labs differ for everyone) ----
+import { buildWeek, labSlotOptions, isLabSlotCode } from "./src/lib/timetable/slots.ts";
+{
+  const cs = [{ course_code: "CS101", title: "Computer Programming and Utilization", lecture_slots: ["7A", "7B", "L2"], tutorial_slots: [], venue: "LA 202" }];
+  const wk = buildWeek(cs, new Date("2026-10-21T10:00:00Z"));
+  const labs = wk.filter((s) => s.slot_type === "lab");
+  assert.strictEqual(labs.length, 1, "one lab block");
+  assert.ok(/Lab$/.test(labs[0].title), "the lab block is named as a lab, not as the lecture");
+  assert.strictEqual(wk.filter((s) => s.slot_type === "lecture").length, 2);
+  assert.ok(isLabSlotCode("l2") && !isLabSlotCode("7A"));
+  assert.ok(labSlotOptions().length >= 9 && /^\w{3} \d\d:\d\d–\d\d:\d\d$/.test(labSlotOptions()[0].label));
+}
+console.log("✓ Passed: personal lab slot shows as its own lab block");

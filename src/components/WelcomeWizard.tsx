@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bell, CalendarDays, Check, MapPin, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Logo } from "@/components/Logo";
 import { CoursesEditor } from "@/components/CoursesEditor";
@@ -12,7 +12,7 @@ import { MoodleConnect } from "@/components/MoodleConnect";
 import { PushToggle } from "@/components/PushToggle";
 import { DigestPicker } from "@/components/DigestPicker";
 import { coursesForDivision } from "@/lib/timetable/catalog";
-import { CATEGORIES, DEPARTMENTS, DIVISIONS, HASMED, HOSTELS, PROGRAM_YEARS } from "@/lib/constants";
+import { CATEGORIES, CLUBS, DEPARTMENTS, DIVISIONS, HASMED, HOSTELS, PROGRAM_YEARS, WANTS } from "@/lib/constants";
 
 const STEPS = ["About you", "Your courses", "Interests", "Alerts"] as const;
 const NOT_SURE = "?";
@@ -74,6 +74,16 @@ export function WelcomeWizard({ demo = false }: { demo?: boolean }) {
       setReady(true);
     })();
   }, [router, demo]);
+
+  // Clubs and "also tell me about" chips live in the keywords box, so they stay editable.
+  const kwList = form.keywords.split(",").map((x) => x.trim()).filter(Boolean);
+  const hasKw = (kw: string) => kwList.some((x) => x.toLowerCase() === kw.toLowerCase());
+  const toggleKw = (kw: string) =>
+    setForm((f) => {
+      const list = f.keywords.split(",").map((x) => x.trim()).filter(Boolean);
+      const on = list.some((x) => x.toLowerCase() === kw.toLowerCase());
+      return { ...f, keywords: (on ? list.filter((x) => x.toLowerCase() !== kw.toLowerCase()) : [...list, kw]).join(", ") };
+    });
 
   const toggle = (c: string) =>
     setForm((f) => ({ ...f, categories: f.categories.includes(c) ? f.categories.filter((x) => x !== c) : [...f.categories, c] }));
@@ -158,7 +168,37 @@ export function WelcomeWizard({ demo = false }: { demo?: boolean }) {
       {step === 0 && (
         <section className="welcome-card">
           <h1>{name ? `Welcome, ${name}` : "Welcome to Campus Daily"}</h1>
-          <p className="muted">Two minutes to set up. This is how we pick notices meant for you.</p>
+          <p className="muted">Two minutes to set up. Here is what you get:</p>
+          <ul className="perks">
+            <li>
+              <Bell aria-hidden />
+              <span>
+                <b>Never walk to a cancelled class</b>
+                <small>Cancelled, moved or shifted classes reach you the moment they are announced.</small>
+              </span>
+            </li>
+            <li>
+              <MapPin aria-hidden />
+              <span>
+                <b>Your exam room and seat, found for you</b>
+                <small>We read the seating PDFs so you only see your own row: room, seat, time.</small>
+              </span>
+            </li>
+            <li>
+              <CalendarDays aria-hidden />
+              <span>
+                <b>A timetable that updates itself</b>
+                <small>A month ahead, with holidays, buffer weeks, quizzes and room changes added from notices.</small>
+              </span>
+            </li>
+            <li>
+              <Sparkles aria-hidden />
+              <span>
+                <b>Only what matters to you</b>
+                <small>Events, orientations, deadlines and club posts, ranked by your department, hostel and interests.</small>
+              </span>
+            </li>
+          </ul>
           <div className="pform" style={{ marginTop: 18 }}>
             <div className="row2">
               <label className="field">
@@ -247,6 +287,24 @@ export function WelcomeWizard({ demo = false }: { demo?: boolean }) {
               <button key={c} type="button" className={`chip ${form.categories.includes(c) ? "on" : ""}`} aria-pressed={form.categories.includes(c)} onClick={() => toggle(c)}>
                 {form.categories.includes(c) && <Check aria-hidden className="chip-tick" />}
                 {c}
+              </button>
+            ))}
+          </div>
+          <h2 className="chips-title">Clubs you follow</h2>
+          <div className="chips">
+            {CLUBS.map((c) => (
+              <button key={c} type="button" className={`chip ${hasKw(c) ? "on" : ""}`} aria-pressed={hasKw(c)} onClick={() => toggleKw(c)}>
+                {hasKw(c) && <Check aria-hidden className="chip-tick" />}
+                {c}
+              </button>
+            ))}
+          </div>
+          <h2 className="chips-title">Also tell me about</h2>
+          <div className="chips">
+            {WANTS.map((w) => (
+              <button key={w.kw} type="button" className={`chip ${hasKw(w.kw) ? "on" : ""}`} aria-pressed={hasKw(w.kw)} onClick={() => toggleKw(w.kw)} title={w.hint}>
+                {hasKw(w.kw) && <Check aria-hidden className="chip-tick" />}
+                {w.label}
               </button>
             ))}
           </div>

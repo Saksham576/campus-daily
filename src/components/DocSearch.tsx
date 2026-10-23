@@ -5,7 +5,7 @@ import { FileText, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 type Hit = { doc_id: string; name: string; course_code: string | null; page: number | null; snippet: string; view_url: string | null };
-type Row = { doc_id: string; page: number | null; line: string; name?: string };
+type Row = { doc_id: string; page: number | null; line: string; context?: string | null; columns?: string | null; name?: string };
 
 /** "<<word>>" markers from the database → highlighted text (no HTML from documents is ever rendered). */
 function Snippet({ text }: { text: string }) {
@@ -61,7 +61,7 @@ export function MyRows() {
   useEffect(() => {
     (async () => {
       const supabase = createClient();
-      const { data } = await supabase.from("personal_rows").select("doc_id, page, line").limit(30);
+      const { data } = await supabase.from("personal_rows").select("doc_id, page, line, context, columns").limit(30);
       if (!data?.length) return;
       const { data: docs } = await supabase.from("documents").select("id, name").in("id", [...new Set(data.map((r) => r.doc_id))]);
       const nameOf = new Map((docs || []).map((d) => [d.id, d.name]));
@@ -80,6 +80,8 @@ export function MyRows() {
               <b>{r.name}</b>
               {r.page ? <span className="from">page {r.page}</span> : null}
             </span>
+            {r.context && <span className="doc-context">{r.context}</span>}
+            {r.columns && <span className="doc-cols mono">{r.columns}</span>}
             <span className="doc-snippet mono">{r.line}</span>
           </li>
         ))}

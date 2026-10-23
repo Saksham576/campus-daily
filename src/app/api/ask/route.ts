@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
   // class lists (mess dues, marks, seating). Added as extra numbered entries so answers can cite them.
   const [docHits, ownRows] = await Promise.all([
     supabase.rpc("search_docs", { q: question, lim: 6, mode: "any" }),
-    supabase.from("personal_rows").select("doc_id, page, line").limit(40),
+    supabase.from("personal_rows").select("doc_id, page, line, context, columns").limit(40),
   ]);
   for (const h of (docHits.data || []) as any[]) {
     notices.push({ id: `doc:${h.doc_id}:${h.page}`, subject: `File: ${h.name}${h.course_code ? ` (${h.course_code})` : ""}, page ${h.page}`, body: String(h.content).slice(0, 1500) });
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
     const { data: names } = await supabase.from("documents").select("id, name").in("id", ids);
     const nameOf = new Map((names || []).map((d) => [d.id, d.name]));
     for (const r of ownRows.data) {
-      notices.push({ id: `row:${r.doc_id}:${r.page}`, subject: `Your row in “${nameOf.get(r.doc_id) || "a class list"}”`, body: r.line });
+      notices.push({ id: `row:${r.doc_id}:${r.page}`, subject: `Your row in “${nameOf.get(r.doc_id) || "a class list"}”`, body: [r.context ? `About this list: ${r.context}` : "", r.columns ? `Columns: ${r.columns}` : "", `Your row: ${r.line}`].filter(Boolean).join("\n") });
     }
   }
 

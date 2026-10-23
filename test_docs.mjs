@@ -65,3 +65,26 @@ assert.strictEqual(rr.find((r) => r.roll === "26b2477").line, "26b2477  Student 
 assert.deepStrictEqual(rosterHeader(roster), [{ page: 1, text: "Hostel 16 mess dues — October\nRoll  Name  Amount" }]);
 assert.strictEqual(rosterRows([{ page: 1, text: "Contact 26b2477 for details" }]), null, "a few roll numbers is not a class list");
 console.log("✓ Passed: PDF / Word / PowerPoint / Excel text, chunks, and class-list privacy");
+
+// A seating plan keeps the room, date and column names with each student's own row
+{
+  const seat = [
+    {
+      page: 1,
+      text: [
+        "INDIAN INSTITUTE OF TECHNOLOGY BOMBAY", "Quiz 2", "Course – MA 105", "Date – 23-10-2026, Time : 05.15 pm to 6.45 pm",
+        "LA 001 - LEFT ROW", "Sr. No. Seat No. Roll No Name Of The Student Division/ Tutorial",
+        "1 A11 26b2401 Rohan Meena D1 T6", "2 B11 26b2402 Pritam Halder D1 T6", "3 C11 26b2403 Aditya Singh D1 T3", "4 D11 26b2404 A B D1 T4",
+        "LA 001 - RIGHT ROW", "1 A12 26b2405 C D D2 T1", "2 B12 26b2406 E F D2 T2", "3 C12 26b2407 G H D2 T3", "4 D12 26b2408 I J D2 T4",
+      ].join("\n"),
+    },
+  ];
+  const sr = rosterRows(seat);
+  const mine = sr.find((r) => r.roll === "26b2405");
+  assert.strictEqual(mine.line, "1 A12 26b2405 C D D2 T1");
+  assert.ok(/LA 001 - RIGHT ROW/.test(mine.context) && /Quiz 2/.test(mine.context) && /23-10-2026/.test(mine.context), "row keeps its room, title and date");
+  assert.ok(/LEFT ROW/.test(sr.find((r) => r.roll === "26b2402").context), "rows before a new heading keep the earlier one");
+  assert.ok(/Seat No/.test(mine.columns), "column names kept");
+  assert.ok(!/26b24/.test(rosterHeader(seat)[0].text), "the shared header carries no roll numbers");
+}
+console.log("✓ Passed: seating rows keep room, date and columns");
