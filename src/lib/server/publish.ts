@@ -80,11 +80,11 @@ export async function publishNotice(
   const recipients = repeat
     ? []
     : update && update.kind !== "added"
-      ? subs.filter((s) => takesCourse(s, update.course_code)).map((s) => s.email)
+      ? subs.filter((s) => update.course_code === "*" || takesCourse(s, update.course_code)).map((s) => s.email)
       : scores.filter((x) => x.score >= URGENT_SCORE).map((x) => x.sub.email);
   const title =
     update?.kind === "cancelled"
-      ? `${update.course_code} cancelled`
+      ? update.course_code === "*" ? "No classes" : `${update.course_code} cancelled`
       : update?.kind === "moved"
       ? `${update.course_code} changed`
       : "Campus Daily: important notice";

@@ -1,5 +1,6 @@
 import assert from "node:assert";
 import { updateFromNotice, applyCourseUpdates, istDate, courseCodeOf } from "./src/lib/timetable/updates.ts";
+const FIXED_NOW = new Date("2026-10-15T00:00:00Z"); // tests below talk about 23 October 2026
 
 console.log("Timetable auto-update tests...");
 
@@ -16,7 +17,7 @@ const slots = [
 ];
 
 // 1. Cancellation with a time cancels only that slot
-const cancel = updateFromNotice("MA 105 lecture cancelled", "The MA 105 lecture on 23 October 2026 at 8:30 AM is cancelled.", "n1");
+const cancel = updateFromNotice("MA 105 lecture cancelled", "The MA 105 lecture on 23 October 2026 at 8:30 AM is cancelled.", "n1", FIXED_NOW);
 assert.strictEqual(cancel.kind, "cancelled");
 assert.strictEqual(cancel.course_code, "MA 105");
 assert.strictEqual(cancel.on_date, "2026-10-23");
@@ -28,19 +29,19 @@ assert.strictEqual(r.find((s) => s.id === "a").notice_id, "n1");
 assert.strictEqual(slots[0].is_cancelled, undefined, "input not mutated");
 
 // 2. Cancellation without a time cancels all that course's slots that day
-const cancelDay = updateFromNotice("No MA 105 class on 23 October 2026", "Classes cancelled.", "n2");
+const cancelDay = updateFromNotice("No MA 105 class on 23 October 2026", "Classes cancelled.", "n2", FIXED_NOW);
 r = applyCourseUpdates(slots, [cancelDay]);
 assert.strictEqual(r.filter((s) => s.is_cancelled).length, 2);
 
 // 3. Venue change
-const moved = updateFromNotice("CS 101 venue changed", "CS 101 lecture on 23 October 2026 shifted to LH 102.", "n3");
+const moved = updateFromNotice("CS 101 venue changed", "CS 101 lecture on 23 October 2026 shifted to LH 102.", "n3", FIXED_NOW);
 assert.strictEqual(moved.kind, "moved");
 r = applyCourseUpdates(slots, [moved]);
 assert.strictEqual(r.find((s) => s.id === "c").location, "LH 102");
 assert.strictEqual(r.find((s) => s.id === "c").start_time, slots[2].start_time);
 
 // 4. Quiz is added only for students taking the course
-const quiz = updateFromNotice("MA 105 Quiz 2", "Quiz 2 will be held on 23rd October 2026 at 2:00 PM in LA 201.", "n4");
+const quiz = updateFromNotice("MA 105 Quiz 2", "Quiz 2 will be held on 23rd October 2026 at 2:00 PM in LA 201.", "n4", FIXED_NOW);
 assert.strictEqual(quiz.kind, "added");
 r = applyCourseUpdates(slots, [quiz]);
 assert.strictEqual(r.length, 4);
@@ -154,4 +155,20 @@ console.log("✓ Passed: a division's common first-year courses fill the timetab
   assert.strictEqual(next.on_date, "2026-10-26");
   assert.strictEqual(next.until_date, "2026-11-01");
   assert.strictEqual(updateFromNotice("Hostel 5 buffer week mess menu", "No classes this week for anyone", "z", recv), null, "no course, no change");
+}
+
+// ---- Institute holiday: every class that day is off ----
+{
+  const recv = new Date("2026-10-19T14:00:00Z"); // Monday evening IST
+  const h = updateFromNotice("[Btech1] [All] Institute holiday on 20 October 2026 on account of Dussehra", "The institute will remain closed on Tuesday, 20 October 2026.", "hol", recv);
+  assert.ok(h, "holiday notice recognised");
+  assert.strictEqual(h.course_code, "*");
+  assert.strictEqual(h.on_date, "2026-10-20");
+  const mk = (id, title, d, t) => ({ id, title, start_time: `${d}T${t}:00+05:30`, slot_type: "lecture" });
+  const slots = [mk("a", "MA 105: Calculus", "2026-10-20", "08:30"), mk("b", "CS 101: Programming", "2026-10-20", "11:05"), mk("c", "MA 105: Calculus", "2026-10-21", "08:30")];
+  assert.deepStrictEqual(applyCourseUpdates(slots, [h]).map((s) => !!s.is_cancelled), [true, true, false], "all classes that day off, other days untouched");
+  assert.strictEqual(updateFromNotice("Holiday tomorrow", "Tomorrow is a holiday for all.", "t", recv).on_date, "2026-10-20", "tomorrow is read from the received time");
+  assert.strictEqual(updateFromNotice("Institute holiday on 10 October", "x", "p", recv), null, "past dates ignored");
+  assert.strictEqual(updateFromNotice("CS 101: no classes for all on 20 October", "x", "c", recv)?.course_code === "*", false, "a course notice stays course-level");
+  assert.strictEqual(updateFromNotice("Dussehra Pooja celebration", "Join us at 11 AM on 19 October 2026.", "d", recv), null, "a celebration is not a holiday");
 }

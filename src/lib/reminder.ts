@@ -39,7 +39,7 @@ export function todaysClasses(courses: UserCourse[], updates: CourseUpdate[], no
       title: x.title.includes(":") ? x.title.split(": ").slice(1).join(": ") : "",
       location: x.location || "",
     };
-    for (const u of todays.filter((u) => u.course_code === code)) {
+    for (const u of todays.filter((u) => u.course_code === code || u.course_code === "*")) {
       if (u.kind === "cancelled") c.note = "Cancelled";
       if (u.kind === "moved" && u.new_location) {
         c.location = u.new_location;

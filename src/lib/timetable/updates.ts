@@ -1,4 +1,5 @@
 import { extractEventDetails, extractTimeFromText } from "../events.ts";
+import { ALL_COURSES, holidayFromNotice } from "./holiday.ts";
 
 export type CourseUpdate = {
   course_code: string;
@@ -94,6 +95,8 @@ export function updateFromNotice(
   const body = rawBody.replace(POSTED_LINE_RE, " ");
   const weekOff = weekOffFromNotice(subject, body, noticeId, receivedAt);
   if (weekOff) return weekOff;
+  const holiday = holidayFromNotice(subject, body, noticeId, receivedAt);
+  if (holiday) return holiday;
   const ev = extractEventDetails(subject, body);
   if (!ev || !ev.course_code) return null;
   // Lecture halls ("LA 001", "LC 101", "LH 302"…) look like course codes but aren't; club/event lists aren't course notices.
@@ -170,7 +173,7 @@ export function applyCourseUpdates(slots: Slot[], updates: CourseUpdate[]): Slot
     const last = u.until_date && u.until_date > u.on_date ? u.until_date : u.on_date;
     const sameDay = out.filter((s) => {
       const d = istDate(s.start_time);
-      return courseCodeOf(s.title) === u.course_code && d >= u.on_date && d <= last && s.slot_type !== "quiz" && s.slot_type !== "exam";
+      return (u.course_code === ALL_COURSES || courseCodeOf(s.title) === u.course_code) && d >= u.on_date && d <= last && s.slot_type !== "quiz" && s.slot_type !== "exam";
     });
     const exact = u.match_start ? sameDay.filter((s) => s.start_time === u.match_start) : [];
     const targets = exact.length > 0 ? exact : sameDay;
