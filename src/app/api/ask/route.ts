@@ -5,6 +5,7 @@ import { buildWeek, type UserCourse } from "@/lib/timetable/slots";
 import { cleanSubject } from "@/lib/display";
 import { geminiJson } from "@/lib/server/gemini";
 import { validateAction, describeAction } from "@/lib/actions";
+import { getAdminClient, isAdminEmail } from "@/lib/server/admin";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -25,7 +26,13 @@ export async function POST(req: NextRequest) {
   const since = new Date(Date.now() - 86400_000).toISOString();
   const { count } = await supabase.from("ask_log").select("id", { count: "exact", head: true }).eq("user_id", user.id).gte("asked_at", since);
   if ((count || 0) >= ASK_DAILY_LIMIT) return NextResponse.json({ error: `That's ${ASK_DAILY_LIMIT} questions today — try again tomorrow.` }, { status: 429 });
-  await supabase.from("ask_log").insert({ user_id: user.id });
+  const { data: logRow } = await supabase.from("ask_log").insert({ user_id: user.id }).select("id").single();
+  // Only the owner's conversations are kept in full, to debug wrong answers (see /admin).
+  const keepText = isAdminEmail(user.email);
+  const logTurn = async (answer: string, ok: boolean) => {
+    if (!keepText || !logRow?.id) return;
+    await getAdminClient()?.from("ask_log").update({ question: question.slice(0, 500), answer: answer.slice(0, 2000), ok }).eq("id", logRow.id);
+  };
 
   const now = new Date();
   const [feed, courses, deadlines, files, profile, evs] = await Promise.all([
@@ -82,6 +89,7 @@ export async function POST(req: NextRequest) {
   const prompt = buildAskPrompt(question, { now, notices, classes, deadlines: deadlines.data || [], files: files.data || [], settings, events });
   const g = await geminiJson(prompt);
   if (!g.ok) {
+    await logTurn(`ERROR ${g.status}: ${g.detail}`, false);
     const busy = g.status === 429 || g.status === 503;
     return NextResponse.json({ error: busy ? "The AI is busy right now — try again in a minute." : "Couldn't answer that one. Try rephrasing." }, { status: 502 });
   }
@@ -93,6 +101,7 @@ export async function POST(req: NextRequest) {
     .map((a) => validateAction(a, ctx))
     .filter(Boolean)
     .map((a) => ({ action: a!, label: describeAction(a!, title) }));
+  await logTurn(`${out.answer}${actions.length ? "\n[actions: " + actions.map((a) => a.label).join("; ") + "]" : ""}`, true);
   return NextResponse.json({ answer: out.answer, sources: out.sources.map((s) => ({ ...s, subject: cleanSubject(s.subject) })), actions });
 }
 

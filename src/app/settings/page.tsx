@@ -25,12 +25,6 @@ import {
   type Profile,
 } from "@/lib/constants";
 
-const DELIVERY = [
-  ["app", "Board only", "Read here whenever you like."],
-  ["email", "Evening email digest", "One email at 6 PM with what matters."],
-  ["both", "Board + evening email", "Both."],
-] as const;
-
 function SettingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -43,10 +37,10 @@ function SettingsContent() {
   const [successMsg, setSuccessMsg] = useState("");
 
   const [form, setForm] = useState<Profile>({
-    department: DEPARTMENTS[0],
+    department: "",
     year: "1",
-    division: "D1",
-    hostel: "Hostel 16",
+    division: "",
+    hostel: "",
     hasmed: HASMED[0],
     categories: [...CATEGORIES],
     keywords: "",
@@ -82,10 +76,10 @@ function SettingsContent() {
         const rawHasmed = sub.hasmed || sub.hasmed1 || HASMED[0];
         const resolvedHasmed = HASMED.includes(rawHasmed) ? rawHasmed : HASMED[0];
         setForm({
-          department: sub.department || DEPARTMENTS[0],
+          department: sub.department || "",
           year: sub.year ? String(sub.year) : "1",
-          division: sub.division || "D1",
-          hostel: sub.hostel || "Hostel 16",
+          division: sub.division || "",
+          hostel: sub.hostel || "",
           hasmed: resolvedHasmed,
           categories: resolvedCategories,
           keywords: sub.keywords || sub.interests || "",
@@ -126,17 +120,15 @@ function SettingsContent() {
       const cleanKeywords = form.keywords?.trim() || null;
       const payload: Record<string, any> = {
         email: activeEmail,
-        department: form.department,
+        ...(form.department ? { department: form.department } : {}),
         year: form.year,
-        division: form.year === "1" ? form.division : null,
-        hostel: form.hostel,
-        hasmed: form.year === "1" ? form.hasmed : null,
+        division: form.year === "1" && form.division ? form.division : null,
+        ...(form.hostel ? { hostel: form.hostel } : {}),
         categories: form.categories,
         keywords: cleanKeywords,
         personal_email: cleanPersonalEmail,
         delivery_preference: form.delivery_preference,
         // Legacy columns kept in sync for the old digest script
-        hasmed1: form.year === "1" ? form.hasmed : null,
         category: form.categories.join(", "),
         interests: cleanKeywords,
         delivery_email: cleanPersonalEmail,
@@ -214,12 +206,23 @@ function SettingsContent() {
         <div className="settings">
           <SettingsRail />
 
-          <form onSubmit={handleSubmit} className="panels">
+          <form
+            onSubmit={handleSubmit}
+            className="panels"
+            onKeyDown={(e) => {
+              // Enter in the course search / add-by-code boxes must not save the whole profile.
+              const el = e.target as HTMLElement;
+              if (e.key === "Enter" && el.tagName === "INPUT" && (el as HTMLInputElement).type !== "checkbox" && el.closest("[data-nosubmit]")) e.preventDefault();
+            }}
+          >
             <Panel id="profile" title="Profile" sub="Used to pick notices meant for you — department, year and hostel.">
               <div className="row2">
                 <label className="field">
                   Department
                   <select value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })}>
+                    <option value="" disabled>
+                      Choose…
+                    </option>
                     {DEPARTMENTS.map((d) => (
                       <option key={d} value={d}>
                         {d}
@@ -242,6 +245,9 @@ function SettingsContent() {
                 <label className="field">
                   Hostel
                   <select value={form.hostel} onChange={(e) => setForm({ ...form, hostel: e.target.value })}>
+                    <option value="" disabled>
+                      Choose…
+                    </option>
                     {HOSTELS.map((h) => (
                       <option key={h} value={h}>
                         {h}
@@ -253,6 +259,9 @@ function SettingsContent() {
                   <label className="field">
                     Division
                     <select value={form.division} onChange={(e) => setForm({ ...form, division: e.target.value })}>
+                      <option value="" disabled>
+                        Choose…
+                      </option>
                       {DIVISIONS.map((div) => (
                         <option key={div} value={div}>
                           {div}
@@ -264,13 +273,21 @@ function SettingsContent() {
               </div>
             </Panel>
 
-            <Panel id="courses" title="My courses" sub="Your timetable is built from these. Pick your division and the slots fill in from ResoBin.">
-              <ResobinImport onDone={() => window.location.reload()} />
-              <CoursePicker division={form.division || ""} department={form.department} year={form.year} />
-              <details className="more-courses">
-                <summary>A course isn&apos;t listed? Add it by code</summary>
-                <CoursesEditor />
-              </details>
+            <Panel id="courses" title="My courses" sub="Your timetable is built from these.">
+              <div data-nosubmit>
+                <CoursePicker division={form.division || ""} department={form.department} year={form.year} />
+                <details className="more-courses">
+                  <summary>A course isn&apos;t listed? Add it by code</summary>
+                  <CoursesEditor />
+                </details>
+                <details className="welcome-block welcome-more">
+                  <summary>
+                    <b>On a laptop? Import from ResoBin for an exact timetable</b>
+                    <span className="help">Copies your exact courses, labs and rooms. Needs the Campus Daily Connect extension.</span>
+                  </summary>
+                  <ResobinImport onDone={() => window.location.reload()} />
+                </details>
+              </div>
             </Panel>
 
             <Panel
@@ -317,38 +334,19 @@ function SettingsContent() {
               </label>
             </Panel>
 
-            <Panel id="delivery" title="Delivery" sub="Where you want your notices.">
-              {DELIVERY.map(([v, title, sub]) => (
-                <label key={v} className="choice">
-                  <input
-                    type="radio"
-                    name="delivery"
-                    value={v}
-                    checked={form.delivery_preference === v}
-                    onChange={() => setForm({ ...form, delivery_preference: v })}
-                  />
-                  <span>
-                    <b>{title}</b>
-                    <br />
-                    <span className="help">{sub}</span>
-                  </span>
-                </label>
-              ))}
-              <label className="field">
-                Personal email (optional)
+            <Panel id="alerts" title="Alerts & calendar" sub="Phone alerts for cancellations and top-priority notices, the morning digest, and a live calendar link.">
+              <PushToggle />
+              <DigestPicker />
+              <label className="field" style={{ marginTop: 14 }}>
+                Email for the digest (optional)
                 <input
                   type="email"
                   placeholder="yourname@gmail.com"
                   value={form.personal_email}
                   onChange={(e) => setForm({ ...form, personal_email: e.target.value })}
                 />
-                <span className="help">Send digests here instead of your IITB inbox.</span>
+                <span className="help">Leave empty to use your IITB address. Saved with the Save button below.</span>
               </label>
-            </Panel>
-
-            <Panel id="alerts" title="Alerts & calendar" sub="Phone alerts for cancellations and top-priority notices, and a live calendar link.">
-              <PushToggle />
-              <DigestPicker />
               <div style={{ marginTop: 16 }}>
                 <CalendarLink />
               </div>
@@ -386,7 +384,7 @@ function SettingsContent() {
             </Panel>
 
             <div className="save-bar">
-              <span>{successMsg || "Profile, interests and delivery save together."}</span>
+              <span>{successMsg || "Profile, interests and email save together."}</span>
               <button type="submit" disabled={saving} className="primary">
                 {saving ? "Saving…" : isOnboarding ? "Save & open my board" : "Save"}
               </button>

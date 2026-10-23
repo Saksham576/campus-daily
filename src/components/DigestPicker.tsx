@@ -14,6 +14,7 @@ const OPTIONS = [
 export function DigestPicker() {
   const [value, setValue] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [devices, setDevices] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -22,6 +23,8 @@ export function DigestPicker() {
       if (!user?.email) return;
       const { data } = await supabase.from("subscribers").select("digest").eq("email", user.email.toLowerCase()).maybeSingle();
       setValue(data?.digest || "push");
+      const { count } = await supabase.from("push_subscriptions").select("endpoint", { count: "exact", head: true });
+      setDevices(count ?? 0);
     })();
   }, []);
 
@@ -45,6 +48,14 @@ export function DigestPicker() {
           </button>
         ))}
       </div>
+      {devices === 0 && (value === "push" || value === "both") && (
+        <span className="note small" style={{ marginTop: 0 }}>
+          Phone alerts aren&apos;t on for this device, so the digest can&apos;t reach you by phone yet.{" "}
+          <button type="button" className="link" onClick={() => pick(value === "both" ? "email" : "email")}>
+            Send it by email instead
+          </button>
+        </span>
+      )}
       <span className="help">
         Today&apos;s classes, what&apos;s due this week and your next exam. Phone alerts need alerts turned on above.
         {saved && " Saved."}

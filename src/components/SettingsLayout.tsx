@@ -8,7 +8,6 @@ export const SETTINGS_SECTIONS: { id: string; label: string; Icon: LucideIcon }[
   { id: "courses", label: "My courses", Icon: BookOpen },
   { id: "moodle", label: "Moodle", Icon: GraduationCap },
   { id: "interests", label: "Interests", Icon: Heart },
-  { id: "delivery", label: "Delivery", Icon: Mail },
   { id: "alerts", label: "Alerts & calendar", Icon: Bell },
   { id: "appearance", label: "Appearance", Icon: Palette },
   { id: "privacy", label: "Data & privacy", Icon: Shield },
