@@ -6,7 +6,7 @@ import { takesCourse } from "@/lib/timetable/courses";
 import { coursesFromShortnames } from "@/lib/timetable/catalog";
 import { docKind } from "@/lib/docs/extract";
 import { docId } from "@/lib/server/docWorker";
-import { updateFromNotice } from "@/lib/timetable/updates";
+import { updatesFromNotice } from "@/lib/timetable/updates";
 import {
   MOODLE_URL,
   moodleCall,
@@ -225,7 +225,7 @@ export async function syncMoodle(admin: SupabaseClient, deadlineMs: number) {
                     received_at: new Date(modified * 1000).toISOString(),
                   },
                   courseScore(code, 8),
-                  updateFromNotice(subject, body, id, new Date(modified * 1000))
+                  updatesFromNotice(subject, body, id, new Date(modified * 1000))
                 );
                 stats.notices++;
               }

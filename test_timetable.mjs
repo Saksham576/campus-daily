@@ -206,3 +206,54 @@ import { buildWeek, labSlotOptions, isLabSlotCode } from "./src/lib/timetable/sl
   assert.ok(labSlotOptions().length >= 9 && /^\w{3} \d\d:\d\d–\d\d:\d\d$/.test(labSlotOptions()[0].label));
 }
 console.log("✓ Passed: personal lab slot shows as its own lab block");
+
+// ---- Real CS 101 notices (23 Oct 2026): no more lectures + a doubt session in KReSIT, per division ----
+import { updatesFromNotice } from "./src/lib/timetable/updates.ts";
+{
+  const d4 = updatesFromNotice(
+    "[Bodhitree] [Forum - CS101A26] Doubt Solving Session (D4 Batch)",
+    "Course: CS101A26 - Computer Programming (Prof. Abir) <br> Topic: Doubt Solving Session (D4 Batch) <br> <p>Dear D4 Batch students,<br /> <br /> As you may have heard from the D3 batch, we are no longer having CS101 lectures. However, we are available during the lecture hours for solving doubts.&nbsp;<br /> <br /> The doubt-solving session for the D4 batch i.e. Fri, 23rd Oct, 14:00 hrs, is in <strong>KR-225, 2nd Floor, KReSIT</strong> Building (next to New CSE Building). Please note that attendance is NOT mandatory.</p>",
+    "n-d4",
+    new Date("2026-10-23T06:30:00Z")
+  );
+  assert.strictEqual(d4.length, 2, "both changes found: " + JSON.stringify(d4));
+  const gone = d4.find((u) => u.kind === "cancelled");
+  assert.strictEqual(gone.course_code, "CS 101");
+  assert.strictEqual(gone.slot_type, "lecture");
+  assert.strictEqual(gone.until_date, "2026-11-06");
+  const sess = d4.find((u) => u.kind === "added");
+  assert.strictEqual(sess.division, "D4");
+  assert.strictEqual(sess.new_start, "2026-10-23T08:30:00.000Z"); // 14:00 IST
+  assert.ok(/KR-225/.test(sess.new_location) && /KReSIT/.test(sess.new_location), sess.new_location);
+
+  const d3 = updatesFromNotice(
+    "[Bodhitree] [Forum - CS101A26] Doubt Solving Session (D3 Batch)",
+    "<p>Dear All,<br /> The doubt-solving session tomorrow i.e. Fri, 23rd Oct, 11:00 am, for the D3 batch is in KR-125, 1st Floor, KReSIT Building (next to New CSE Building). Attendance is NOT mandatory.</p>",
+    "n-d3",
+    new Date("2026-10-22T15:56:00Z")
+  );
+  assert.strictEqual(d3.length, 1);
+  assert.strictEqual(d3[0].division, "D3");
+  assert.strictEqual(d3[0].new_start, "2026-10-23T05:30:00.000Z");
+
+  // A student's week: D3 lectures vanish after the notice, labs stay, only their division's session appears.
+  const mk = (id, title, d, t, type, division) => ({ id, title, start_time: `${d}T${t}:00+05:30`, slot_type: type, division });
+  const mine3 = [
+    mk("l1", "CS 101: Programming", "2026-10-21", "08:00", "lecture", "D3"),
+    mk("l2", "CS 101: Programming", "2026-10-28", "08:00", "lecture", "D3"),
+    mk("lab", "CS 101: Programming Lab", "2026-10-28", "14:00", "lab", "D3"),
+    mk("tut", "CS 101: Programming (Tutorial)", "2026-10-29", "15:00", "lecture", "D3"),
+  ];
+  const all = [...d4, ...d3];
+  const out = applyCourseUpdates(mine3, all);
+  assert.strictEqual(out.find((s) => s.id === "l2").is_cancelled, true, "later D3 lecture is off");
+  assert.ok(!out.find((s) => s.id === "l1").is_cancelled, "a lecture before the notice stays");
+  assert.ok(!out.find((s) => s.id === "lab").is_cancelled && !out.find((s) => s.id === "tut").is_cancelled, "lab and tutorial untouched");
+  const sessions = out.filter((s) => /doubt/i.test(s.title));
+  assert.strictEqual(sessions.length, 1, "D3 student sees only the D3 session");
+  assert.ok(/KR-125/.test(sessions[0].location));
+  const out4 = applyCourseUpdates(mine3.map((s) => ({ ...s, division: "D4" })), all);
+  assert.ok(/KR-225/.test(out4.find((s) => /doubt/i.test(s.title)).location), "D4 student sees the D4 room");
+  assert.strictEqual(updatesFromNotice("[Bodhitree] [Forum - CS101A26] Lab Exam 2", "The lab exam is on Monday.", "x", new Date("2026-10-23T06:30:00Z")).length, 0, "an ordinary post changes nothing");
+}
+console.log("✓ Passed: no-more-lectures and per-division doubt sessions reach the timetable");

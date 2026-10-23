@@ -26,7 +26,7 @@ const istDay = (d: Date) => ymd(new Date(d.getTime() + IST_MS));
 const addDays = (day: string, n: number) => ymd(new Date(Date.parse(day + "T00:00:00Z") + n * 86400000));
 
 /** The day a holiday notice is about, as written in it. */
-function dayIn(text: string, receivedAt: Date): string | null {
+export function dayIn(text: string, receivedAt: Date): string | null {
   const today = istDay(receivedAt);
   const year = Number(today.slice(0, 4));
   const dm = text.match(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?${MONTH_RE}\\b(?:,?\\s*(\\d{4}))?`, "i"));

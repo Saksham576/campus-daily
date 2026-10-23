@@ -26,9 +26,11 @@ export async function publishNotice(
   admin: SupabaseClient,
   row: { id: string; subject: string; summary?: string | null } & Record<string, unknown>,
   scoreFor: (sub: Sub) => number,
-  update: CourseUpdate | null,
+  updateIn: CourseUpdate | CourseUpdate[] | null,
   opts?: { only?: string[] }
 ) {
+  const updates = Array.isArray(updateIn) ? updateIn : updateIn ? [updateIn] : [];
+  let update: CourseUpdate | null = updates[0] ?? null;
   const { error } = await admin.from("items").upsert(row, { onConflict: "id" });
   if (error) throw new Error(`items upsert: ${error.message}`);
 
@@ -64,13 +66,13 @@ export async function publishNotice(
   let link: LinkResult | null = null;
   try {
     // Personal mail stays out of shared events.
-    if (!only) link = await linkNotice(admin, row as any);
+    if (!only && updates.length <= 1) link = await linkNotice(admin, row as any);
   } catch (e) {
     console.error("publish: linking failed", e instanceof Error ? e.message : e);
   }
   if (link) update = link.update;
-  else if (update) {
-    const { error: upErr } = await admin.from("course_updates").upsert(update, { onConflict: "notice_id" });
+  else if (updates.length) {
+    const { error: upErr } = await admin.from("course_updates").upsert(updates, { onConflict: "notice_id,kind,on_date,slot_type,division", ignoreDuplicates: false });
     if (upErr) console.error("publish: course update failed", upErr.message);
   }
   // Another source repeating what we already knew: no second buzz.
@@ -80,7 +82,7 @@ export async function publishNotice(
   const recipients = repeat
     ? []
     : update && update.kind !== "added"
-      ? subs.filter((s) => update.course_code === "*" || takesCourse(s, update.course_code)).map((s) => s.email)
+      ? subs.filter((s) => (update.course_code === "*" || takesCourse(s, update.course_code)) && (!update.division || !s.division || s.division.toUpperCase() === update.division.toUpperCase())).map((s) => s.email)
       : scores.filter((x) => x.score >= URGENT_SCORE).map((x) => x.sub.email);
   const title =
     update?.kind === "cancelled"

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { scoreWithGemini, buildItemRow, personalizeScore, privateMailReason, contentIdFor, type InboundEmail } from "@/lib/ingest";
 import { forwardToken, isPersonalMail } from "@/lib/forwarding";
 import { extractEventDetails } from "@/lib/events";
-import { updateFromNotice } from "@/lib/timetable/updates";
+import { updatesFromNotice } from "@/lib/timetable/updates";
 import { publishNotice } from "@/lib/server/publish";
 import { docId } from "@/lib/server/docWorker";
 
@@ -93,11 +93,11 @@ async function processNotice(email: InboundEmail): Promise<{ status: number; bod
   });
   const row = personal ? { ...base, id: `${base.id}_${createHash("sha256").update(owner!).digest("hex").slice(0, 8)}`, is_personal: true } : base;
   // A personal mail never changes everyone's timetable.
-  const update = personal ? null : updateFromNotice(email.subject, email.body, row.id, new Date(email.date));
+  const update = personal ? null : updatesFromNotice(email.subject, email.body, row.id, new Date(email.date));
 
   try {
     const result = await publishNotice(admin, row, (s) => personalizeScore(scored, s), update, personal ? { only: [owner!] } : undefined);
-    return { status: 200, body: { ok: true, id: row.id, score: scored.score, ...result, timetable_update: update?.kind ?? null } };
+    return { status: 200, body: { ok: true, id: row.id, score: scored.score, ...result, timetable_update: update?.map((u) => u.kind).join("+") || null } };
   } catch (err) {
     console.error("ingest:", err instanceof Error ? err.message : "publish failed");
     return { status: 500, body: { error: "Database error" } };

@@ -88,3 +88,20 @@ console.log("✓ Passed: PDF / Word / PowerPoint / Excel text, chunks, and class
   assert.ok(!/26b24/.test(rosterHeader(seat)[0].text), "the shared header carries no roll numbers");
 }
 console.log("✓ Passed: seating rows keep room, date and columns");
+
+// Seating rows said in words; older roll formats never leak into the shared title
+import { summarizeRow, whenFrom } from "./src/lib/docs/rows.ts";
+{
+  const plan = [{ page: 1, text: ["INDIAN INSTITUTE OF TECHNOLOGY BOMBAY", "Quiz 2", "Course – MA 105", "Date – 23-10-2026, Time : 05.15 pm to 6.45 pm", "Sr. No. Seat No. Roll No Name Of The Student Division/ Tutorial", "1 A11 21D070058 Rohan Meena D1 T6", "LH 301 – MIDDLE ROW", "2 B11 26B2401 Pritam Halder D1 T6", "3 C11 26B2402 A B D1 T3", "4 D11 26B2403 C D D1 T4", "5 E11 26B2404 E F D1 T5", "6 F11 26B2405 G H D1 T6", "48 H21 26B2477 Saksham Tiwari D3 T8", "7 G11 26B2406 I J D1 T7"].join("\n") }];
+  const rr = rosterRows(plan);
+  assert.ok(rr.find((r) => r.roll === "21d070058"), "6-digit roll formats are class-list rows too");
+  const mine = rr.find((r) => r.roll === "26b2477");
+  assert.ok(!/Rohan|21D0/.test(rosterHeader(plan)[0].text) && !/Rohan|21D0/.test(mine.context || ""), "no classmate's row in shared or context text");
+  const s = summarizeRow({ ...mine, docName: "MA 105 Quiz 2_seat-plan.pdf" });
+  assert.strictEqual(s.headline, "MA 105 Quiz 2: seat H21, LH 301, middle row");
+  assert.ok(s.details.includes("Fri 23 Oct, 5:15 pm – 6:45 pm"), s.details.join("|"));
+  assert.ok(s.details.some((d) => /D3, tutorial T8/.test(d)));
+  assert.strictEqual(whenFrom("Date – 12-09-2026, Time : 11.00hrs to 13.00 hrs"), "Sat 12 Sep, 11 am – 1 pm");
+  assert.strictEqual(summarizeRow({ line: "279 26B2477 Saksham Tiwari D3 T8", context: "CourseList-2", columns: "Sr. no. Roll Name Section Tutorial", docName: "D3-student list.pdf" }).headline, "Your class list: division D3, tutorial batch T8");
+}
+console.log("✓ Passed: seat answers in words, old roll formats kept out of shared text");

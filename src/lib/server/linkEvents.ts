@@ -95,7 +95,7 @@ export async function linkNotice(admin: SupabaseClient, item: LinkItem): Promise
   const verified = claims.some((c) => c.trust >= 3);
   const update = eventCourseUpdate(r.sources[0]?.item_id || item.id, { course_code: ev.course_code || claim.course_code, kind: ev.kind, on_date: ev.on_date }, r, verified);
   if (update) {
-    const { error } = await admin.from("course_updates").upsert(update, { onConflict: "notice_id" });
+    const { error } = await admin.from("course_updates").upsert(update, { onConflict: "notice_id,kind,on_date,slot_type,division" });
     if (error) console.error("link: timetable change failed", error.message);
   }
 

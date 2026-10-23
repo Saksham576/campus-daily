@@ -113,6 +113,8 @@ export function claimFrom(item: LinkItem, now = new Date()): Claim | null {
 
   // Course notices: reuse the timetable rules (cancel / move / quiz-exam-deadline).
   const u = updateFromNotice(item.subject, body, item.id, new Date(at));
+  // Division-specific changes and "no more lectures" are applied straight from their notice, not merged across sources.
+  if (u && (u.division || u.slot_type === "session" || u.slot_type === "lecture")) return null;
   if (u) {
     return {
       ...base,

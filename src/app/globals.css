@@ -2665,3 +2665,15 @@ button.chip.on:hover:not(:disabled) {
   .perks li { padding: 9px 12px; grid-template-columns: 26px 1fr; align-items: center; }
   .perks small { display: none; }
 }
+.doc-raw { margin-top: 6px; font-size: 12px; color: var(--ink-3); }
+.doc-raw summary { cursor: pointer; }
+
+/* ---------- Finish setting up (existing students) ---------- */
+.nudges { display: grid; gap: 8px; margin: 0 0 16px; }
+.nudge { display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; padding: 12px 14px; border: 1px solid var(--rule); border-left: 3px solid var(--accent); border-radius: var(--radius); background: var(--surface); }
+.nudge > div { display: grid; gap: 4px; min-width: 0; }
+.nudge b { font: 600 14px/1.3 var(--font-sans); }
+.nudge span { color: var(--ink-3); font-size: 13px; line-height: 1.45; }
+.nudge .navlink { justify-self: start; margin-top: 4px; }
+.nudge .ghost { flex: 0 0 auto; width: 28px; height: 28px; padding: 0; display: grid; place-items: center; }
+.nudge .ghost .lucide { width: 14px; height: 14px; }

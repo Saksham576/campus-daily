@@ -20,6 +20,8 @@ import {
   HASMED,
   HOSTELS,
   CATEGORIES,
+  CLUBS,
+  WANTS,
   normalizeCategories,
   normalizeDeliveryPreference,
   type Profile,
@@ -92,6 +94,16 @@ function SettingsContent() {
     }
     loadData();
   }, [router]);
+
+  // Clubs and "also tell me about" chips live in the keywords box, so they stay editable.
+  const kwList = (form.keywords || "").split(",").map((x) => x.trim()).filter(Boolean);
+  const hasKw = (kw: string) => kwList.some((x) => x.toLowerCase() === kw.toLowerCase());
+  const toggleKw = (kw: string) =>
+    setForm((f) => {
+      const list = (f.keywords || "").split(",").map((x) => x.trim()).filter(Boolean);
+      const on = list.some((x) => x.toLowerCase() === kw.toLowerCase());
+      return { ...f, keywords: (on ? list.filter((x) => x.toLowerCase() !== kw.toLowerCase()) : [...list, kw]).join(", ") };
+    });
 
   function toggleCategory(cat: string) {
     setForm((prev) => {
@@ -321,6 +333,22 @@ function SettingsContent() {
                     </span>
                   );
                 })}
+              </div>
+              <h3 className="chips-title">Clubs you follow</h3>
+              <div className="chips">
+                {CLUBS.map((c) => (
+                  <button key={c} type="button" className={`chip ${hasKw(c) ? "on" : ""}`} aria-pressed={hasKw(c)} onClick={() => toggleKw(c)}>
+                    {c}
+                  </button>
+                ))}
+              </div>
+              <h3 className="chips-title">Also tell me about</h3>
+              <div className="chips">
+                {WANTS.map((w) => (
+                  <button key={w.kw} type="button" className={`chip ${hasKw(w.kw) ? "on" : ""}`} aria-pressed={hasKw(w.kw)} onClick={() => toggleKw(w.kw)} title={w.hint}>
+                    {w.label}
+                  </button>
+                ))}
               </div>
               <label className="field">
                 Keywords

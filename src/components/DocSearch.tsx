@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { FileText, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { summarizeRow } from "@/lib/docs/rows";
 
 type Hit = { doc_id: string; name: string; course_code: string | null; page: number | null; snippet: string; view_url: string | null };
 type Row = { doc_id: string; page: number | null; line: string; context?: string | null; columns?: string | null; name?: string };
@@ -73,18 +74,46 @@ export function MyRows() {
     <section className="lib-group">
       <h2 className="lib-title">Your entries in class lists</h2>
       <ul className="lib-list">
-        {rows.map((r, i) => (
-          <li key={`${r.doc_id}-${i}`} className="doc-hit">
-            <span className="doc-hit-head">
-              <UserRound aria-hidden />
-              <b>{r.name}</b>
-              {r.page ? <span className="from">page {r.page}</span> : null}
-            </span>
-            {r.context && <span className="doc-context">{r.context}</span>}
-            {r.columns && <span className="doc-cols mono">{r.columns}</span>}
-            <span className="doc-snippet mono">{r.line}</span>
-          </li>
-        ))}
+        {rows.map((r, i) => {
+          const s = summarizeRow({ line: r.line, context: r.context, columns: r.columns, docName: r.name });
+          return (
+            <li key={`${r.doc_id}-${i}`} className="doc-hit">
+              {s ? (
+                <>
+                  <span className="doc-hit-head">
+                    <UserRound aria-hidden />
+                    <b>{s.headline}</b>
+                  </span>
+                  {s.details.map((d) => (
+                    <span key={d} className="doc-context">
+                      {d}
+                    </span>
+                  ))}
+                  <span className="from" style={{ display: "block", marginTop: 4 }}>
+                    From {r.name}
+                    {r.page ? ", page " + r.page : ""}
+                  </span>
+                  <details className="doc-raw">
+                    <summary>Show the original line</summary>
+                    {r.columns && <span className="doc-cols mono">{r.columns}</span>}
+                    <span className="doc-snippet mono">{r.line}</span>
+                  </details>
+                </>
+              ) : (
+                <>
+                  <span className="doc-hit-head">
+                    <UserRound aria-hidden />
+                    <b>{r.name}</b>
+                    {r.page ? <span className="from">page {r.page}</span> : null}
+                  </span>
+                  {r.context && <span className="doc-context">{r.context}</span>}
+                  {r.columns && <span className="doc-cols mono">{r.columns}</span>}
+                  <span className="doc-snippet mono">{r.line}</span>
+                </>
+              )}
+            </li>
+          );
+        })}
       </ul>
       <p className="help" style={{ marginTop: 6 }}>Only your own row is kept from shared lists — never anyone else&apos;s.</p>
     </section>
