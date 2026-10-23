@@ -51,6 +51,34 @@ export const CATEGORIES = [
   "Hostel / Campus Life",
 ];
 
+/** Clubs and groups a student can follow at setup; picked ones become keywords that lift matching notices. */
+export const CLUBS = [
+  "Techfest",
+  "Mood Indigo",
+  "E-Cell",
+  "Insight",
+  "Web & Coding Club",
+  "Robotics",
+  "Aeromodelling",
+  "Music",
+  "Dramatics",
+  "Photography",
+  "Quizzing",
+  "Debating",
+  "Finance club",
+  "NSS",
+];
+
+/** Kinds of things worth hearing about, each mapped to the keyword that finds them. */
+export const WANTS: { label: string; kw: string; hint: string }[] = [
+  { label: "Orientation & freshie events", kw: "orientation", hint: "Welcome sessions, club orientations, freshie nights" },
+  { label: "Hackathons & coding contests", kw: "hackathon", hint: "Cash prizes, team formation, registrations" },
+  { label: "Sports trials & NSO", kw: "trials", hint: "Selections, pre-camps, inter-hostel matches" },
+  { label: "Internship & placement talks", kw: "internship", hint: "Company talks, resume workshops, deadlines" },
+  { label: "Scholarships & fee notices", kw: "scholarship", hint: "Fee waivers, deadlines, forms" },
+  { label: "Mess & hostel updates", kw: "mess", hint: "Menus, shutdowns, maintenance, allotments" },
+];
+
 export type DeliveryPreference = "app" | "email" | "both";
 
 /**

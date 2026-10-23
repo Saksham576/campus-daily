@@ -120,17 +120,40 @@ const ROLL_RE = /\b(\d{2}[a-z]\d{4}|\d{9})\b/gi;
 
 /**
  * Lists with many students' rows (mess dues, marks, seating) are never stored whole: each student
- * only ever sees the lines with their own roll number. Returns null for normal documents.
+ * only ever sees the lines with their own roll number. Each row keeps what a bare line loses:
+ * the document title (course, date, time), the section it sits under (room, row, batch) and the
+ * column names, so "10 J11 26b2477 … D1 T3" reads as "LA 001 – Left row, seat J11". Null for normal documents.
  */
-export function rosterRows(pages: Page[]): { roll: string; page: number; line: string }[] | null {
+export type RosterRow = { roll: string; page: number; line: string; context: string | null; columns: string | null };
+
+const HEADING_RE = /(?:\b(?:LA|LC|LH|LT|CC|SIC|MB|VMCC)[- ]?\d{1,3}\b|\b(?:row|hall|room|block|lab|venue|section|batch|group|sub-?group|slot|shift|session|floor|wing)\b)/i;
+const COLUMNS_RE = /\b(roll|seat|name|sr\.?\s*no|s\.?\s*no|division|batch|marks|amount)\b.*\b(roll|seat|name|sr\.?\s*no|s\.?\s*no|division|batch|marks|amount)\b/i;
+
+export function rosterRows(pages: Page[]): RosterRow[] | null {
   const lines = pages.flatMap((p) => p.text.split("\n").map((line) => ({ page: p.page, line: line.trim() })));
   const rolls = new Set<string>();
   for (const l of lines) for (const m of l.line.matchAll(ROLL_RE)) rolls.add(m[1].toLowerCase());
   if (rolls.size < 8) return null;
-  const rows: { roll: string; page: number; line: string }[] = [];
+
+  const hasRoll = (t: string) => new RegExp(ROLL_RE.source, "i").test(t);
+  // Title: the lines before the first student row (course, date, time), minus the column header.
+  const firstRow = lines.findIndex((l) => hasRoll(l.line));
+  const head = lines.slice(0, Math.max(0, firstRow)).map((l) => l.line).filter(Boolean);
+  const columns = head.filter((t) => COLUMNS_RE.test(t)).pop() ?? null;
+  const title = head.filter((t) => t !== columns && !HEADING_RE.test(t) && t.length > 2).join(" · ").replace(/\s+/g, " ").slice(0, 260) || null;
+  const titleHasSection = head.filter((t) => t !== columns && HEADING_RE.test(t) && t.length <= 80).pop() ?? null;
+
+  const rows: RosterRow[] = [];
+  let section: string | null = titleHasSection;
   for (const l of lines) {
     const found = new Set([...l.line.matchAll(ROLL_RE)].map((m) => m[1].toLowerCase()));
-    for (const roll of found) rows.push({ roll, page: l.page, line: l.line.slice(0, 500) });
+    if (!found.size) {
+      // A short heading line such as "LA 001 - LEFT ROW" or "Sub-group 3" applies to the rows below it.
+      if (l.line.length >= 3 && l.line.length <= 80 && HEADING_RE.test(l.line) && !COLUMNS_RE.test(l.line)) section = l.line;
+      continue;
+    }
+    const context = [title, section].filter(Boolean).join(" · ") || null;
+    for (const roll of found) rows.push({ roll, page: l.page, line: l.line.slice(0, 500), context: context ? context.slice(0, 400) : null, columns });
   }
   return rows;
 }

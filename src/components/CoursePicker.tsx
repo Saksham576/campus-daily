@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { COURSE_CATALOG, coursesForDivision } from "@/lib/timetable/catalog";
-import { formatCourseCode } from "@/lib/timetable/slots";
+import { formatCourseCode, isLabSlotCode, labSlotOptions } from "@/lib/timetable/slots";
 
 // Department name → course-code prefixes (IITB)
 const DEPT_PREFIX: [RegExp, string[]][] = [
@@ -21,6 +21,10 @@ const DEPT_PREFIX: [RegExp, string[]][] = [
   [/physics/i, ["PH"]],
   [/economic|humanit/i, ["HS"]],
 ];
+
+// Courses whose lab runs in a slot of each student's own (allotted in the first lab), not by division.
+const OWN_LAB = ["CS101"];
+const LAB_OPTIONS = labSlotOptions();
 
 type Pick = Record<string, string>; // course key → division / batch / section ("" = not taking)
 
@@ -64,6 +68,7 @@ export function CoursePicker({
   );
 
   const [pick, setPick] = useState<Pick>({});
+  const [lab, setLab] = useState<Record<string, string>>({}); // course key -> lab slot code
   const [saved, setSaved] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -71,10 +76,18 @@ export function CoursePicker({
   // Start from what's saved, else the division's courses.
   useEffect(() => {
     (async () => {
-      const { data } = await createClient().from("user_courses").select("course_code, division");
+      const { data } = await createClient().from("user_courses").select("course_code, division, lecture_slots");
       const p: Pick = {};
-      if (data?.length) for (const r of data) p[r.course_code.replace(/\s+/g, "")] = r.division || "";
-      else for (const k of common) p[k] = division;
+      if (data?.length) {
+        const labs: Record<string, string> = {};
+        for (const r of data) {
+          const key = r.course_code.replace(/\s+/g, "");
+          p[key] = r.division || "";
+          const mine = (r.lecture_slots || []).find((x: string) => isLabSlotCode(x));
+          if (mine) labs[key] = mine.toUpperCase();
+        }
+        setLab(labs);
+      } else for (const k of common) p[k] = division;
       setPick(p);
     })();
   }, [common, division]);
@@ -91,7 +104,7 @@ export function CoursePicker({
     const t = setTimeout(save, 500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pick, dirty]);
+  }, [pick, dirty, lab]);
 
   async function save() {
     setBusy(true);
@@ -105,7 +118,9 @@ export function CoursePicker({
       .map(([k, d]) => {
         const c = COURSE_CATALOG[k];
         const div = c.divisions.find((x) => x.d === d) || c.divisions[0];
-        return { user_id: user.id, course_code: k, title: c.title, division: div.d, lecture_slots: div.l, tutorial_slots: div.t, venue: div.v || null };
+        // A personal lab slot rides along with the lecture slots (the timetable shows it as a Lab block).
+        const own = OWN_LAB.includes(k) && lab[k] ? [lab[k]] : [];
+        return { user_id: user.id, course_code: k, title: c.title, division: div.d, lecture_slots: [...div.l.filter((x) => !isLabSlotCode(x)), ...own], tutorial_slots: div.t, venue: div.v || null };
       });
     const drop = Object.entries(pick)
       .filter(([k, d]) => !d && COURSE_CATALOG[k])
@@ -154,7 +169,35 @@ export function CoursePicker({
       {common.length > 0 ? (
         <>
           <h3>Everyone in {division} takes</h3>
-          {common.map((k) => row(k, [division]))}
+          {common.map((k) => (
+            <div key={k}>
+              {row(k, [division])}
+              {OWN_LAB.includes(k) && pick[k] && (
+                <label className="pick-lab">
+                  <span>
+                    Your {formatCourseCode(k)} lab slot
+                    <small className="help">Lab times differ for everyone. Pick the slot you were allotted (it is on your first lab sheet or Moodle).</small>
+                  </span>
+                  <select
+                    value={lab[k] || ""}
+                    onChange={(e) => {
+                      setLab((l) => ({ ...l, [k]: e.target.value }));
+                      setSaved(null);
+                      setDirty(true);
+                    }}
+                    aria-label={`Lab slot for ${formatCourseCode(k)}`}
+                  >
+                    <option value="">Not sure yet</option>
+                    {LAB_OPTIONS.map((o) => (
+                      <option key={o.code} value={o.code}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
+          ))}
         </>
       ) : (
         <p className="note" style={{ marginTop: 0 }}>

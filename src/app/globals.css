@@ -2629,3 +2629,39 @@ button.chip.on:hover:not(:disabled) {
 @media (prefers-reduced-motion: reduce) {
   .skel { animation: none; }
 }
+
+/* ---------- Class-list rows (seating, groups): what the list is, then your line ---------- */
+.doc-context { display: block; font: 550 13px/1.4 var(--font-sans); color: var(--ink); margin-top: 4px; }
+.doc-cols { display: block; font-size: 11px; color: var(--ink-3); margin-top: 6px; }
+
+/* Personal lab slot under a course (CS 101) */
+.pick-lab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -2px 0 10px 28px;
+  padding: 10px 12px;
+  border: 1px dashed var(--rule-strong);
+  border-radius: var(--radius-sm, 8px);
+  font-size: 13px;
+}
+.pick-lab > span { display: grid; gap: 2px; min-width: 0; }
+.pick-lab select { flex: 0 0 auto; max-width: 48%; }
+@media (max-width: 560px) {
+  .pick-lab { flex-direction: column; align-items: stretch; margin-left: 0; }
+  .pick-lab select { max-width: none; }
+}
+
+/* ---------- Setup: what you get, club chips ---------- */
+.perks { list-style: none; padding: 0; margin: 14px 0 6px; display: grid; gap: 10px; }
+.perks li { display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start; padding: 12px; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--surface); }
+.perks .lucide { width: 18px; height: 18px; color: var(--accent); margin-top: 2px; justify-self: center; }
+.perks b { display: block; font: 600 14px/1.3 var(--font-sans); }
+.perks small { display: block; color: var(--ink-3); font-size: 12.5px; line-height: 1.45; margin-top: 2px; }
+.chips-title { font: 600 13px/1.3 var(--font-sans); color: var(--ink-2); margin: 20px 0 8px; }
+@media (max-width: 640px) {
+  .perks { gap: 6px; }
+  .perks li { padding: 9px 12px; grid-template-columns: 26px 1fr; align-items: center; }
+  .perks small { display: none; }
+}

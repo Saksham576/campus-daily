@@ -73,6 +73,19 @@ const rowTime = (row: number) => {
   return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
 };
 
+const DAY_NAMES = ["", "Mon", "Tue", "Wed", "Thu", "Fri"];
+
+/** The institute's lab slots as choices a student can read: "Tue 14:00–17:00 (L1)". */
+export function labSlotOptions(): { code: string; label: string }[] {
+  return Object.keys(LABS)
+    .map((code) => ({ code, t: slotTime(code)! }))
+    .sort((a, b) => a.t.day - b.t.day || a.t.start.localeCompare(b.t.start))
+    .map(({ code, t }) => ({ code, label: `${DAY_NAMES[t.day]} ${t.start}–${t.end}` }));
+}
+
+/** True for lab slot codes (L1…L9, LX). */
+export const isLabSlotCode = (code: string) => code.toUpperCase() in LABS;
+
 export type SlotTime = { day: number; start: string; end: string; isLab: boolean };
 
 export function slotTime(code: string): SlotTime | null {
@@ -145,7 +158,8 @@ export function buildWeek(courses: UserCourse[], now = new Date()): WeekSlot[] {
         const date = dates[s.day - 1];
         out.push({
           id: `course-${code}-${s.day}-${s.start}${suffix ? "-tut" : ""}`,
-          title: label + suffix,
+          // A lab block gets its own name so it isn't mistaken for the lecture.
+          title: s.isLab && !/lab/i.test(c.title || "") ? (c.title ? `${code}: ${c.title} Lab` : `${code} Lab`) : label + suffix,
           location: c.venue || null,
           start_time: new Date(`${date}T${s.start}:00+05:30`).toISOString(),
           end_time: new Date(`${date}T${s.end}:00+05:30`).toISOString(),
