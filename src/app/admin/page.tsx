@@ -26,6 +26,13 @@ export default async function AdminPage() {
     admin.from("bridge_status").select("data, updated_at").eq("id", "whatsapp").maybeSingle(),
     admin.from("moodle_connections").select("user_id", { count: "exact", head: true }),
   ]);
+  // Your own recent Ask conversations (only the owner's are kept in full).
+  const { data: askTurns } = await admin
+    .from("ask_log")
+    .select("asked_at, question, answer, ok")
+    .not("question", "is", null)
+    .order("asked_at", { ascending: false })
+    .limit(15);
   const wa = (bridge?.data || {}) as { groups?: string[]; seenToday?: number; forwardedToday?: number; caughtUp?: number; qr?: string | null };
   const waAgeMin = bridge?.updated_at ? Math.round((Date.now() - new Date(bridge.updated_at).getTime()) / 60000) : null;
   // The bridge is logged out and waiting: show its login QR (codes rotate every ~20 s; reload for a fresh one).
@@ -56,6 +63,8 @@ export default async function AdminPage() {
           <span className="n" style={{ whiteSpace: "normal" }}>
             {waAgeMin === null
               ? "Bridge has not reported yet"
+              : !wa.groups?.length
+              ? "Connected but watching 0 groups, so it is not reading anything. Restart it: docker compose restart"
               : `${wa.groups?.length || 0} groups · ${wa.seenToday || 0} messages read today · ${wa.forwardedToday || 0} sent · ${wa.caughtUp || 0} caught up after sleep`}
           </span>
           <span className={`status ${waAgeMin !== null && waAgeMin < 25 ? "go" : "stop"}`}>
@@ -81,6 +90,26 @@ export default async function AdminPage() {
               scan this. Codes change every ~20 seconds — reload this page if it doesn&apos;t scan.
             </span>
           </div>
+        )}
+      </section>
+      <section className="board" aria-label="Ask conversations">
+        <div className="board-head">
+          <div className="board-title">Your recent Ask chats <span>▸</span></div>
+        </div>
+        {(askTurns || []).length === 0 ? (
+          <p className="muted" style={{ padding: 14 }}>Nothing yet. Questions you ask from now on are kept here so wrong answers can be traced.</p>
+        ) : (
+          (askTurns || []).map((a, i) => (
+            <div key={i} className="board-row" style={{ gridTemplateColumns: "92px 1fr", alignItems: "start" }}>
+              <span className="c">{new Date(a.asked_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })}</span>
+              <span className="n" style={{ whiteSpace: "pre-wrap" }}>
+                <b>{a.question}</b>
+                {"\n"}
+                {a.ok === false ? "⚠ " : ""}
+                {a.answer}
+              </span>
+            </div>
+          ))
         )}
       </section>
       <AdminPanel requests={requests || []} cards={cards || []} />

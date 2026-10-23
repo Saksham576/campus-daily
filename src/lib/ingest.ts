@@ -297,7 +297,7 @@ export function personalizeScore(scored: ScoredNotice, sub: SubscriberTarget): n
  * WhatsApp-bridge posts are exempt (they come from chosen groups).
  */
 export function privateMailReason(email: Pick<InboundEmail, "from" | "subject">): string | null {
-  if (email.from.startsWith("WhatsApp:") || email.from.startsWith("Web:")) return null;
+  if (email.from.startsWith("WhatsApp:") || email.from.startsWith("Web:") || email.from.startsWith("Instagram:")) return null;
   if (/(supabase|signin@campusdaily|@campusdaily\.nexuspulsetech\.com|accounts\.google|no-?reply@google|noreply-cc@iitb)/i.test(email.from)) {
     return "auth sender";
   }

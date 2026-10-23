@@ -83,12 +83,18 @@ const client = new Client({
 let watched = new Map();
 
 async function refreshWatched() {
-  const chats = await client.getChats().catch((e) => (console.error("getChats failed:", e?.message || e), []));
+  // A failed or empty chat list must never wipe the groups we already watch (that silently stopped all reading).
+  const chats = await client.getChats().catch((e) => (console.error("getChats failed:", e?.message || e), null));
+  if (!chats) return;
   const next = new Map();
   for (const c of chats) {
     if (!c.isGroup) continue;
     const members = c.participants?.length || c.groupMetadata?.participants?.length || 0;
     if (shouldWatch({ name: c.name, members }, { minMembers: MIN_MEMBERS, include: GROUPS, exclude: EXCLUDE })) next.set(c.id._serialized, c.name);
+  }
+  if (next.size === 0 && watched.size > 0) {
+    console.error(`Chat list came back with no groups; keeping the ${watched.size} already watched.`);
+    return;
   }
   watched = next;
   console.log(`Watching ${watched.size} group(s) (${MIN_MEMBERS}+ members${GROUPS.length ? " + listed" : ""}, admins only: ${ADMINS_ONLY}).`);
