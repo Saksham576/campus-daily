@@ -2539,3 +2539,17 @@ button.chip.on:hover:not(:disabled) {
   justify-self: start;
   padding-left: 0;
 }
+
+/* ---------- Phone: less chrome above the notices ---------- */
+@media (max-width: 640px) {
+  .ask { padding: 10px; }
+  .ask-head { display: none; }
+  .ask-sugg { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-top: 8px; }
+  .ask-sugg::-webkit-scrollbar { display: none; }
+  .ask-sugg button { flex: 0 0 auto; white-space: nowrap; }
+  /* Hint that the section tabs scroll sideways. */
+  .platforms {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+  }
+}
