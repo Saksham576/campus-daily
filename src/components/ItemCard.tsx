@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Sheet } from "@/components/Sheet";
 import { toast } from "@/components/Toaster";
@@ -120,8 +120,11 @@ function friendlyWhen(iso: string): { text: string; hot: boolean } {
 export function ItemCard({
   item,
   onStatusChange,
+  hint,
 }: {
   item: FeedItem;
+  /** First card in the list: teach the swipe gesture once, on touch screens. */
+  hint?: boolean;
   onStatusChange?: (id: string, status: "kept" | "removed" | "new" | "done") => void;
 }) {
   const [showBody, setShowBody] = useState(false);
@@ -130,6 +133,45 @@ export function ItemCard({
   const [timetableAdded, setTimetableAdded] = useState(false);
   const [muted, setMuted] = useState(false);
   const [detail, setDetail] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [coach, setCoach] = useState(false);
+  const [demoDx, setDemoDx] = useState(0);
+  const stopCoach = () => {
+    setCoach(false);
+    setDemoDx(0);
+    try {
+      localStorage.setItem("cd_swipe_seen", "1");
+    } catch {}
+  };
+  // Once per device: when the first notice scrolls into view on a phone, nudge it right then left.
+  useEffect(() => {
+    if (!hint) return;
+    try {
+      if (localStorage.getItem("cd_swipe_seen") || !matchMedia("(pointer: coarse)").matches) return;
+    } catch {
+      return;
+    }
+    const el = wrapRef.current;
+    if (!el) return;
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (!e.isIntersecting) return;
+        io.disconnect();
+        setCoach(true);
+        if (!reduce) for (const [t, v] of [[500, 72], [1500, 0], [1900, -72], [2900, 0]]) timers.push(setTimeout(() => setDemoDx(v), t));
+        timers.push(setTimeout(stopCoach, 5600));
+      },
+      { threshold: 0.7 }
+    );
+    io.observe(el);
+    return () => {
+      io.disconnect();
+      timers.forEach(clearTimeout);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hint]);
   // Phone swipe: right = Done, left = Save.
   const [drag, setDrag] = useState<{ x0: number; y0: number; dx: number; live: boolean } | null>(null);
 
@@ -304,8 +346,11 @@ export function ItemCard({
   const SrcIcon = item.source === "whatsapp" ? MessageCircle : item.source === "moodle" ? GraduationCap : isInstagram ? Instagram : Mail;
   const srcClass = isInstagram ? "instagram" : item.source || "mail";
 
-  const dx = drag?.live ? drag.dx : 0;
-  const onTouchStart = (e: React.TouchEvent) => setDrag({ x0: e.touches[0].clientX, y0: e.touches[0].clientY, dx: 0, live: false });
+  const dx = drag?.live ? drag.dx : demoDx;
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (coach) stopCoach();
+    setDrag({ x0: e.touches[0].clientX, y0: e.touches[0].clientY, dx: 0, live: false });
+  };
   const onTouchMove = (e: React.TouchEvent) => {
     if (!drag) return;
     const mx = e.touches[0].clientX - drag.x0;
@@ -322,11 +367,11 @@ export function ItemCard({
   };
 
   return (
-    <div className="swipe-wrap" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={() => setDrag(null)}>
+    <div className="swipe-wrap" ref={wrapRef} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={() => setDrag(null)}>
       {dx > 0 && <span className="swipe-hint done" aria-hidden>Done</span>}
       {dx < 0 && <span className="swipe-hint save" aria-hidden>Save</span>}
     <article
-      className={`notice sec-${sec} ${status === "kept" ? "kept" : ""}`}
+      className={`notice sec-${sec} ${status === "kept" ? "kept" : ""} ${coach ? "demo" : ""}`}
       style={dx ? { transform: `translateX(${dx}px)` } : undefined}
     >
       <div className="meta">
@@ -469,6 +514,13 @@ export function ItemCard({
         </details>
       </div>
     </article>
+    {coach && (
+      <div className="coach" role="note">
+        <span>Swipe right: Done</span>
+        <span aria-hidden>·</span>
+        <span>Swipe left: Save</span>
+      </div>
+    )}
     {detail && (
       <Sheet title={cleanSubject(item.subject)} onClose={() => setDetail(false)}>
         <p className="eyebrow">
