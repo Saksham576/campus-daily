@@ -13,7 +13,7 @@ import { HomeHead } from "@/components/HomeHead";
 import { SetupNudges, type Nudge } from "@/components/SetupNudge";
 import { isLabSlotCode } from "@/lib/timetable/slots";
 import { buildSections, packSections } from "@/lib/sections";
-import { parseKeywords, relevanceOf, type FeedMode } from "@/lib/relevance";
+import { profileFromSubscriber, relevanceOf } from "@/lib/relevance";
 import { coursesForDivision } from "@/lib/timetable/catalog";
 import { groupByEvent } from "@/lib/linking";
 import { buildWeek, formatCourseCode, type UserCourse } from "@/lib/timetable/slots";
@@ -202,14 +202,7 @@ export default async function HomePage() {
   const sections = buildSections(items, myCourses, now);
   addMoodleDeadlines(sections as any, dueRes.data || []);
   // What you told us you follow decides what leads Home; the rest waits in Explore.
-  const follows = {
-    categories: Array.isArray(profile?.categories) ? (profile.categories as string[]) : [],
-    keywords: parseKeywords(profile?.keywords),
-    hostel: profile?.hostel,
-    department: profile?.department,
-    year: profile?.year ? String(profile.year) : null,
-    mode: ((profile?.feed_mode as FeedMode) || "balanced") as FeedMode,
-  };
+  const follows = profileFromSubscriber(profile || {});
   for (const list of Object.values(sections) as any[][])
     for (const it of list) {
       const r = relevanceOf(it, follows);

@@ -121,6 +121,10 @@ export function extractTimeFromText(text: string): {
   return null;
 }
 
+/** "26–30 October", "Oct 26-30", "week of 26 October": a span of days, not one day. */
+export const DATE_RANGE_RE =
+  /\b\d{1,2}(?:st|nd|rd|th)?\s*(?:–|—|-|to)\s*\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?\s*(?:–|—|-|to)\s*\d{1,2}(?:st|nd|rd|th)?\b|\bweek of\b|\bduring the week\b/i;
+
 // Moodle/Bodhitree forum mails carry "by Name - Wednesday, 14 October 2026, 5:15 PM": the posting
 // time, not the event time. It must never be read as the event date.
 export const POSTED_LINE_RE =

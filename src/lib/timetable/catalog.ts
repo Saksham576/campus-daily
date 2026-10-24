@@ -37,8 +37,32 @@ const HAND_CATALOG: Record<string, CatalogCourse> = {
   PH117: { title: "Physics Lab", credits: 3, divisions: [{ d: "P13", l: ["L1"], t: [], v: "" }, { d: "P14", l: ["L2"], t: [], v: "" }, { d: "P15", l: ["L3"], t: [], v: "" }, { d: "P16", l: ["L4"], t: [], v: "" }, { d: "P19", l: ["1A", "2A", "3A"], t: [], v: "" }, { d: "P20", l: ["1B", "2B", "3B"], t: [], v: "" }, { d: "P21", l: ["1C", "2C", "3C"], t: [], v: "" }, { d: "P22", l: ["6B", "7B"], t: [], v: "" }] },
 };
 
-/** Every autumn-2026 course from ResoBin (all departments and years); hand entries fill gaps. */
-export const COURSE_CATALOG: Record<string, CatalogCourse> = { ...HAND_CATALOG, ...RESOBIN_AUTUMN_2026 };
+/**
+ * Official Academic Office timetable, Autumn 2026-27 (acad.iitb.ac.in/sites/default/files/Autumn_TTC_26-27_09.07.2026.pdf, pages 3-5).
+ * ResoBin lists a tutorial room where the lecture hall belongs for these courses, so this wins over it.
+ * Tutorial rooms depend on the tutorial batch and are not set here.
+ */
+const OFFICIAL_FIRST_YEAR: Record<string, Record<string, { v: string; t?: string[] }>> = {
+  CH111: { D1: { v: "LA 201" }, D2: { v: "LA 202" }, D3: { v: "LA 201", t: ["X2"] }, D4: { v: "LA 202" } },
+  MA105: { D1: { v: "LA 202" }, D2: { v: "LA 201" }, D3: { v: "LA 202" }, D4: { v: "LA 201" } },
+  BB101: { D1: { v: "LH 302" }, D2: { v: "LH 302" } },
+  CS101: { D3: { v: "LA 201" }, D4: { v: "LA 202" } },
+  ENT101: { Core: { v: "LH 301" } },
+};
+
+/** Every autumn-2026 course from ResoBin (all departments and years); hand entries fill gaps; official rooms win. */
+export const COURSE_CATALOG: Record<string, CatalogCourse> = (() => {
+  const all: Record<string, CatalogCourse> = { ...HAND_CATALOG, ...RESOBIN_AUTUMN_2026 };
+  for (const [code, divs] of Object.entries(OFFICIAL_FIRST_YEAR)) {
+    const c = all[code];
+    if (!c) continue;
+    all[code] = {
+      ...c,
+      divisions: c.divisions.map((d) => (divs[d.d] ? { ...d, v: divs[d.d].v, t: divs[d.d].t && !d.t.length ? divs[d.d].t! : d.t } : d)),
+    };
+  }
+  return all;
+})();
 
 export function catalogKey(code: string): string {
   return code.toUpperCase().replace(/\s+/g, "");
