@@ -34,7 +34,7 @@ export default async function AdminPage() {
     .not("question", "is", null)
     .order("asked_at", { ascending: false })
     .limit(15);
-  const wa = (bridge?.data || {}) as { groups?: string[]; seenToday?: number; forwardedToday?: number; caughtUp?: number; qr?: string | null };
+  const wa = (bridge?.data || {}) as { groups?: string[]; seenToday?: number; forwardedToday?: number; caughtUp?: number; qr?: string | null; code?: string | null };
   const waAgeMin = bridge?.updated_at ? Math.round((Date.now() - new Date(bridge.updated_at).getTime()) / 60000) : null;
   // The bridge is logged out and waiting: show its login QR (codes rotate every ~20 s; reload for a fresh one).
   const waQr = wa.qr && waAgeMin !== null && waAgeMin < 2 ? await QRCode.toString(wa.qr, { type: "svg", margin: 1, width: 240 }) : null;
@@ -85,7 +85,16 @@ export default async function AdminPage() {
           <span className="status go">On</span>
         </div>
         {wa.groups && wa.groups.length > 0 && <div className="board-empty">Groups: {wa.groups.join(" · ")}</div>}
-        {waQr && (
+        {wa.code && waAgeMin !== null && waAgeMin < 2 && (
+          <div className="note">
+            <AutoRefresh seconds={8} />
+            <b style={{ fontSize: 28, letterSpacing: 4 }}>{wa.code}</b>
+            <p>
+              On the phone: WhatsApp → Settings → Linked devices → Link a device → <b>Link with phone number instead</b>, then type this code.
+            </p>
+          </div>
+        )}
+        {waQr && !wa.code && (
           <div className="note" style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
             <AutoRefresh seconds={8} />
             <div style={{ background: "#fff", padding: 8, borderRadius: 8, lineHeight: 0 }} dangerouslySetInnerHTML={{ __html: waQr }} />

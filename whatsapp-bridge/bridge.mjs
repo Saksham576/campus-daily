@@ -34,6 +34,7 @@ const ADMINS_ONLY = (process.env.ADMINS_ONLY || "true").toLowerCase() !== "false
 const DATA_DIR = process.env.DATA_DIR || ".";
 const STATE_FILE = `${DATA_DIR}/state.json`;
 const FIRST_RUN_LOOKBACK_S = 12 * 3600;
+const PAIR_PHONE = (process.env.PAIR_PHONE || "").replace(/\D/g, "");
 
 if (!SECRET) {
   console.error("Set INGEST_SECRET_KEY in whatsapp-bridge/.env first.");
@@ -74,6 +75,8 @@ const executablePath = BROWSER_CANDIDATES.find((p) => existsSync(p));
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: `${DATA_DIR}/.wwebjs_auth` }),
   // After a restart WhatsApp may think the old session is still open elsewhere; take over quietly.
+  // PAIR_PHONE (digits with country code, e.g. 919876543210) links with an 8-character code instead of a QR.
+  ...(PAIR_PHONE ? { pairWithPhoneNumber: { phoneNumber: PAIR_PHONE, showNotification: true } } : {}),
   takeoverOnConflict: true,
   takeoverTimeoutMs: 0,
   puppeteer: { headless: true, executablePath, timeout: 120000, args: ["--no-first-run", "--disable-extensions", ...(LINUX ? ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--disable-software-rasterizer", "--disable-background-networking", "--disable-features=Translate,site-per-process", "--mute-audio", "--js-flags=--max-old-space-size=384"] : [])] },
@@ -227,6 +230,7 @@ async function catchUp(reason) {
 
 /** Latest login QR (only while not logged in), shown on Campus Daily's /admin page for remote scanning. */
 let pendingQr = null;
+let pendingCode = null;
 
 async function heartbeat() {
   rollDay();
@@ -234,7 +238,7 @@ async function heartbeat() {
     await fetch(HEARTBEAT_URL, {
       method: "POST",
       headers: { "content-type": "application/json", "x-ingest-secret": SECRET },
-      body: JSON.stringify({ ...stats, groups: [...watched.values()], qr: pendingQr }),
+      body: JSON.stringify({ ...stats, groups: [...watched.values()], qr: pendingQr, code: pendingCode }),
     });
   } catch {}
   console.log(`${new Date().toLocaleTimeString()} · ${watched.size} groups · ${stats.seenToday} messages read today · ${stats.forwardedToday} sent to Campus Daily · skipped: ${stats.skippedShort} short/chit-chat, ${stats.skippedNotAdmin} not from admins`);
@@ -249,8 +253,14 @@ client.on("qr", (qr) => {
 });
 
 client.on("loading_screen", (pct, msg) => console.log(`Loading WhatsApp ${pct}% ${msg || ""}`));
+client.on("code", (code) => {
+  console.log(`\nPairing code: ${code}  (WhatsApp > Linked devices > Link a device > Link with phone number instead)\n`);
+  pendingCode = code;
+  heartbeat();
+});
 client.on("authenticated", () => {
   pendingQr = null;
+  pendingCode = null;
   console.log("Logged in to WhatsApp.");
 });
 client.on("auth_failure", (m) => console.error("WhatsApp login failed — delete .wwebjs_auth and scan the QR again:", m));
