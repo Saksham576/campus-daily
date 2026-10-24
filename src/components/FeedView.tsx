@@ -98,7 +98,7 @@ export function FeedView({
   const card = (it: FeedItem, i: number, withSponsor: boolean) => (
     <div key={it.id || it.item_id}>
       {withSponsor && i === 2 && sponsored && <SponsoredCard card={sponsored} />}
-      <ItemCard item={it} />
+      <ItemCard item={it} hint={i === 0} />
     </div>
   );
 
@@ -218,8 +218,6 @@ export function FeedView({
 
       <AskBox request={request} />
 
-      {needle.length >= 3 && <DocHits q={q} />}
-
       {!needle && (
         <nav className="platforms" aria-label="Views" role="tablist">
           <button type="button" role="tab" aria-selected={view === "foryou"} className={`platform ${view === "foryou" ? "active" : ""} ${dueSoon ? "urgent" : ""}`} onClick={() => pick("foryou")}>
@@ -234,6 +232,8 @@ export function FeedView({
       )}
 
       {body}
+
+      {needle.length >= 3 && <DocHits q={q} max={3} />}
     </>
   );
 }

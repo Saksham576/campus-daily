@@ -19,8 +19,9 @@ function Snippet({ text }: { text: string }) {
 }
 
 /** Matches inside course documents for the Library search box. */
-export function DocHits({ q }: { q: string }) {
+export function DocHits({ q, max }: { q: string; max?: number }) {
   const [hits, setHits] = useState<Hit[] | null>(null);
+  const [all, setAll] = useState(false);
   useEffect(() => {
     const query = q.trim();
     if (query.length < 3) return setHits(null);
@@ -32,11 +33,12 @@ export function DocHits({ q }: { q: string }) {
   }, [q]);
 
   if (!hits || hits.length === 0) return null;
+  const shown = max && !all ? hits.slice(0, max) : hits;
   return (
     <section className="lib-group">
       <h2 className="lib-title">Inside files</h2>
       <ul className="lib-list">
-        {hits.map((h, i) => (
+        {shown.map((h, i) => (
           <li key={`${h.doc_id}-${h.page}-${i}`}>
             <a href={h.view_url || "#"} target="_blank" rel="noopener noreferrer" className="doc-hit">
               <span className="doc-hit-head">
@@ -52,6 +54,11 @@ export function DocHits({ q }: { q: string }) {
           </li>
         ))}
       </ul>
+      {max && hits.length > max && (
+        <button type="button" className="link" onClick={() => setAll(!all)}>
+          {all ? "Show fewer" : `Show all ${hits.length} matches in files`}
+        </button>
+      )}
     </section>
   );
 }

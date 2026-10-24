@@ -2,6 +2,7 @@
 
 import { AppBar } from "@/components/AppBar";
 import { Panel, SettingsRail, ThemePicker } from "@/components/SettingsLayout";
+import { CoursePicker } from "@/components/CoursePicker";
 import { CATEGORIES } from "@/lib/constants";
 
 /** Dev-only: the Settings layout with sample values. */
@@ -37,18 +38,7 @@ export default function PreviewSettings() {
               </div>
             </Panel>
             <Panel id="courses" title="My courses" sub="Your timetable is built from these.">
-              <div className="list-row">
-                <span>
-                  <b>MA 105</b> Calculus · D3
-                </span>
-                <button type="button" className="ghost">Remove</button>
-              </div>
-              <div className="list-row">
-                <span>
-                  <b>CH 111</b> Chemistry · D3
-                </span>
-                <button type="button" className="ghost">Remove</button>
-              </div>
+              <CoursePicker division="D3" department="MEMS" year="1" />
             </Panel>
             <Panel id="moodle" title="Moodle" sub="Announcements, slides and seating plans from your courses.">
               <div className="list-row">

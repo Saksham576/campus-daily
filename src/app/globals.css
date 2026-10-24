@@ -3202,3 +3202,62 @@ kbd {
   justify-content: flex-start;
   width: 100%;
 }
+
+/* Settings panels must shrink to the screen; long course names truncate instead of widening the page. */
+.panels {
+  grid-template-columns: minmax(0, 1fr);
+}
+.panel,
+.panel-body,
+.picker,
+.pick-row,
+.pick-main {
+  min-width: 0;
+}
+.pick-main {
+  flex: 1 1 auto;
+}
+.pick-lab select {
+  max-width: 100%;
+}
+@media (max-width: 560px) {
+  .pick-row {
+    flex-wrap: wrap;
+  }
+  .pick-row select {
+    width: 100%;
+  }
+}
+
+/* ---------- First-time swipe coach ---------- */
+.swipe-wrap > .notice.demo {
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.coach {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  z-index: 2;
+  display: flex;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--bg);
+  font: 500 12px/1 var(--font-sans);
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation: coach-in 0.3s ease-out;
+}
+@keyframes coach-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 6px));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .coach {
+    animation: none;
+  }
+}
