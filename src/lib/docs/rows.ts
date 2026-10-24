@@ -72,7 +72,10 @@ function summarizeRowText(r: RowInput): RowSummary | null {
   }
   if (/tutorial|section/.test(columns)) {
     const m = r.line.match(/\b(D\d)\s*\/?\s*(T\d+)\b/);
-    if (m) return { headline: `${course || "Your"} class list: division ${m[1]}, tutorial batch ${m[2]}`, details: [] };
+    if (m) {
+      const classroom = r.line.match(/\b((?:LT|LH|LA|LC|CC|SIC|MB)[- ]?\d{1,3})\b/i)?.[1]?.toUpperCase().replace(/^([A-Z]+)-?(\d)/, "$1 $2");
+      return { headline: `${course || "Your"} class list: division ${m[1]}, tutorial batch ${m[2]}`, details: classroom ? [`Tutorial classroom ${classroom}`] : [] };
+    }
   }
   if (/batch|group/.test(columns)) {
     const m = r.line.match(/\b(P\d+)\b(?:\s+(\w+))?\s*$/);
