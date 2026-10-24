@@ -180,7 +180,7 @@ export default function ScheduleClient({ initialSchedules, moodleOn }: { initial
       <main className="wrap">
         <div className="page-head">
           <div>
-            <p className="eyebrow">{SEMESTER.name} · updates itself from notices</p>
+            <p className="eyebrow">{SEMESTER.name}</p>
             <h1>Timetable</h1>
           </div>
           <div className="nav-links">
