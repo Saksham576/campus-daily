@@ -301,6 +301,8 @@ setInterval(() => {
 
 setInterval(() => watched.size && catchUp("periodic"), 20 * 60_000);
 setInterval(heartbeat, 10 * 60_000);
+// While waiting for a login, report every 20 s so /admin always shows the current QR / pairing code.
+setInterval(() => (pendingQr || pendingCode) && heartbeat(), 20_000);
 // Pick up newly joined groups quickly: on join, and every 10 minutes.
 setInterval(refreshWatched, 10 * 60_000);
 client.on("group_join", () => setTimeout(refreshWatched, 5000));
