@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 
 export type BoardRow = {
   id: string;
@@ -31,6 +32,8 @@ function statusOf(r: BoardRow, now: number): { text: string; cls: string; phase:
 /** Today's classes as a quiet timeline; the current one is highlighted. */
 export function DayBoard({ title, rows, emptyText, note }: { title: string; rows: BoardRow[]; emptyText: string; note?: string | null }) {
   const [now, setNow] = useState(() => Date.now());
+  // On phones the card starts as one line (the class that is on or next); "Full day" opens the rest.
+  const [open, setOpen] = useState(false);
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(t);
@@ -50,7 +53,7 @@ export function DayBoard({ title, rows, emptyText, note }: { title: string; rows
       : null;
 
   return (
-    <section className="today" aria-label={title}>
+    <section className={`today ${open ? "open" : ""}`} aria-label={title}>
       <div className="today-head">
         <span className="today-title">{title}</span>
         {next && nextText && (
@@ -66,7 +69,7 @@ export function DayBoard({ title, rows, emptyText, note }: { title: string; rows
           {rows.map((r) => {
             const st = statusOf(r, now);
             return (
-              <li key={r.id} className={`today-row ${st.phase} ${r.cancelled ? "cancelled" : ""}`}>
+              <li key={r.id} className={`today-row ${st.phase} ${r.cancelled ? "cancelled" : ""} ${next && r.id === next.id ? "focus" : ""}`}>
                 <span className="t">{hhmm(r.start)}</span>
                 <span className="bar" aria-hidden />
                 <span className="what">
@@ -81,6 +84,12 @@ export function DayBoard({ title, rows, emptyText, note }: { title: string; rows
             );
           })}
         </ul>
+      )}
+      {rows.length > 1 && (
+        <button type="button" className="today-toggle" onClick={() => setOpen(!open)} aria-expanded={open}>
+          {open ? "Hide full day" : `Full day (${rows.length})`}
+          <ChevronDown aria-hidden />
+        </button>
       )}
       {note && rows.length > 0 && <p className="today-note">{note}</p>}
     </section>

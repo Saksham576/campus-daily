@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Sheet } from "@/components/Sheet";
 import { ChevronLeft, ChevronRight, Clock, MapPin, MoreHorizontal, RotateCcw, XCircle } from "lucide-react";
 import { SEMESTER, WEEKS_AHEAD, WEEKS_BACK, addDays, weekInfo } from "@/lib/timetable/range";
 import { istDate } from "@/lib/timetable/updates";
@@ -25,6 +26,33 @@ const hueOf = (title: string) => {
   return HUES[h % HUES.length];
 };
 const HOUR_PX = 56;
+
+/** Side-by-side lanes for classes that overlap (a lecture and a lab at the same time). */
+function lanes<T extends { id: string; start_time: string; end_time?: string | null }>(list: T[]) {
+  const out = new Map<string, { lane: number; of: number }>();
+  const sorted = [...list].sort((a, b) => minutesOf(a.start_time) - minutesOf(b.start_time));
+  let group: T[] = [];
+  let groupEnd = -1;
+  const flush = () => {
+    const ends: number[] = [];
+    const place = new Map<string, number>();
+    for (const g of group) {
+      let l = ends.findIndex((e) => e <= minutesOf(g.start_time));
+      if (l < 0) l = ends.length;
+      ends[l] = minutesOf(g.end_time || g.start_time);
+      place.set(g.id, l);
+    }
+    for (const g of group) out.set(g.id, { lane: place.get(g.id)!, of: ends.length });
+    group = [];
+  };
+  for (const x of sorted) {
+    if (group.length && minutesOf(x.start_time) >= groupEnd) flush();
+    group.push(x);
+    groupEnd = Math.max(groupEnd, minutesOf(x.end_time || x.start_time));
+  }
+  flush();
+  return out;
+}
 
 const ist = (iso: string) => new Date(new Date(iso).getTime() + 5.5 * 3600_000);
 const minutesOf = (iso: string) => {
@@ -52,6 +80,20 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
     return left || !slots.some((s) => istDate(s.start_time) > w.sunday) ? 0 : 1;
   });
   const info = useMemo(() => weekInfo(offset), [offset]);
+  const [open, setOpen] = useState<Slot | null>(null);
+  const [nowMin, setNowMin] = useState<number | null>(null);
+  const [noteGone, setNoteGone] = useState(true);
+  useEffect(() => {
+    const tick = () => setNowMin(minutesOf(new Date().toISOString()));
+    tick();
+    const t = setInterval(tick, 60_000);
+    try {
+      setNoteGone(Boolean(localStorage.getItem("cd_tt_note")));
+    } catch {
+      setNoteGone(false);
+    }
+    return () => clearInterval(t);
+  }, []);
   const todayKey = ist(new Date().toISOString()).toISOString().slice(0, 10);
   const dates = useMemo(() => DAYS.map((_, i) => new Date(Date.parse(addDays(info.monday, i) + "T00:00:00Z"))), [info.monday]);
   const inWeek = useMemo(() => slots.filter((s) => istDate(s.start_time) >= info.monday && istDate(s.start_time) <= info.sunday), [slots, info]);
@@ -80,6 +122,18 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
   const hours = Array.from({ length: endH - startH }, (_, i) => startH + i);
 
   const daySlots = weekday.filter((s) => dayIndex(s.start_time) === day);
+  const laneOf = useMemo(() => {
+    const m = new Map<string, { lane: number; of: number }>();
+    for (let i = 0; i < 7; i++) lanes(weekday.filter((s) => dayIndex(s.start_time) === i)).forEach((v, k) => m.set(k, v));
+    return m;
+  }, [weekday]);
+  // Swipe the day list left / right to change day.
+  const [touchX, setTouchX] = useState<number | null>(null);
+  const swipe = (x: number) => {
+    if (touchX === null || Math.abs(x - touchX) < 60) return;
+    setPickedDay(Math.max(0, Math.min(ncols - 1, day + (x < touchX ? 1 : -1))));
+    setTouchX(null);
+  };
 
   const nav = (
     <div className="week-nav">
@@ -104,9 +158,21 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
   return (
     <>
       {nav}
-      {info.tentative && !info.afterLectures && (
-        <p className="note" style={{ marginTop: 0 }}>
-          Tentative. This follows the official slot chart; cancellations, holidays, quizzes and room changes are added here as notices arrive.
+      {info.tentative && !info.afterLectures && !noteGone && (
+        <p className="note tt-note" style={{ marginTop: 0 }}>
+          <span>From the official slot chart; notices add changes as they arrive.</span>
+          <button
+            type="button"
+            className="link"
+            onClick={() => {
+              setNoteGone(true);
+              try {
+                localStorage.setItem("cd_tt_note", "1");
+              } catch {}
+            }}
+          >
+            Got it
+          </button>
         </p>
       )}
       {info.afterLectures && (
@@ -144,16 +210,31 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
               {hours.map((h) => (
                 <span key={h} className="week-line" style={{ top: (h - startH) * HOUR_PX }} />
               ))}
+              {nowMin !== null && dates[i].toISOString().slice(0, 10) === todayKey && nowMin >= startH * 60 && nowMin <= endH * 60 && (
+                <span className="week-now" aria-hidden style={{ top: ((nowMin - startH * 60) / 60) * HOUR_PX }} />
+              )}
               {weekday
                 .filter((s) => dayIndex(s.start_time) === i)
                 .map((s) => {
                   const top = ((minutesOf(s.start_time) - startH * 60) / 60) * HOUR_PX;
                   const height = Math.max(26, ((minutesOf(s.end_time || s.start_time) - minutesOf(s.start_time)) / 60) * HOUR_PX - 3);
+                  const ln = laneOf.get(s.id) || { lane: 0, of: 1 };
                   return (
                     <div
                       key={s.id}
                       className={`week-block t-${s.slot_type} ${s.is_cancelled ? "cancelled" : ""}`}
-                      style={{ top, height, ["--c" as string]: hueOf(s.title) }}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setOpen(s)}
+                      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setOpen(s))}
+                      style={{
+                        top,
+                        height,
+                        left: `calc(${ln.lane} * 100% / ${ln.of} + 3px)`,
+                        width: `calc(100% / ${ln.of} - 6px)`,
+                        right: "auto",
+                        ["--c" as string]: hueOf(s.title),
+                      }}
                       title={`${s.title}\n${hhmm(s.start_time)}${s.end_time ? `–${hhmm(s.end_time)}` : ""}${s.location ? ` · ${s.location}` : ""}`}
                     >
                       <b>{codeOf(s.title)}</b>
@@ -166,7 +247,10 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
                       <button
                         type="button"
                         className="week-act"
-                        onClick={() => onToggle(s.id, s.is_cancelled)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggle(s.id, s.is_cancelled);
+                        }}
                         aria-label={s.is_cancelled ? `Undo cancelled: ${s.title}` : `Mark ${s.title} as cancelled (only for me)`}
                         title={s.is_cancelled ? "Undo" : "Mark as cancelled (only for me)"}
                       >
@@ -181,11 +265,11 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
       </div>
 
       {/* Day list (phones) */}
-      <div className="dayview">
+      <div className="dayview" onTouchStart={(e) => setTouchX(e.touches[0].clientX)} onTouchEnd={(e) => swipe(e.changedTouches[0].clientX)}>
         <div className="schedule-tabs" role="tablist">
           {DAYS.slice(0, ncols).map((d, i) => (
             <button key={d} role="tab" aria-selected={day === i} className={`schedule-tab ${day === i ? "active" : ""}`} onClick={() => setPickedDay(i)}>
-              {d} <span className="muted">{dates[i].getUTCDate()}</span>
+              <span>{d}</span> <b>{dates[i].getUTCDate()}</b>
             </button>
           ))}
         </div>
@@ -195,7 +279,7 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
           <div className="timetable-grid">
             {daySlots.map((s) => (
               <div key={s.id} className={`slot-card ${s.slot_type} ${s.is_cancelled ? "cancelled" : ""}`} style={{ ["--c" as string]: hueOf(s.title) }}>
-                <div className="slot-info">
+                <div className="slot-info" role="button" tabIndex={0} onClick={() => setOpen(s)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setOpen(s))}>
                   <h4>
                     {codeOf(s.title)}
                     {nameOf(s.title) && <span className="muted"> {nameOf(s.title)}</span>}
@@ -237,6 +321,40 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
           </div>
         )}
       </div>
+      {open && (
+        <Sheet title={open.title} onClose={() => setOpen(null)}>
+          <p className="eyebrow">
+            {new Date(open.start_time).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Kolkata" })}
+          </p>
+          <h2 className="sheet-title">
+            {codeOf(open.title)}
+            {nameOf(open.title) && <span className="muted"> {nameOf(open.title)}</span>}
+          </h2>
+          <dl className="sheet-facts">
+            <dt>Time</dt>
+            <dd>
+              {hhmm(open.start_time)}
+              {open.end_time ? `–${hhmm(open.end_time)}` : ""}
+            </dd>
+            <dt>Room</dt>
+            <dd>{open.location || "Not announced yet"}</dd>
+            <dt>Type</dt>
+            <dd>{open.is_cancelled ? "Cancelled (only for you)" : open.slot_type}</dd>
+          </dl>
+          <div className="sheet-actions">
+            <button
+              type="button"
+              className={open.is_cancelled ? "ghost" : ""}
+              onClick={() => {
+                onToggle(open.id, open.is_cancelled);
+                setOpen(null);
+              }}
+            >
+              {open.is_cancelled ? "Undo cancelled" : "Mark as cancelled (only for me)"}
+            </button>
+          </div>
+        </Sheet>
+      )}
     </>
   );
 }
