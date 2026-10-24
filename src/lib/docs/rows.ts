@@ -52,7 +52,7 @@ export function summarizeRow(r: RowInput): RowSummary | null {
 function summarizeRowText(r: RowInput): RowSummary | null {
   const ctx = (r.context || "").split(" · ").map((x) => x.trim()).filter(Boolean);
   const columns = (r.columns || "").toLowerCase();
-  const course = (r.context || "").match(/\b([A-Z]{2,3})\s?(\d{3}[A-Z]?)\b/)?.[0]?.replace(/^([A-Z]+)(\d)/, "$1 $2") || (r.docName || "").match(/\b([A-Z]{2,3})\s?(\d{3}[A-Z]?)\b/)?.[0] || null;
+  const course = (r.context || "").match(/\b([A-Z]{2,3})\s?(\d{3}[A-Z]?)\b/)?.[0]?.replace(/^([A-Z]+)(\d)/, "$1 $2") || (r.docName || "").match(/\b([A-Z]{2,3})\s?(\d{3}[A-Z]?)(?![A-Za-z0-9])/)?.[0]?.replace(/^([A-Z]+)(\d)/, "$1 $2") || null;
   const when = whenFrom(r.context || "");
   const division = (r.context || "").match(/\bdivision\s*[:–-]\s*([A-Z]?\d+[A-Z]?)\b/i)?.[1]?.toUpperCase() || null;
   // What it is: the first title-like line ("Quiz 2", "Mid Sem", "End semester exam time table").
