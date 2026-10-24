@@ -63,7 +63,11 @@ export function LibraryView({ files }: { files: LibFile[] }) {
   }, [shown, course, q]);
 
   if (files.length === 0) {
-    return <div className="empty">No course files yet. They appear here once Moodle is connected (Settings → Moodle) and the next sync runs.</div>;
+    return (
+      <div className="empty">
+        This is where your course files (slides, tutorial sheets, seating plans) and your own seat and batch lines will show up. It needs Moodle connected, which takes a laptop with Chrome: Settings → Courses → Connect Moodle. Until then, notices and your timetable work as usual.
+      </div>
+    );
   }
 
   const choose = (k: string) => {
