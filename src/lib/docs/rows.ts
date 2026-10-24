@@ -4,7 +4,7 @@
  * (course, what it is, date and time, room, seat) and drops the table plumbing.
  */
 export type RowInput = { line: string; context?: string | null; columns?: string | null; docName?: string | null };
-export type RowSummary = { headline: string; details: string[] };
+export type RowSummary = { headline: string; details: string[]; /** yyyy-mm-dd of the event the row is about, if it has one */ date?: string | null };
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -36,11 +36,25 @@ const titleCase = (s: string) => s.toLowerCase().replace(/\b\w/g, (c) => c.toUpp
 /** "LH 301 – MIDDLE ROW" -> "LH 301, middle row". */
 const place = (s: string) => s.replace(/\s*[-–—]\s*/g, ", ").replace(/,\s*([A-Z ]+)$/, (_m, r: string) => ", " + r.toLowerCase());
 
+/** First dd-mm-yyyy in the text as yyyy-mm-dd ("Date – 23-10-2026" -> "2026-10-23"). */
+export function dateFrom(text: string): string | null {
+  const d = text.match(/(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+  if (!d) return null;
+  const date = new Date(Date.UTC(+d[3], +d[2] - 1, +d[1]));
+  return date.getUTCMonth() === +d[2] - 1 ? date.toISOString().slice(0, 10) : null;
+}
+
 export function summarizeRow(r: RowInput): RowSummary | null {
+  const s = summarizeRowText(r);
+  return s ? { ...s, date: dateFrom(r.context || "") } : s;
+}
+
+function summarizeRowText(r: RowInput): RowSummary | null {
   const ctx = (r.context || "").split(" · ").map((x) => x.trim()).filter(Boolean);
   const columns = (r.columns || "").toLowerCase();
   const course = (r.context || "").match(/\b([A-Z]{2,3})\s?(\d{3}[A-Z]?)\b/)?.[0]?.replace(/^([A-Z]+)(\d)/, "$1 $2") || (r.docName || "").match(/\b([A-Z]{2,3})\s?(\d{3}[A-Z]?)\b/)?.[0] || null;
   const when = whenFrom(r.context || "");
+  const division = (r.context || "").match(/\bdivision\s*[:–-]\s*([A-Z]?\d+[A-Z]?)\b/i)?.[1]?.toUpperCase() || null;
   // What it is: the first title-like line ("Quiz 2", "Mid Sem", "End semester exam time table").
   const what = ctx.find((c) => /\b(quiz|mid\s?-?sem|end\s?-?sem|exam|test|lab|viva|tutorial|allotment|group)\b/i.test(c) && c.length <= 60 && !/institute|technology/i.test(c));
   const room = ctx.find((c) => /\b(?:LA|LC|LH|LT|CC|SIC|MB|KR|VMCC)[- ]?\d{1,3}\b|\b(?:row|hall|room)\b/i.test(c) && c.length <= 60);
@@ -66,8 +80,8 @@ export function summarizeRow(r: RowInput): RowSummary | null {
   }
   if (/event/.test(columns)) {
     const last = r.line.split(/\s+/).slice(-1)[0];
-    if (last && !/^\d/.test(last)) return { headline: `Allotted: ${last}`, details: [] };
+    if (last && !/^\d/.test(last)) return { headline: `Your allotment: ${last}`, details: [] };
   }
-  if (when) return { headline: [course, what ? titleCase(what) : null].filter(Boolean).join(" ") || "Your slot", details: [when, room ? place(room) : null].filter(Boolean) as string[] };
+  if (when) return { headline: [course, what ? titleCase(what) : null].filter(Boolean).join(" ") || "Your slot", details: [when, division ? `Division ${division}` : null, room ? place(room) : null].filter(Boolean) as string[] };
   return null;
 }

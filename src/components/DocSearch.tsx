@@ -56,13 +56,13 @@ export function DocHits({ q }: { q: string }) {
   );
 }
 
-/** Your own lines in class lists (mess dues, marks, seating) — nobody else's. */
+/** Your own lines in class lists (mess dues, marks, seating) — nobody else's. Upcoming first, finished ones tucked away. */
 export function MyRows() {
   const [rows, setRows] = useState<Row[]>([]);
   useEffect(() => {
     (async () => {
       const supabase = createClient();
-      const { data } = await supabase.from("personal_rows").select("doc_id, page, line, context, columns").limit(30);
+      const { data } = await supabase.from("personal_rows").select("doc_id, page, line, context, columns").limit(60);
       if (!data?.length) return;
       const { data: docs } = await supabase.from("documents").select("id, name").in("id", [...new Set(data.map((r) => r.doc_id))]);
       const nameOf = new Map((docs || []).map((d) => [d.id, d.name]));
@@ -70,51 +70,62 @@ export function MyRows() {
     })();
   }, []);
   if (!rows.length) return null;
+
+  const today = new Date(Date.now() + 5.5 * 3600_000).toISOString().slice(0, 10);
+  const items = rows.map((r) => ({ r, s: summarizeRow({ line: r.line, context: r.context, columns: r.columns, docName: r.name }) }));
+  const isPast = (it: (typeof items)[number]) => !!it.s?.date && it.s.date < today;
+  const byDate = (a: (typeof items)[number], b: (typeof items)[number]) => (a.s?.date || "9999").localeCompare(b.s?.date || "9999");
+  const upcoming = items.filter((it) => !isPast(it)).sort(byDate);
+  const earlier = items.filter(isPast).sort((a, b) => byDate(b, a));
+
+  const card = ({ r, s }: (typeof items)[number], i: number) => (
+    <li key={`${r.doc_id}-${r.page}-${i}`} className="doc-hit">
+      {s ? (
+        <>
+          <span className="doc-hit-head">
+            <UserRound aria-hidden />
+            <b>{s.headline}</b>
+          </span>
+          {s.details.map((d) => (
+            <span key={d} className="doc-context">
+              {d}
+            </span>
+          ))}
+          <span className="from" style={{ display: "block", marginTop: 4 }}>
+            From {r.name}
+            {r.page ? ", page " + r.page : ""}
+          </span>
+          <details className="doc-raw">
+            <summary>Show the original line</summary>
+            {r.columns && <span className="doc-cols mono">{r.columns}</span>}
+            <span className="doc-snippet mono">{r.line}</span>
+          </details>
+        </>
+      ) : (
+        <>
+          <span className="doc-hit-head">
+            <UserRound aria-hidden />
+            <b>{r.name}</b>
+            {r.page ? <span className="from">page {r.page}</span> : null}
+          </span>
+          {r.context && <span className="doc-context">{r.context}</span>}
+          {r.columns && <span className="doc-cols mono">{r.columns}</span>}
+          <span className="doc-snippet mono">{r.line}</span>
+        </>
+      )}
+    </li>
+  );
+
   return (
     <section className="lib-group">
       <h2 className="lib-title">Your entries in class lists</h2>
-      <ul className="lib-list">
-        {rows.map((r, i) => {
-          const s = summarizeRow({ line: r.line, context: r.context, columns: r.columns, docName: r.name });
-          return (
-            <li key={`${r.doc_id}-${i}`} className="doc-hit">
-              {s ? (
-                <>
-                  <span className="doc-hit-head">
-                    <UserRound aria-hidden />
-                    <b>{s.headline}</b>
-                  </span>
-                  {s.details.map((d) => (
-                    <span key={d} className="doc-context">
-                      {d}
-                    </span>
-                  ))}
-                  <span className="from" style={{ display: "block", marginTop: 4 }}>
-                    From {r.name}
-                    {r.page ? ", page " + r.page : ""}
-                  </span>
-                  <details className="doc-raw">
-                    <summary>Show the original line</summary>
-                    {r.columns && <span className="doc-cols mono">{r.columns}</span>}
-                    <span className="doc-snippet mono">{r.line}</span>
-                  </details>
-                </>
-              ) : (
-                <>
-                  <span className="doc-hit-head">
-                    <UserRound aria-hidden />
-                    <b>{r.name}</b>
-                    {r.page ? <span className="from">page {r.page}</span> : null}
-                  </span>
-                  {r.context && <span className="doc-context">{r.context}</span>}
-                  {r.columns && <span className="doc-cols mono">{r.columns}</span>}
-                  <span className="doc-snippet mono">{r.line}</span>
-                </>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      <ul className="lib-list">{upcoming.map(card)}</ul>
+      {earlier.length > 0 && (
+        <details className="doc-raw" style={{ marginTop: 8 }}>
+          <summary>Earlier ({earlier.length}): exams and quizzes that are over</summary>
+          <ul className="lib-list">{earlier.map(card)}</ul>
+        </details>
+      )}
       <p className="help" style={{ marginTop: 6 }}>Only your own row is kept from shared lists — never anyone else&apos;s.</p>
     </section>
   );

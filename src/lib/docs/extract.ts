@@ -142,19 +142,31 @@ export function rosterRows(pages: Page[]): RosterRow[] | null {
   const looksLikeRow = (t: string) => /^\d+\s+[A-Z]\d{1,3}\s/.test(t) || /\b[DP]\d\s*\/?\s*T?\d+\s*$/.test(t) || (/^\d+\s/.test(t) && t.split(/\s+/).length >= 4 && !/[:–-]/.test(t));
   const head = lines.slice(0, Math.max(0, firstRow)).map((l) => l.line).filter((t) => t && !looksLikeRow(t));
   const columns = head.filter((t) => COLUMNS_RE.test(t)).pop() ?? null;
-  const title = head.filter((t) => t !== columns && !HEADING_RE.test(t) && t.length > 2).join(" · ").replace(/\s+/g, " ").slice(0, 260) || null;
+  // Lines that say which group a block of rows belongs to ("Division : P19", "Date : Monday, 26/10/2026", "Time : …").
+  // Slot lists repeat them for every division, so the nearest block above a row is the one that applies to it.
+  const BLOCK_RE = /\b(?:division|date|time|slot|shift)\s*[:–-]|\b\d{1,2}[./-]\d{1,2}[./-]\d{4}\b|\b\d{1,2}[.:]\d{2}\s*(?:am|pm)\b/i;
+  const isBlockLine = (t: string) => t.length <= 120 && BLOCK_RE.test(t) && !COLUMNS_RE.test(t);
+  const title = head.filter((t) => t !== columns && !HEADING_RE.test(t) && !isBlockLine(t) && t.length > 2).join(" · ").replace(/\s+/g, " ").slice(0, 200) || null;
   const titleHasSection = head.filter((t) => t !== columns && HEADING_RE.test(t) && t.length <= 80).pop() ?? null;
 
   const rows: RosterRow[] = [];
   let section: string | null = titleHasSection;
-  for (const l of lines) {
+  let block: string[] = head.filter((t) => t !== columns && isBlockLine(t));
+  let afterRow = false;
+  for (const [li, l] of lines.entries()) {
     const found = new Set([...l.line.matchAll(ROLL_RE)].map((m) => m[1].toLowerCase()));
     if (!found.size) {
       // A short heading line such as "LA 001 - LEFT ROW" or "Sub-group 3" applies to the rows below it.
       if (l.line.length >= 3 && l.line.length <= 80 && HEADING_RE.test(l.line) && !COLUMNS_RE.test(l.line)) section = l.line;
+      if (firstRow >= 0 && isBlockLine(l.line) && li > firstRow) {
+        if (afterRow) block = [];
+        block.push(l.line);
+        afterRow = false;
+      }
       continue;
     }
-    const context = [title, section].filter(Boolean).join(" · ") || null;
+    afterRow = true;
+    const context = [title, ...block, section].filter(Boolean).join(" · ").replace(/\s+/g, " ") || null;
     for (const roll of found) rows.push({ roll, page: l.page, line: l.line.slice(0, 500), context: context ? context.slice(0, 400) : null, columns });
   }
   return rows;
