@@ -206,7 +206,7 @@ function SettingsContent() {
         <div className="page-head">
           <div>
             <p className="eyebrow">Signed in as {userEmail}</p>
-            <h1>{isOnboarding ? "Set up your board" : "Settings"}</h1>
+            <h1>{isOnboarding ? "Set up Campus Daily" : "Settings"}</h1>
           </div>
         </div>
 
@@ -380,7 +380,7 @@ function SettingsContent() {
               </div>
             </Panel>
 
-            <Panel id="appearance" title="Appearance" sub="Light or dark. You can also switch from the sidebar.">
+            <Panel id="appearance" title="Appearance" sub="Light or dark. You can also use the sun / moon button at the top.">
               <ThemePicker />
             </Panel>
 
@@ -414,7 +414,7 @@ function SettingsContent() {
             <div className="save-bar">
               <span>{successMsg || "Profile, interests and email save together."}</span>
               <button type="submit" disabled={saving} className="primary">
-                {saving ? "Saving…" : isOnboarding ? "Save & open my board" : "Save"}
+                {saving ? "Saving…" : isOnboarding ? "Save and finish" : "Save"}
               </button>
             </div>
           </form>
