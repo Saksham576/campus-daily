@@ -25,6 +25,8 @@ export async function POST(req: NextRequest) {
     lastMessageAt: typeof data.lastMessageAt === "string" ? data.lastMessageAt : null,
     // Login QR while the bridge is logged out (admins scan it from /admin). Short-lived.
     qr: typeof data.qr === "string" && data.qr.length < 2000 ? data.qr : null,
+    // 8-character pairing code when the bridge links by phone number instead of QR.
+    code: typeof data.code === "string" && /^[A-Z0-9-]{6,12}$/i.test(data.code) ? data.code : null,
   };
   await admin.from("bridge_status").upsert({ id: "whatsapp", data: clean, updated_at: new Date().toISOString() });
   return NextResponse.json({ ok: true });
