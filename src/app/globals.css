@@ -811,6 +811,9 @@ code {
 .meta .src-moodle .lucide {
   color: var(--accent);
 }
+.meta .src-instagram .lucide {
+  color: #c13584;
+}
 .meta .dot {
   color: var(--faint);
 }

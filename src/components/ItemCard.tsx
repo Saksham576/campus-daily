@@ -23,6 +23,7 @@ import {
   Download,
   EyeOff,
   GraduationCap,
+  Instagram,
   Mail,
   MessageCircle,
   MoreHorizontal,
@@ -192,6 +193,25 @@ export function ItemCard({
     }
   }
 
+  /** Undo "Not interested". */
+  async function unmuteSender() {
+    setMuted(false);
+    try {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user?.email || !item.from_address) return;
+      const { data } = await supabase.from("subscribers").select("muted_senders").eq("email", user.email.toLowerCase()).maybeSingle();
+      await supabase
+        .from("subscribers")
+        .update({ muted_senders: (data?.muted_senders || []).filter((s: string) => s !== item.from_address) })
+        .eq("email", user.email.toLowerCase());
+    } catch {
+      // ignore
+    }
+  }
+
   async function handleAddToTimetable(ev: ExtractedEvent) {
     setAddingToTimetable(true);
     try {
@@ -259,7 +279,10 @@ export function ItemCard({
   if (muted) {
     return (
       <div className="card removed">
-        <span>Hidden. You won&apos;t see notices from {senderName(item.from_address)} again.</span>
+        <span>Got it. Fewer notices from {senderName(item.from_address)}.</span>
+        <button onClick={unmuteSender} className="link">
+          Undo
+        </button>
       </div>
     );
   }
@@ -286,12 +309,14 @@ export function ItemCard({
 
   const sec = item.section || "campus";
   const when = item.when && (sec === "action" || sec === "exams" || sec === "events" || sec === "courses") ? friendlyWhen(item.when) : null;
-  const SrcIcon = item.source === "whatsapp" ? MessageCircle : item.source === "moodle" ? GraduationCap : Mail;
+  const isInstagram = item.source === "instagram" || (item.from_address || "").startsWith("Instagram:");
+  const SrcIcon = item.source === "whatsapp" ? MessageCircle : item.source === "moodle" ? GraduationCap : isInstagram ? Instagram : Mail;
+  const srcClass = isInstagram ? "instagram" : item.source || "mail";
 
   return (
     <article className={`notice sec-${sec} ${status === "kept" ? "kept" : ""}`}>
       <div className="meta">
-        <span className={`src src-${item.source || "mail"}`} title={item.from_address || ""}>
+        <span className={`src src-${srcClass}`} title={item.from_address || ""}>
           <SrcIcon aria-hidden />
           {sourceLabel(item)}
         </span>
@@ -422,7 +447,7 @@ export function ItemCard({
             {item.from_address && (
               <button onClick={muteSender}>
                 <BellOff aria-hidden />
-                Stop showing {senderName(item.from_address) || "this sender"}
+                Not interested in {senderName(item.from_address) || "this sender"}
               </button>
             )}
           </div>
