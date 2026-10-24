@@ -169,8 +169,28 @@ export function CoursePicker({
   const opts = (key: string) =>
     COURSE_CATALOG[key].divisions.map((d) => d.d).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
+  // Saved common courses that still belong to another division (the student changed division in Settings).
+  const staleKeys = common.filter((k) => pick[k] && pick[k] !== division && COURSE_CATALOG[k]?.divisions.some((d) => d.d === division));
+  const switchDivision = () => {
+    setSaved(null);
+    setDirty(true);
+    setPick((p) => ({ ...p, ...Object.fromEntries(staleKeys.map((k) => [k, division])) }));
+    // Tutorial slots follow the new division's defaults.
+    setTut((t) => Object.fromEntries(Object.entries(t).filter(([k]) => !staleKeys.includes(k))));
+  };
+
   return (
     <div className="picker">
+      {staleKeys.length > 0 && (
+        <div className="note" role="status">
+          <span>
+            Your {staleKeys.length} common course{staleKeys.length === 1 ? " is" : "s are"} still set to {pick[staleKeys[0]]}. Switch to {division}?
+          </span>{" "}
+          <button type="button" className="accent" onClick={switchDivision}>
+            Switch to {division}
+          </button>
+        </div>
+      )}
       {common.length > 0 ? (
         <>
           <h3>Everyone in {division} takes</h3>
