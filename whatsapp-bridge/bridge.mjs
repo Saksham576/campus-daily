@@ -76,7 +76,7 @@ const client = new Client({
   // After a restart WhatsApp may think the old session is still open elsewhere; take over quietly.
   takeoverOnConflict: true,
   takeoverTimeoutMs: 0,
-  puppeteer: { headless: true, executablePath, timeout: 120000, args: ["--no-first-run", "--disable-extensions", ...(LINUX ? ["--no-sandbox", "--disable-dev-shm-usage"] : [])] },
+  puppeteer: { headless: true, executablePath, timeout: 120000, args: ["--no-first-run", "--disable-extensions", ...(LINUX ? ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--disable-software-rasterizer", "--disable-background-networking", "--disable-features=Translate,site-per-process", "--mute-audio", "--js-flags=--max-old-space-size=384"] : [])] },
 });
 
 /** chatId -> group name, for groups we read. */
