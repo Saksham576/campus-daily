@@ -105,3 +105,17 @@ import { summarizeRow, whenFrom } from "./src/lib/docs/rows.ts";
   assert.strictEqual(summarizeRow({ line: "279 26B2477 Saksham Tiwari D3 T8", context: "CourseList-2", columns: "Sr. no. Roll Name Section Tutorial", docName: "D3-student list.pdf" }).headline, "Your class list: division D3, tutorial batch T8");
 }
 console.log("✓ Passed: seat answers in words, old roll formats kept out of shared text");
+
+// A slot list repeats "Division / Date / Time" per block: each row takes the block above it, not the first one in the file
+{
+  const slot = [{ page: 1, text: ["END SEMESTER EXAM TIME TABLE", "PH117 - PHYSICS LAB", "Division : P15 Date : Monday, 26/10/2026 Time : 9.30 AM - 01.00 PM", "26B2001", "26B2002", "26B2003", "26B2004", "Division : P16 Date : Tuesday, 27/10/2026 Time : 2.00 PM - 05.30 PM", "26B2477", "26B2005", "26B2006", "26B2007", "26B2008"].join("\n") }];
+  const rr = rosterRows(slot);
+  const mine = rr.find((r) => r.roll === "26b2477");
+  const first = rr.find((r) => r.roll === "26b2001");
+  assert.ok(/P16/.test(mine.context) && /27\/10\/2026/.test(mine.context) && !/26\/10\/2026|P15/.test(mine.context), mine.context);
+  assert.ok(/P15/.test(first.context) && /26\/10\/2026/.test(first.context), first.context);
+  const s = summarizeRow({ ...mine, docName: "PH117 - End Sem Exam Slot Details.pdf" });
+  assert.ok(s.details.includes("Tue 27 Oct, 2 pm – 5:30 pm") && s.details.includes("Division P16"), JSON.stringify(s));
+  assert.strictEqual(s.date, "2026-10-27");
+}
+console.log("✓ Passed: each exam-list row uses the division and date block above it");
