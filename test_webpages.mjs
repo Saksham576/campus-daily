@@ -1,5 +1,5 @@
 import assert from "node:assert";
-import { htmlToText, parseWebItems, webItemToEmail, istWords, buildExtractPrompt } from "./src/lib/webPages.ts";
+import { htmlToText, parseWebItems, webItemToEmail, istWords, buildExtractPrompt, normTitle } from "./src/lib/webPages.ts";
 import { extractEventDetails } from "./src/lib/events.ts";
 import { privateMailReason } from "./src/lib/ingest.ts";
 import { senderName } from "./src/lib/display.ts";
@@ -31,3 +31,11 @@ const ev = extractEventDetails(mail.subject, mail.body);
 assert.ok(ev && new Date(ev.start_time).toISOString() === "2026-10-24T04:30:00.000Z", "date written in the body is read as the event time");
 assert.ok(buildExtractPrompt("x", "https://x", "hello").includes("untrusted"));
 console.log("✓ Passed: pages become text, replies are validated, items become notices");
+
+// A reworded headline is the same item
+{
+  assert.strictEqual(normTitle("Applications are invited for UCEED (2027)"), normTitle("Applications invited for UCEED"));
+  assert.strictEqual(normTitle("Hostel allotment 2026-27: round 2"), normTitle("Hostel allotment round 2"));
+  assert.notStrictEqual(normTitle("UCEED results"), normTitle("UCEED applications"));
+}
+console.log("✓ Passed: reworded headlines match");
