@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient, isAdminEmail } from "@/lib/server/admin";
 import { AdminPanel } from "./AdminPanel";
+import { AutoRefresh } from "./AutoRefresh";
 import { AppBar } from "@/components/AppBar";
 import QRCode from "qrcode";
 
@@ -63,8 +64,10 @@ export default async function AdminPage() {
           <span className="n" style={{ whiteSpace: "normal" }}>
             {waAgeMin === null
               ? "Bridge has not reported yet"
+              : wa.qr
+              ? "Not logged in to WhatsApp yet. Scan the QR code below."
               : !wa.groups?.length
-              ? "Connected but watching 0 groups, so it is not reading anything. Restart it: docker compose restart"
+              ? "Logged in but watching 0 groups, so it is not reading anything. Restart it: docker compose restart"
               : `${wa.groups?.length || 0} groups · ${wa.seenToday || 0} messages read today · ${wa.forwardedToday || 0} sent · ${wa.caughtUp || 0} caught up after sleep`}
           </span>
           <span className={`status ${waAgeMin !== null && waAgeMin < 25 ? "go" : "stop"}`}>
@@ -84,10 +87,11 @@ export default async function AdminPage() {
         {wa.groups && wa.groups.length > 0 && <div className="board-empty">Groups: {wa.groups.join(" · ")}</div>}
         {waQr && (
           <div className="note" style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+            <AutoRefresh seconds={8} />
             <div style={{ background: "#fff", padding: 8, borderRadius: 8, lineHeight: 0 }} dangerouslySetInnerHTML={{ __html: waQr }} />
             <span>
               The WhatsApp bridge is waiting to log in. On the spare phone: WhatsApp → Settings → Linked devices → Link a device, and
-              scan this. Codes change every ~20 seconds — reload this page if it doesn&apos;t scan.
+              scan this. This code refreshes itself every few seconds; scan it right after it appears.
             </span>
           </div>
         )}
