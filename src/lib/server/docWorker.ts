@@ -126,6 +126,9 @@ export async function processDocs(admin: SupabaseClient, deadlineMs: number) {
         continue;
       }
 
+      // Postgres text rejects NUL and lone surrogates, which some PDFs produce ("unsupported Unicode escape sequence").
+      ex = { ...ex, pages: ex.pages.map((p) => ({ ...p, text: p.text.replace(/\u0000/g, "").replace(/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g, "") })) };
+
       // Class lists: keep only each student's own lines, plus the header.
       const roster = rosterRows(ex.pages);
       const chunks = chunkPages(roster ? rosterHeader(ex.pages) : ex.pages);
@@ -137,7 +140,8 @@ export async function processDocs(admin: SupabaseClient, deadlineMs: number) {
       }
       if (roster) {
         for (let i = 0; i < roster.length; i += 500) {
-          await admin.from("personal_rows").insert(roster.slice(i, i + 500).map((r) => ({ doc_id: d.id, ...r })));
+          const { error } = await admin.from("personal_rows").insert(roster.slice(i, i + 500).map((r) => ({ doc_id: d.id, ...r })));
+          if (error) throw new Error(`rows: ${error.message}`);
         }
         stats.roster++;
       }
