@@ -4,7 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { AppBar } from "@/components/AppBar";
 import { TimetableView } from "@/components/TimetableView";
-import { Download, Pencil, Plus } from "lucide-react";
+import { CalendarPlus, Download, Pencil, Plus } from "lucide-react";
+import { SlotForm } from "@/components/SlotForm";
+import { CalendarImport, type Feed } from "@/components/CalendarImport";
 import { createClient } from "@/lib/supabase/client";
 import { generateMultiEventIcs } from "@/lib/events";
 import { SEMESTER, addDays, mondayOf } from "@/lib/timetable/range";
@@ -20,83 +22,48 @@ export type ScheduleItem = {
   end_time?: string | null;
   slot_type: "lecture" | "lab" | "quiz" | "exam" | "deadline" | "event" | "custom";
   is_cancelled?: boolean;
+  series_id?: string | null;
+  origin?: "manual" | "gcal" | null;
 };
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
-export default function ScheduleClient({ initialSchedules, moodleOn }: { initialSchedules: ScheduleItem[]; moodleOn: boolean }) {
+export default function ScheduleClient({ initialSchedules, moodleOn, feed }: { initialSchedules: ScheduleItem[]; moodleOn: boolean; feed: Feed }) {
   const [schedules, setSchedules] = useState<ScheduleItem[]>(initialSchedules);
   const [statusNotification, setStatusNotification] = useState<string | null>(null);
 
   const [showAddModal, setShowAddModal] = useState(false);
 
-  // Form state for adding custom slot
-  const [newTitle, setNewTitle] = useState("");
-  const [newLocation, setNewLocation] = useState("");
-  const [newDay, setNewDay] = useState(1); // 1 = Mon
-  const [newStartTime, setNewStartTime] = useState("09:30");
-  const [newEndTime, setNewEndTime] = useState("10:25");
-  const [newSlotType, setNewSlotType] = useState<ScheduleItem["slot_type"]>("lecture");
+  const [showImport, setShowImport] = useState(false);
+  const note = (text: string) => {
+    setStatusNotification(text);
+    setTimeout(() => setStatusNotification(null), 5000);
+  };
 
-  async function handleAddSlot(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newTitle) return;
-
+  /** Delete your own slot: just this one, or every repeat of it. */
+  async function removeSlot(slot: ScheduleItem, scope: "one" | "series") {
     const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const q = supabase.from("user_schedules").delete();
+    const { error } = scope === "series" && slot.series_id ? await q.eq("series_id", slot.series_id) : await q.eq("id", slot.id);
+    if (error) return note("Could not delete that. Please try again.");
+    setSchedules((prev) => prev.filter((x) => (scope === "series" && slot.series_id ? x.series_id !== slot.series_id : x.id !== slot.id)));
+    note(scope === "series" ? "Deleted every repeat." : "Deleted.");
+  }
 
-    if (!user) return;
-
-    // Calculate occurrence of chosen day in the current week
-    const now = new Date();
-    const currentDay = now.getDay() || 7;
-    const diff = newDay - currentDay;
-    const targetDate = new Date(now);
-    targetDate.setDate(now.getDate() + diff);
-
-    const [sh, sm] = newStartTime.split(":").map(Number);
-    const [eh, em] = newEndTime.split(":").map(Number);
-
-    const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-    const startIso = `${targetDate.getFullYear()}-${pad(targetDate.getMonth() + 1)}-${pad(
-      targetDate.getDate()
-    )}T${pad(sh)}:${pad(sm)}:00+05:30`;
-    const endIso = `${targetDate.getFullYear()}-${pad(targetDate.getMonth() + 1)}-${pad(
-      targetDate.getDate()
-    )}T${pad(eh)}:${pad(em)}:00+05:30`;
-
-    const newSlot: Partial<ScheduleItem> = {
-      user_id: user.id,
-      title: newTitle,
-      location: newLocation || "IIT Bombay",
-      start_time: new Date(startIso).toISOString(),
-      end_time: new Date(endIso).toISOString(),
-      slot_type: newSlotType,
-      is_cancelled: false,
-    };
-
-    const { data, error } = await supabase
-      .from("user_schedules")
-      .insert(newSlot)
-      .select()
-      .single();
-
-    if (!error && data) {
-      setSchedules((prev) => [...prev, data as ScheduleItem]);
-    } else {
-      setSchedules((prev) => [
-        ...prev,
-        { ...newSlot, id: `custom-${Date.now()}` } as ScheduleItem,
-      ]);
+  /** Change the name, venue or times of your own slot (this one, or every repeat in its series). */
+  async function editSlot(slot: ScheduleItem, patch: { title: string; location: string; start: string; end: string }, scope: "one" | "series") {
+    const supabase = createClient();
+    const targets = scope === "series" && slot.series_id ? schedules.filter((x) => x.series_id === slot.series_id) : [slot];
+    const withTime = (iso: string, hhmm: string) => new Date(`${istDate(iso)}T${hhmm}:00+05:30`).toISOString();
+    const updated: ScheduleItem[] = [];
+    for (const t of targets) {
+      const row = { title: patch.title.trim() || t.title, location: patch.location.trim() || null, start_time: withTime(t.start_time, patch.start), end_time: withTime(t.start_time, patch.end) };
+      const { error } = await supabase.from("user_schedules").update(row).eq("id", t.id);
+      if (error) return note("Could not save that change. Please try again.");
+      updated.push({ ...t, ...row });
     }
-
-    setNewTitle("");
-    setNewLocation("");
-    setShowAddModal(false);
-    setStatusNotification("Custom slot added successfully!");
-    setTimeout(() => setStatusNotification(null), 4000);
+    setSchedules((prev) => prev.map((x) => updated.find((u) => u.id === x.id) || x));
+    note(targets.length > 1 ? `Updated ${targets.length} slots.` : "Saved.");
   }
 
   async function handleToggleCancellation(slotId: string, currentStatus?: boolean) {
@@ -184,9 +151,13 @@ export default function ScheduleClient({ initialSchedules, moodleOn }: { initial
             <h1>Timetable</h1>
           </div>
           <div className="nav-links">
-            <button type="button" onClick={() => setShowAddModal(!showAddModal)}>
+            <button type="button" onClick={() => { setShowAddModal(!showAddModal); setShowImport(false); }}>
               <Plus aria-hidden />
               Add slot
+            </button>
+            <button type="button" onClick={() => { setShowImport(!showImport); setShowAddModal(false); }}>
+              <CalendarPlus aria-hidden />
+              Import
             </button>
             <button type="button" onClick={handleExportWeekIcs} title="Download a calendar file for Google / Apple / Outlook">
               <Download aria-hidden />
@@ -208,63 +179,17 @@ export default function ScheduleClient({ initialSchedules, moodleOn }: { initial
         {statusNotification && <p className="note" style={{ marginTop: 0, marginBottom: 16 }}>{statusNotification}</p>}
 
         {showAddModal && (
-          <form onSubmit={handleAddSlot} className="panel pform" style={{ marginBottom: 20 }}>
-            <div className="panel-head" style={{ marginBottom: 0 }}>
-              <h2 className="panel-title">Add a slot</h2>
-            </div>
-            <div className="row2">
-              <label>
-                Title
-                <input type="text" required placeholder="e.g. MA 105 extra tutorial" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
-              </label>
-              <label>
-                Venue
-                <input type="text" placeholder="e.g. LA 201" value={newLocation} onChange={(e) => setNewLocation(e.target.value)} />
-              </label>
-            </div>
-            <div className="row2">
-              <label>
-                Day
-                <select value={newDay} onChange={(e) => setNewDay(Number(e.target.value))}>
-                  {DAYS.map((d, i) => (
-                    <option key={d} value={i + 1}>
-                      {d}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Type
-                <select value={newSlotType} onChange={(e) => setNewSlotType(e.target.value as any)}>
-                  <option value="lecture">Lecture</option>
-                  <option value="lab">Lab</option>
-                  <option value="quiz">Quiz</option>
-                  <option value="exam">Exam</option>
-                  <option value="deadline">Deadline</option>
-                  <option value="custom">Other</option>
-                </select>
-              </label>
-            </div>
-            <div className="row2">
-              <label>
-                Starts
-                <input type="time" value={newStartTime} onChange={(e) => setNewStartTime(e.target.value)} />
-              </label>
-              <label>
-                Ends
-                <input type="time" value={newEndTime} onChange={(e) => setNewEndTime(e.target.value)} />
-              </label>
-            </div>
-            <div className="actions">
-              <button type="submit" className="primary">
-                Save slot
-              </button>
-              <button type="button" onClick={() => setShowAddModal(false)} className="ghost">
-                Cancel
-              </button>
-            </div>
-          </form>
+          <SlotForm
+            onClose={() => setShowAddModal(false)}
+            onSaved={(rows, text) => {
+              setSchedules((prev) => [...prev, ...rows]);
+              setShowAddModal(false);
+              note(text);
+            }}
+          />
         )}
+
+        {showImport && <CalendarImport feed={feed} onClose={() => setShowImport(false)} onDone={note} />}
 
         {!moodleOn && schedules.length > 0 && (
           <p className="note" style={{ marginTop: 0, marginBottom: 16 }}>
@@ -272,7 +197,7 @@ export default function ScheduleClient({ initialSchedules, moodleOn }: { initial
             <Link href="/settings#moodle">Connect Moodle</Link>
           </p>
         )}
-        <TimetableView slots={schedules} onToggle={handleToggleCancellation} />
+        <TimetableView slots={schedules} onToggle={handleToggleCancellation} onRemove={(s, scope) => removeSlot(s as ScheduleItem, scope)} onEdit={(s, patch, scope) => editSlot(s as ScheduleItem, patch, scope)} />
       </main>
     </>
   );
