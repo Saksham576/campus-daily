@@ -67,6 +67,8 @@ const minutesOf = (iso: string) => {
 const dayIndex = (iso: string) => (ist(iso).getUTCDay() + 6) % 7; // 0 = Mon
 const hhmm = (iso: string) =>
   new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" });
+/** Things that came from a notice (talks, sessions, workshops) rather than the course timetable: shown by heading only. */
+const isEventLike = (s: Slot) => s.slot_type === "event" || s.slot_type === "session" || s.slot_type === "custom";
 const codeOf = (title: string) => title.split(": ")[0].replace(" (Tutorial)", " · Tut");
 const nameOf = (title: string) => (title.includes(": ") ? title.split(": ").slice(1).join(": ").replace(" (Tutorial)", "") : "");
 
@@ -135,10 +137,11 @@ export function TimetableView({
     setOffset((o) => Math.max(-WEEKS_BACK, Math.min(WEEKS_AHEAD, o + n)));
     setPickedDay(null);
   };
-  const label = `${dates[0].getUTCDate()} ${dates[0].toLocaleString("en-IN", { month: "short", timeZone: "UTC" })} – ${dates[4].getUTCDate()} ${dates[4].toLocaleString("en-IN", { month: "short", timeZone: "UTC" })}`;
+  const label = `${dates[0].getUTCDate()} ${dates[0].toLocaleString("en-IN", { month: "short", timeZone: "UTC" })} – ${dates[6].getUTCDate()} ${dates[6].toLocaleString("en-IN", { month: "short", timeZone: "UTC" })}`;
 
-  // Mon–Fri always; Saturday / Sunday only in weeks where something is scheduled on them.
-  const ncols = inWeek.some((s) => dayIndex(s.start_time) === 6) ? 7 : inWeek.some((s) => dayIndex(s.start_time) === 5) ? 6 : 5;
+  // All seven days, always: extra classes, quizzes and workshops land on weekends too. Weekend columns are a little narrower.
+  const ncols = 7;
+  const cols = `56px repeat(5, minmax(0, 1fr)) repeat(2, minmax(0, 0.75fr))`;
   const weekday = inWeek.filter((s) => dayIndex(s.start_time) < ncols);
   // Fit the grid to the hours that actually have classes (an all-afternoon week starts at 14:00), at least 6 hours tall.
   const firstH = weekday.length ? Math.min(...weekday.map((s) => Math.floor(minutesOf(s.start_time) / 60))) : 8;
@@ -212,18 +215,19 @@ export function TimetableView({
       )}
       {/* Week calendar (desktop) */}
       <div className="week" role="grid" aria-label="Week calendar">
-        <div className="week-head" style={{ gridTemplateColumns: `56px repeat(${ncols}, minmax(0, 1fr))` }}>
+        <div className="week-head" style={{ gridTemplateColumns: cols }}>
           <span />
           {dates.slice(0, ncols).map((d, i) => {
             const isToday = d.toISOString().slice(0, 10) === todayKey;
             return (
-              <span key={i} className={`week-day ${isToday ? "today" : ""}`}>
+              <span key={i} className={`week-day ${isToday ? "today" : ""} ${i > 4 ? "weekend" : ""}`} aria-current={isToday ? "date" : undefined}>
                 {DAYS[i]} <b>{d.getUTCDate()}</b>
+                {isToday && <i className="today-tag">Today</i>}
               </span>
             );
           })}
         </div>
-        <div className="week-body" style={{ height: hours.length * HOUR_PX, gridTemplateColumns: `56px repeat(${ncols}, minmax(0, 1fr))` }}>
+        <div className="week-body" style={{ height: hours.length * HOUR_PX, gridTemplateColumns: cols }}>
           <div className="week-hours" aria-hidden>
             {hours.map((h) => (
               <span key={h} style={{ top: (h - startH) * HOUR_PX }}>
@@ -245,10 +249,12 @@ export function TimetableView({
                   const top = ((minutesOf(s.start_time) - startH * 60) / 60) * HOUR_PX;
                   const height = Math.max(26, ((minutesOf(s.end_time || s.start_time) - minutesOf(s.start_time)) / 60) * HOUR_PX - 3);
                   const ln = laneOf.get(s.id) || { lane: 0, of: 1 };
+                  const range = `${hhmm(s.start_time)}${s.end_time ? `–${hhmm(s.end_time)}` : ""}`;
+                  const headingOnly = isEventLike(s);
                   return (
                     <div
                       key={s.id}
-                      className={`week-block t-${s.slot_type} ${s.is_cancelled ? "cancelled" : ""}`}
+                      className={`week-block t-${s.slot_type} ${s.is_cancelled ? "cancelled" : ""} ${height <= 40 ? "short" : ""} ${headingOnly ? "heading-only" : ""}`}
                       role="button"
                       tabIndex={0}
                       onClick={() => setOpen(s)}
@@ -261,13 +267,14 @@ export function TimetableView({
                         right: "auto",
                         ["--c" as string]: hueOf(s.title),
                       }}
-                      title={`${s.title}\n${hhmm(s.start_time)}${s.end_time ? `–${hhmm(s.end_time)}` : ""}${s.location ? ` · ${s.location}` : ""}`}
+                      title={`${s.title}\n${range}${s.location ? ` · ${s.location}` : ""}`}
                     >
-                      <b>{codeOf(s.title)}</b>
-                      {height > 40 && (
+                      <b>{headingOnly ? nameOf(s.title) || s.title : codeOf(s.title)}</b>
+                      {/* Events show only their heading here; time and place are one tap away. */}
+                      {!headingOnly && (
                         <span>
-                          {hhmm(s.start_time)}
-                          {s.location ? ` · ${s.location}` : ""}
+                          {range}
+                          {height > 40 && s.location ? ` · ${s.location}` : ""}
                         </span>
                       )}
                       <button
@@ -294,7 +301,7 @@ export function TimetableView({
       <div className="dayview" onTouchStart={(e) => setTouchX(e.touches[0].clientX)} onTouchEnd={(e) => swipe(e.changedTouches[0].clientX)}>
         <div className="schedule-tabs" role="tablist">
           {DAYS.slice(0, ncols).map((d, i) => (
-            <button key={d} role="tab" aria-selected={day === i} className={`schedule-tab ${day === i ? "active" : ""}`} onClick={() => setPickedDay(i)}>
+            <button key={d} role="tab" aria-selected={day === i} className={`schedule-tab ${day === i ? "active" : ""} ${dates[i].toISOString().slice(0, 10) === todayKey ? "is-today" : ""}`} onClick={() => setPickedDay(i)}>
               <span>{d}</span> <b>{dates[i].getUTCDate()}</b>
             </button>
           ))}
@@ -317,7 +324,7 @@ export function TimetableView({
                       {hhmm(s.start_time)}
                       {s.end_time ? `–${hhmm(s.end_time)}` : ""}
                     </span>
-                    {s.location && (
+                    {s.location && !isEventLike(s) && (
                       <span className="ico-text">
                         <MapPin aria-hidden />
                         {s.location}
