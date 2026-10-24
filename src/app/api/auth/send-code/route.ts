@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getAdminClient } from "@/lib/server/admin";
-import { isValidIitbEmail, sanitizeRedirectUrl } from "@/lib/auth";
+import { isAllowedEmail, sanitizeRedirectUrl } from "@/lib/auth";
 import { buildSigninEmail, rateLimitReason } from "@/lib/signinEmail";
 
 export const runtime = "nodejs";
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   } catch {}
   const email = (body.email || "").trim().toLowerCase();
   const mode = body.mode === "login" ? "login" : "signup";
-  if (!isValidIitbEmail(email)) {
+  if (!isAllowedEmail(email)) {
     return NextResponse.json({ error: "Use your IITB email (…@iitb.ac.in)." }, { status: 400 });
   }
 

@@ -11,13 +11,4 @@ export function getAdminClient(): SupabaseClient | null {
   );
 }
 
-export function adminEmails(): string[] {
-  return (process.env.ADMIN_EMAILS || "26b2477@iitb.ac.in")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-export function isAdminEmail(email?: string | null): boolean {
-  return Boolean(email) && adminEmails().includes(email!.toLowerCase());
-}
+export { adminEmails, isAdminEmail } from "@/lib/adminEmails";
