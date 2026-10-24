@@ -593,7 +593,39 @@ code {
 }
 .status.done {
   background: transparent;
-  color: var(--faint);
+  color: var(--muted);
+}
+.today-toggle {
+  display: none;
+}
+@media (max-width: 640px) {
+  .today:not(.open) .today-row:not(.focus),
+  .today:not(.open) .today-note {
+    display: none;
+  }
+  .today-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    min-height: 44px;
+    border: 0;
+    border-top: 1px solid var(--rule);
+    border-radius: 0 0 var(--radius) var(--radius);
+    background: none;
+    box-shadow: none;
+    color: var(--muted);
+    font: 500 13px/1 var(--font-sans);
+  }
+  .today-toggle .lucide {
+    width: 16px;
+    height: 16px;
+    transition: transform 0.15s;
+  }
+  .today-toggle[aria-expanded="true"] .lucide {
+    transform: rotate(180deg);
+  }
 }
 
 /* Admin page still uses the board header/rows */
@@ -2690,4 +2722,147 @@ button.chip.on:hover:not(:disabled) {
   align-self: stretch;
   margin: 6px 4px;
   background: var(--line, rgba(128, 128, 128, 0.3));
+}
+
+/* ---------- Calendar details: now line, notes, class sheet ---------- */
+.week-now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px solid var(--red);
+  z-index: 3;
+  pointer-events: none;
+}
+.week-now::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: -5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--red);
+}
+.week-block {
+  cursor: pointer;
+}
+.week-block:focus-visible,
+.slot-info:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.tt-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.slot-info {
+  cursor: pointer;
+}
+@media (max-width: 899px) {
+  .dayview .schedule-tabs {
+    width: 100%;
+    overflow: visible;
+  }
+  .dayview .schedule-tab {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 7px 0;
+    font-size: 12px;
+  }
+  .dayview .schedule-tab b {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+}
+
+.sheet-back {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgb(0 0 0 / 0.45);
+}
+.sheet {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 18px 20px calc(20px + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 16px 16px 0 0;
+  box-shadow: var(--shadow-lg, 0 20px 50px rgb(0 0 0 / 0.35));
+  outline: none;
+  animation: sheet-up 0.18s ease-out;
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet {
+    animation: none;
+  }
+}
+@media (min-width: 640px) {
+  .sheet-back {
+    align-items: center;
+  }
+  .sheet {
+    border-radius: 16px;
+  }
+}
+.sheet-grip {
+  width: 36px;
+  height: 4px;
+  margin: 0 auto 12px;
+  border-radius: 2px;
+  background: var(--rule-strong);
+}
+.sheet-x {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  min-width: 44px;
+  min-height: 44px;
+}
+.sheet-title {
+  font: 650 20px/1.25 var(--font-sans);
+  letter-spacing: -0.015em;
+  margin-bottom: 14px;
+}
+.sheet-facts {
+  display: grid;
+  grid-template-columns: 70px 1fr;
+  gap: 8px 12px;
+  margin-bottom: 18px;
+  font-size: 14px;
+}
+.sheet-facts dt {
+  color: var(--muted);
+}
+.sheet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sheet-actions > * {
+  min-height: 44px;
+}
+.tt-note .link {
+  white-space: nowrap;
+  min-height: 44px;
 }
