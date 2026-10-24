@@ -68,6 +68,22 @@ const LABS: Record<string, Cell> = {
   LX: merge("X1", "X2", "X3"),
 };
 
+/**
+ * CS 101 labs don't follow the slot chart. Bodhitree (Lab Exam 2 notice, 23 Oct 2026) gives the regular weekly
+ * lab hours by lab batch: P13, P14 Tue 08:15 · P19, P21 Tue 10:30 · P15, P16 Thu 08:15 · P20, P22 Thu 10:30.
+ * Each lab is two hours (the 25 Oct compensatory lab ran 08:15–10:15).
+ */
+const CS101_LABS: Record<string, { day: number; start: string; end: string; batches: string[] }> = {
+  C1: { day: 2, start: "08:15", end: "10:15", batches: ["P13", "P14"] },
+  C2: { day: 2, start: "10:30", end: "12:30", batches: ["P19", "P21"] },
+  C3: { day: 4, start: "08:15", end: "10:15", batches: ["P15", "P16"] },
+  C4: { day: 4, start: "10:30", end: "12:30", batches: ["P20", "P22"] },
+};
+
+/** The CS 101 lab slot code for a lab batch ("P16" -> "C3"), if we know it. */
+export const cs101LabFor = (batch?: string | null): string | null =>
+  Object.entries(CS101_LABS).find(([, v]) => v.batches.includes((batch || "").trim().toUpperCase()))?.[0] ?? null;
+
 const rowTime = (row: number) => {
   const mins = 8 * 60 + row * 30;
   return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
@@ -83,6 +99,11 @@ export function labSlotOptions(): { code: string; label: string }[] {
     .map(({ code, t }) => ({ code, label: `${DAY_NAMES[t.day]} ${t.start}–${t.end}` }));
 }
 
+/** CS 101 lab choices, for students whose lab batch we can't read from Moodle: "Thu 08:15–10:15 (batches P15, P16)". */
+export function cs101LabOptions(): { code: string; label: string }[] {
+  return Object.entries(CS101_LABS).map(([code, v]) => ({ code, label: `${DAY_NAMES[v.day]} ${v.start}–${v.end} (batches ${v.batches.join(", ")})` }));
+}
+
 /** Tutorial slots (X1, X2…) as readable choices. Which one is yours depends on your tutorial batch (T1, T8…). */
 export function tutorialSlotOptions(): { code: string; label: string }[] {
   return ["X1", "X2", "X3", "XC", "XD", "XE"]
@@ -93,12 +114,14 @@ export function tutorialSlotOptions(): { code: string; label: string }[] {
 }
 
 /** True for lab slot codes (L1…L9, LX). */
-export const isLabSlotCode = (code: string) => code.toUpperCase() in LABS;
+export const isLabSlotCode = (code: string) => code.toUpperCase() in LABS || code.toUpperCase() in CS101_LABS;
 
 export type SlotTime = { day: number; start: string; end: string; isLab: boolean };
 
 export function slotTime(code: string): SlotTime | null {
   const key = code.trim().toUpperCase();
+  const cs = CS101_LABS[key];
+  if (cs) return { day: cs.day, start: cs.start, end: cs.end, isLab: true };
   const cell = LABS[key] || S[key];
   return cell ? { day: cell.day, start: rowTime(cell.start), end: rowTime(cell.end), isLab: key in LABS } : null;
 }
@@ -160,8 +183,15 @@ export function buildWeek(courses: UserCourse[], now = new Date()): WeekSlot[] {
   for (const c of courses) {
     const code = formatCourseCode(c.course_code);
     const label = c.title ? `${code}: ${c.title}` : code;
+    // CS 101 with no lab slot of its own: take it from the student's lab batch (the P-batch on their Physics lab row).
+    const lecture = [...(c.lecture_slots || [])];
+    if (code === "CS 101" && !lecture.some(isLabSlotCode)) {
+      const batch = courses.map((x) => x.division).find((d) => /^P\d+$/i.test((d || "").trim()));
+      const lab = cs101LabFor(batch);
+      if (lab) lecture.push(lab);
+    }
     const parts: [string[], string][] = [
-      [c.lecture_slots || [], ""],
+      [lecture, ""],
       [c.tutorial_slots || [], " (Tutorial)"],
     ];
     for (const [slots, suffix] of parts) {

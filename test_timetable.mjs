@@ -257,3 +257,24 @@ import { updatesFromNotice } from "./src/lib/timetable/updates.ts";
   assert.strictEqual(updatesFromNotice("[Bodhitree] [Forum - CS101A26] Lab Exam 2", "The lab exam is on Monday.", "x", new Date("2026-10-23T06:30:00Z")).length, 0, "an ordinary post changes nothing");
 }
 console.log("✓ Passed: no-more-lectures and per-division doubt sessions reach the timetable");
+
+// ---- CS 101 lab by lab batch (Bodhitree Lab Exam 2 notice, 23 Oct 2026) ----
+import { cs101LabFor } from "./src/lib/timetable/slots.ts";
+{
+  const mine = [
+    { course_code: "CS101", title: "Computer Programming and Utilization", division: "D3", lecture_slots: ["7A", "7B"], tutorial_slots: [], venue: "LA 201" },
+    { course_code: "PH117", title: "Physics Lab", division: "P16", lecture_slots: ["L4"], tutorial_slots: [], venue: null },
+  ];
+  assert.strictEqual(cs101LabFor("P16"), "C3");
+  assert.strictEqual(cs101LabFor("p13"), "C1");
+  assert.strictEqual(cs101LabFor("P99"), null);
+  const wk = buildWeek(mine, new Date("2026-10-27T10:00:00Z"));
+  const lab = wk.find((s) => /CS 101.*Lab$/.test(s.title));
+  assert.ok(lab, "P16 gets a CS 101 lab block");
+  assert.strictEqual(new Date(lab.start_time).toISOString(), "2026-10-29T02:45:00.000Z", "Thursday 08:15 IST");
+  assert.strictEqual(new Date(lab.end_time).toISOString(), "2026-10-29T04:45:00.000Z", "two hours");
+  assert.strictEqual(mine[0].lecture_slots.length, 2, "the student's saved course is not changed");
+  const noBatch = buildWeek([mine[0]], new Date("2026-10-27T10:00:00Z"));
+  assert.ok(!noBatch.some((s) => s.slot_type === "lab"), "no lab batch known, no lab block");
+}
+console.log("✓ Passed: CS 101 lab comes from the lab batch");
