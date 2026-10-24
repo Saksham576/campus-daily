@@ -222,7 +222,7 @@ function LoginForm() {
 
   if (status === "checking" || status === "verified") {
     return (
-      <main className="wrap narrow">
+      <main id="main" className="wrap narrow">
         <StationSign />
         <div className="login-redirect-card">
           <p className="muted">
@@ -237,7 +237,7 @@ function LoginForm() {
   }
 
   return (
-    <main className="wrap narrow">
+    <main id="main" className="wrap narrow">
       <StationSign />
       <p className="muted small" style={{ marginBottom: 4 }}>
         Continue with your @iitb.ac.in email. We’ll send a 6-digit code and a one-tap sign-in link. New here? Your account is created for you.
@@ -361,7 +361,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <main className="wrap narrow">
+        <main id="main" className="wrap narrow">
           <StationSign />
               <p className="muted">Loading sign-in…</p>
         </main>

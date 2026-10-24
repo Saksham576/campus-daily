@@ -1,4 +1,5 @@
 import { greeting } from "@/lib/display";
+import { Fresh } from "@/components/Fresh";
 
 type Dated = { when?: string | null; subject: string; myCourse?: string | null };
 
@@ -31,6 +32,7 @@ export function HomeHead({ name, now, action, exams }: { name?: string | null; n
           {greeting(now)}
           {first ? `, ${first}` : ""}
         </h1>
+        <Fresh at={now.toISOString()} />
         <p className="brief">{bits.reduce<React.ReactNode[]>((acc, b, i) => (i ? [...acc, <span key={`s${i}`} className="brief-sep">·</span>, b] : [b]), [])}</p>
       </div>
     </div>

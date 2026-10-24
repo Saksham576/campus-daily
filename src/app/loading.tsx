@@ -5,7 +5,7 @@ export default function Loading() {
   return (
     <>
       <AppBar />
-      <main className="wrap" aria-busy="true" aria-label="Loading">
+      <main id="main" className="wrap" aria-busy="true" aria-label="Loading">
         <div className="skel skel-title" />
         <div className="skel skel-card" />
         <div className="skel skel-row" />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUp, Check, Sparkles, X } from "lucide-react";
 
@@ -39,7 +39,7 @@ type Reply = { q: string; answer: string; sources: { n: number; id: string; subj
  * Ask Campus Daily: answers from your own notices, timetable and Moodle — and can propose changes
  * to your settings, which only happen when you tap Confirm.
  */
-export function AskBox() {
+export function AskBox({ request, hideInput }: { request?: { text: string; id: number } | null; hideInput?: boolean } = {}) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
@@ -64,6 +64,12 @@ export function AskBox() {
     }
   }
 
+  // Driven from the main search box: a new request id asks that question.
+  useEffect(() => {
+    if (request) ask(request.text);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request?.id]);
+
   async function confirm(i: number) {
     if (!reply) return;
     const set = (state: Proposed["state"]) =>
@@ -80,13 +86,16 @@ export function AskBox() {
     } else set("error");
   }
 
+  const driven = request !== undefined;
+  if (driven && !reply && !busy && !error) return null;
+
   return (
     <section className="ask" aria-label="Ask Campus Daily">
-      <div className="ask-head">
+      {!driven && <div className="ask-head">
         <Sparkles aria-hidden />
         Ask Campus Daily
-      </div>
-      <form
+      </div>}
+      {!driven && <form
         className="ask-form"
         onSubmit={(e) => {
           e.preventDefault();
@@ -104,9 +113,9 @@ export function AskBox() {
         <button type="submit" className="primary" disabled={busy || q.trim().length < 3} aria-label="Ask">
           {busy ? "…" : <ArrowUp aria-hidden />}
         </button>
-      </form>
+      </form>}
 
-      {!reply && !busy && !error && (
+      {!driven && !reply && !busy && !error && (
         <div className="ask-sugg">
           {SUGGESTIONS.map((s) => (
             <button key={s} type="button" onClick={() => ask(s)}>

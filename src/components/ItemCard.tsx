@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { Sheet } from "@/components/Sheet";
+import { toast } from "@/components/Toaster";
 import {
   extractEventDetails,
   generateIcs,
@@ -127,6 +129,9 @@ export function ItemCard({
   const [addingToTimetable, setAddingToTimetable] = useState(false);
   const [timetableAdded, setTimetableAdded] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [detail, setDetail] = useState(false);
+  // Phone swipe: right = Done, left = Save.
+  const [drag, setDrag] = useState<{ x0: number; y0: number; dx: number; live: boolean } | null>(null);
 
   const itemId = item.id || item.item_id || "";
   // One unusual notice must never break the whole feed.
@@ -156,6 +161,9 @@ export function ItemCard({
     onStatusChange?.(itemId, newStatus);
     if (newStatus === "kept") logInteraction("keep");
     else if (newStatus === "removed") logInteraction("dismiss");
+    if (newStatus === "done") toast("Marked done", () => updateItemStatus("new"));
+    else if (newStatus === "removed") toast("Notice hidden", () => updateItemStatus("new"));
+    else if (newStatus === "kept") toast("Saved", () => updateItemStatus("new"));
     try {
       const supabase = createClient();
       const {
@@ -179,6 +187,7 @@ export function ItemCard({
     if (!item.from_address) return;
     setMuted(true);
     logInteraction("dislike");
+    toast(`Fewer notices from ${senderName(item.from_address) || "this sender"}`, unmuteSender);
     try {
       const supabase = createClient();
       const {
@@ -276,26 +285,8 @@ export function ItemCard({
     logInteraction("add_to_calendar");
   }
 
-  if (muted) {
-    return (
-      <div className="card removed">
-        <span>Got it. Fewer notices from {senderName(item.from_address)}.</span>
-        <button onClick={unmuteSender} className="link">
-          Undo
-        </button>
-      </div>
-    );
-  }
-  if (status === "removed" || status === "done") {
-    return (
-      <div className="card removed">
-        <span>{status === "done" ? "Marked done" : "Hidden from your board"}</span>
-        <button onClick={() => updateItemStatus("new")} className="link">
-          Undo
-        </button>
-      </div>
-    );
-  }
+  // Reversible actions leave the feed at once; the shared toast carries the Undo.
+  if (muted || status === "removed" || status === "done") return null;
 
   let linksArray: string[] = [];
   if (Array.isArray(item.links)) linksArray = item.links;
@@ -313,8 +304,31 @@ export function ItemCard({
   const SrcIcon = item.source === "whatsapp" ? MessageCircle : item.source === "moodle" ? GraduationCap : isInstagram ? Instagram : Mail;
   const srcClass = isInstagram ? "instagram" : item.source || "mail";
 
+  const dx = drag?.live ? drag.dx : 0;
+  const onTouchStart = (e: React.TouchEvent) => setDrag({ x0: e.touches[0].clientX, y0: e.touches[0].clientY, dx: 0, live: false });
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (!drag) return;
+    const mx = e.touches[0].clientX - drag.x0;
+    const my = e.touches[0].clientY - drag.y0;
+    if (!drag.live && (Math.abs(mx) < 12 || Math.abs(mx) < Math.abs(my) * 1.5)) return;
+    setDrag({ ...drag, dx: Math.max(-140, Math.min(140, mx)), live: true });
+  };
+  const onTouchEnd = () => {
+    if (drag?.live) {
+      if (drag.dx > 90) updateItemStatus("done");
+      else if (drag.dx < -90 && status !== "kept") updateItemStatus("kept");
+    }
+    setDrag(null);
+  };
+
   return (
-    <article className={`notice sec-${sec} ${status === "kept" ? "kept" : ""}`}>
+    <div className="swipe-wrap" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={() => setDrag(null)}>
+      {dx > 0 && <span className="swipe-hint done" aria-hidden>Done</span>}
+      {dx < 0 && <span className="swipe-hint save" aria-hidden>Save</span>}
+    <article
+      className={`notice sec-${sec} ${status === "kept" ? "kept" : ""}`}
+      style={dx ? { transform: `translateX(${dx}px)` } : undefined}
+    >
       <div className="meta">
         <span className={`src src-${srcClass}`} title={item.from_address || ""}>
           <SrcIcon aria-hidden />
@@ -330,8 +344,10 @@ export function ItemCard({
         {event?.is_cancelled && <span className="tag event high">Class cancelled</span>}
       </div>
 
-      <h3 title={item.subject}>{cleanSubject(item.subject)}</h3>
-      {item.summary && <p className="summary">{item.summary}</p>}
+      <button type="button" className="notice-open" onClick={() => setDetail(true)} aria-label={`Open: ${cleanSubject(item.subject)}`}>
+        <h3 title={item.subject}>{cleanSubject(item.subject)}</h3>
+        {item.summary && <p className="summary">{item.summary}</p>}
+      </button>
 
       {item.linked && item.linked.sources.length > 1 && (
         <div className="linked">
@@ -411,23 +427,22 @@ export function ItemCard({
         </div>
       )}
 
-      {showBody && item.body && <div className="body">{item.body}</div>}
-
       <div className="actions ticket-actions">
         {sec === "action" && (
-          <button className={when?.hot ? "accent" : "ghost"} onClick={() => updateItemStatus("done")}>
+          <button data-act="done" className={when?.hot ? "accent" : "ghost"} onClick={() => updateItemStatus("done")}>
             <Check aria-hidden />
             Done
           </button>
         )}
         {item.body && (
-          <button className="ghost" onClick={() => setShowBody(!showBody)} aria-expanded={showBody}>
-            {showBody ? <ChevronUp aria-hidden /> : <ChevronDown aria-hidden />}
-            {showBody ? "Less" : "Full notice"}
+          <button className="ghost" onClick={() => setDetail(true)}>
+            <ChevronDown aria-hidden />
+            Full notice
           </button>
         )}
         <span className="spacer" />
         <button
+          data-act="save"
           className={`ghost ${status === "kept" ? "on" : ""}`}
           onClick={() => updateItemStatus(status === "kept" ? "new" : "kept")}
           aria-pressed={status === "kept"}
@@ -454,5 +469,65 @@ export function ItemCard({
         </details>
       </div>
     </article>
+    {detail && (
+      <Sheet title={cleanSubject(item.subject)} onClose={() => setDetail(false)}>
+        <p className="eyebrow">
+          {sourceLabel(item)}
+          {item.received_at ? ` · ${formatDate(item.received_at)}` : ""}
+        </p>
+        <h2 className="sheet-title">{cleanSubject(item.subject)}</h2>
+        {(when || item.seat) && (
+          <div className="actions" style={{ marginBottom: 8 }}>
+            {when && (
+              <span className={`when-chip ${when.hot ? "hot" : ""}`}>
+                <Clock aria-hidden />
+                {sec === "action" ? "Due " : ""}
+                {when.text}
+              </span>
+            )}
+            {item.seat && <span className="when-chip seat">Seat {item.seat}</span>}
+          </div>
+        )}
+        <div className="sheet-body">{item.body || item.summary}</div>
+        {linksArray.length > 0 && (
+          <div className="links">
+            {linksArray.map((l, idx) => (
+              <a key={idx} href={l} target="_blank" rel="noopener noreferrer">
+                {formatHost(l)}
+                <ArrowUpRight aria-hidden />
+              </a>
+            ))}
+          </div>
+        )}
+        {event && (
+          <div className="sheet-actions" style={{ marginTop: 14 }}>
+            <button onClick={() => handleAddToTimetable(event)} disabled={addingToTimetable || timetableAdded}>
+              {timetableAdded ? <Check aria-hidden /> : <CalendarPlus aria-hidden />}
+              {timetableAdded ? "In your timetable" : "Add to timetable"}
+            </button>
+            <button className="ghost" onClick={() => handleDownloadIcs(event)}>
+              <Download aria-hidden />
+              .ics
+            </button>
+          </div>
+        )}
+        <div className="sheet-actions" style={{ marginTop: 10 }}>
+          <button
+            onClick={() => {
+              setDetail(false);
+              updateItemStatus("done");
+            }}
+          >
+            <Check aria-hidden />
+            Done
+          </button>
+          <button className="ghost" onClick={() => updateItemStatus(status === "kept" ? "new" : "kept")}>
+            {status === "kept" ? <BookmarkCheck aria-hidden /> : <Bookmark aria-hidden />}
+            {status === "kept" ? "Saved" : "Save"}
+          </button>
+        </div>
+      </Sheet>
+    )}
+    </div>
   );
 }

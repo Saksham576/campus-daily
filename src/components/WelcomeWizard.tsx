@@ -145,14 +145,14 @@ export function WelcomeWizard({ demo = false }: { demo?: boolean }) {
 
   if (!ready) {
     return (
-      <main className="wrap welcome">
+      <main id="main" className="wrap welcome">
         <p className="muted">Loading…</p>
       </main>
     );
   }
 
   return (
-    <main className="wrap welcome">
+    <main id="main" className="wrap welcome">
       <div className="welcome-top">
         <Logo />
         <span className="muted small">

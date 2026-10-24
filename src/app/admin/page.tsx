@@ -17,7 +17,7 @@ export default async function AdminPage() {
   if (!user || !isAdminEmail(user.email)) notFound();
 
   const admin = getAdminClient();
-  if (!admin) return <main className="wrap"><p className="err">SUPABASE_SERVICE_ROLE_KEY is not set.</p></main>;
+  if (!admin) return <main id="main" className="wrap"><p className="err">SUPABASE_SERVICE_ROLE_KEY is not set.</p></main>;
 
   const [{ data: requests }, { data: cards }, { count: students }, { count: pushDevices }, { data: bridge }, { count: moodleConns }] = await Promise.all([
     admin.from("broadcasters").select("*").order("requested_at", { ascending: false }),
@@ -42,7 +42,7 @@ export default async function AdminPage() {
   return (
     <>
     <AppBar />
-    <main className="wrap">
+    <main id="main" className="wrap">
       <header className="top">
         <div>
           <p className="eyebrow">Admin</p>

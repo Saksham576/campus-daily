@@ -4,7 +4,7 @@ export const metadata = { title: "Privacy Policy — Campus Daily" };
 
 export default function PrivacyPage() {
   return (
-    <main className="wrap narrow">
+    <main id="main" className="wrap narrow">
       <h1>Privacy Policy</h1>
       <p className="muted">Last updated: 14 October 2026. Campus Daily is a student-run project at IIT Bombay.</p>
 

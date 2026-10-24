@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Sheet } from "@/components/Sheet";
+import { toast } from "@/components/Toaster";
 import { ChevronLeft, ChevronRight, Clock, MapPin, MoreHorizontal, RotateCcw, XCircle } from "lucide-react";
 import { SEMESTER, WEEKS_AHEAD, WEEKS_BACK, addDays, weekInfo } from "@/lib/timetable/range";
 import { istDate } from "@/lib/timetable/updates";
@@ -81,6 +82,10 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
   });
   const info = useMemo(() => weekInfo(offset), [offset]);
   const [open, setOpen] = useState<Slot | null>(null);
+  const toggle = (s: Slot) => {
+    onToggle(s.id, s.is_cancelled);
+    toast(s.is_cancelled ? "Class restored" : "Marked as cancelled (only for you)", () => onToggle(s.id, !s.is_cancelled));
+  };
   const [nowMin, setNowMin] = useState<number | null>(null);
   const [noteGone, setNoteGone] = useState(true);
   useEffect(() => {
@@ -249,7 +254,7 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
                         className="week-act"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onToggle(s.id, s.is_cancelled);
+                          toggle(s);
                         }}
                         aria-label={s.is_cancelled ? `Undo cancelled: ${s.title}` : `Mark ${s.title} as cancelled (only for me)`}
                         title={s.is_cancelled ? "Undo" : "Mark as cancelled (only for me)"}
@@ -300,7 +305,7 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
                   </div>
                 </div>
                 {s.is_cancelled ? (
-                  <button type="button" className="ghost" onClick={() => onToggle(s.id, s.is_cancelled)}>
+                  <button type="button" className="ghost" onClick={() => toggle(s)}>
                     Undo
                   </button>
                 ) : (
@@ -309,7 +314,7 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
                       <MoreHorizontal aria-hidden width={18} height={18} />
                     </summary>
                     <div className="more-menu">
-                      <button type="button" onClick={() => onToggle(s.id, s.is_cancelled)}>
+                      <button type="button" onClick={() => toggle(s)}>
                         <XCircle aria-hidden />
                         Mark as cancelled (only for me)
                       </button>
@@ -346,7 +351,7 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
               type="button"
               className={open.is_cancelled ? "ghost" : ""}
               onClick={() => {
-                onToggle(open.id, open.is_cancelled);
+                toggle(open);
                 setOpen(null);
               }}
             >

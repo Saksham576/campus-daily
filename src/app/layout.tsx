@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ServiceWorker } from "@/components/ServiceWorker";
+import { Toaster } from "@/components/Toaster";
+import { Shortcuts } from "@/components/Shortcuts";
 
 const sans = Inter({ subsets: ["latin"], variable: "--f-sans", display: "swap" });
 
@@ -32,7 +34,12 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: "try{var t=localStorage.getItem('cd_theme');if(t)document.documentElement.dataset.theme=t}catch(e){}" }} />
       </head>
       <body>
+        <a href="#main" className="skip">
+          Skip to content
+        </a>
         {children}
+        <Toaster />
+        <Shortcuts />
         <ServiceWorker />
       </body>
     </html>

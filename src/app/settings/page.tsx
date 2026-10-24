@@ -210,7 +210,7 @@ function SettingsContent() {
     return (
       <>
         <AppBar />
-        <main className="wrap">
+        <main id="main" className="wrap">
           <p className="muted" style={{ paddingTop: 40 }}>Loading your settings…</p>
         </main>
       </>
@@ -220,7 +220,7 @@ function SettingsContent() {
   return (
     <>
       <AppBar />
-      <main className="wrap">
+      <main id="main" className="wrap">
         <div className="page-head">
           <div>
             <p className="eyebrow">Signed in as {userEmail}</p>
@@ -452,7 +452,7 @@ export default function SettingsPage() {
   return (
     <Suspense
       fallback={
-        <main className="wrap">
+        <main id="main" className="wrap">
           <p className="muted">Loading settings…</p>
         </main>
       }

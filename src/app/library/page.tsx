@@ -22,11 +22,11 @@ export default async function LibraryPage() {
   return (
     <>
       <AppBar />
-      <main className="wrap">
+      <main id="main" className="wrap">
         <div className="page-head">
           <div>
             <p className="eyebrow">From Moodle · updated every 15 min</p>
-            <h1>Course library</h1>
+            <h1>Course files</h1>
           </div>
         </div>
         {error && <p className="err">Could not load files: {error.message}</p>}

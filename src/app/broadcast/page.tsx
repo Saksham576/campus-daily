@@ -68,7 +68,7 @@ export default function BroadcastPage() {
     setForm({ ...form, [k]: e.target.value });
 
   return (
-    <main className="wrap narrow-form">
+    <main id="main" className="wrap narrow-form">
       <header className="top">
         <div>
           <p className="eyebrow">For Professors & TAs</p>

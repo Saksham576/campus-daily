@@ -10,7 +10,7 @@ export default function PreviewSettings() {
   return (
     <>
       <AppBar />
-      <main className="wrap">
+      <main id="main" className="wrap">
         <div className="page-head">
           <div>
             <p className="eyebrow">26b2477@iitb.ac.in</p>
