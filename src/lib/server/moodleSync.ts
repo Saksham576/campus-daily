@@ -232,6 +232,23 @@ export async function syncMoodle(admin: SupabaseClient, deadlineMs: number) {
             }
           }
           await markSeen(admin, keys);
+
+          // Files attached to announcements (tutorial batch lists, schedules) aren't in the course contents; read them too.
+          if (forum.type === "news") {
+            const all = await moodleCall<any>(token, "mod_forum_get_forum_discussions", { forumid: forum.id, page: 0, perpage: 100 }).catch(() => ({ discussions: [] }));
+            const attached = ((all.discussions || []) as any[]).flatMap((d) =>
+              ((d.attachments || []) as any[]).map((a) => ({
+                course_id: course.id,
+                course_code: code,
+                file_url: a.fileurl as string,
+                name: (a.filename || "") as string,
+                mimetype: (a.mimetype || null) as string | null,
+                view_url: `${MOODLE_URL}/mod/forum/discuss.php?d=${d.discussion || d.id}`,
+                modified_at: a.timemodified ? new Date(a.timemodified * 1000).toISOString() : null,
+              }))
+            );
+            await queueDocuments(admin, attached.filter((a) => a.file_url && a.name));
+          }
         }
 
         // 2) Files (slides, handouts, seating plans)
