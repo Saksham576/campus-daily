@@ -15,7 +15,11 @@ export type Slot = {
   end_time?: string | null;
   slot_type: string;
   is_cancelled?: boolean;
+  series_id?: string | null;
+  origin?: "manual" | "gcal" | null;
 };
+
+export type SlotEdit = { title: string; location: string; start: string; end: string };
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 // One steady colour per course, so a week reads at a glance.
@@ -70,7 +74,17 @@ const nameOf = (title: string) => (title.includes(": ") ? title.split(": ").slic
  * Desktop: a Mon–Fri week calendar with classes placed by time.
  * Phones: one day at a time as a list. Cancel / Restore on every class.
  */
-export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (id: string, cancelled?: boolean) => void }) {
+export function TimetableView({
+  slots,
+  onToggle,
+  onRemove,
+  onEdit,
+}: {
+  slots: Slot[];
+  onToggle: (id: string, cancelled?: boolean) => void;
+  onRemove?: (slot: Slot, scope: "one" | "series") => void;
+  onEdit?: (slot: Slot, patch: SlotEdit, scope: "one" | "series") => void;
+}) {
   const wd = (ist(new Date().toISOString()).getUTCDay() + 6) % 7;
   const weekend = wd > 4;
   // Weekends, and weeks whose classes are all over, open on the coming week.
@@ -82,6 +96,13 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
   });
   const info = useMemo(() => weekInfo(offset), [offset]);
   const [open, setOpen] = useState<Slot | null>(null);
+  const [editing, setEditing] = useState<SlotEdit | null>(null);
+  const hhmmIn = (iso: string) => hhmm(iso);
+  const repeats = open?.series_id ? slots.filter((s) => s.series_id === open.series_id).length : 0;
+  const close = () => {
+    setOpen(null);
+    setEditing(null);
+  };
   const toggle = (s: Slot) => {
     onToggle(s.id, s.is_cancelled);
     toast(s.is_cancelled ? "Class restored" : "Marked as cancelled (only for you)", () => onToggle(s.id, !s.is_cancelled));
@@ -327,7 +348,7 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
         )}
       </div>
       {open && (
-        <Sheet title={open.title} onClose={() => setOpen(null)}>
+        <Sheet title={open.title} onClose={close}>
           <p className="eyebrow">
             {new Date(open.start_time).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Kolkata" })}
           </p>
@@ -358,6 +379,92 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
               {open.is_cancelled ? "Undo cancelled" : "Mark as cancelled (only for me)"}
             </button>
           </div>
+          {open.origin && onRemove && (
+            <div className="sheet-manage">
+              <h3 className="chips-title">{open.origin === "gcal" ? "From your calendar" : "Your own slot"}</h3>
+              {open.origin === "gcal" && <p className="help">Edit it in Google Calendar. If you delete it here it comes back at the next refresh; disconnect the calendar in Import to stop that.</p>}
+              {open.origin === "manual" && onEdit && editing && (
+                <div className="pform" style={{ marginBottom: 10 }}>
+                  <label>
+                    Name
+                    <input type="text" value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} />
+                  </label>
+                  <label>
+                    Venue
+                    <input type="text" value={editing.location} onChange={(e) => setEditing({ ...editing, location: e.target.value })} />
+                  </label>
+                  <div className="row2">
+                    <label>
+                      Starts
+                      <input type="time" value={editing.start} onChange={(e) => setEditing({ ...editing, start: e.target.value })} />
+                    </label>
+                    <label>
+                      Ends
+                      <input type="time" value={editing.end} onChange={(e) => setEditing({ ...editing, end: e.target.value })} />
+                    </label>
+                  </div>
+                  <div className="actions">
+                    <button
+                      type="button"
+                      className="primary"
+                      onClick={() => {
+                        onEdit(open, editing, "one");
+                        close();
+                      }}
+                    >
+                      Save this one
+                    </button>
+                    {repeats > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onEdit(open, editing, "series");
+                          close();
+                        }}
+                      >
+                        Save all {repeats}
+                      </button>
+                    )}
+                    <button type="button" className="ghost" onClick={() => setEditing(null)}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+              {!editing && (
+                <div className="sheet-actions">
+                  {open.origin === "manual" && onEdit && (
+                    <button type="button" onClick={() => setEditing({ title: open.title, location: open.location || "", start: hhmmIn(open.start_time), end: open.end_time ? hhmmIn(open.end_time) : hhmmIn(open.start_time) })}>
+                      Edit
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="danger"
+                    onClick={() => {
+                      onRemove(open, "one");
+                      close();
+                    }}
+                  >
+                    {repeats > 1 ? "Delete this one" : "Delete"}
+                  </button>
+                  {repeats > 1 && (
+                    <button
+                      type="button"
+                      className="danger"
+                      onClick={() => {
+                        if (!confirm(`Delete all ${repeats} repeats of "${codeOf(open.title)}"?`)) return;
+                        onRemove(open, "series");
+                        close();
+                      }}
+                    >
+                      Delete all {repeats}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </Sheet>
       )}
     </>

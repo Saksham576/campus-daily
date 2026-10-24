@@ -3336,3 +3336,16 @@ kbd {
     background: none;
   }
 }
+
+/* ---------- Slot form, calendar import, own-slot management ---------- */
+.cal-steps {
+  margin: 8px 0 12px;
+  padding-left: 22px;
+  display: grid;
+  gap: 4px;
+}
+.sheet-manage {
+  margin-top: 18px;
+  padding-top: 4px;
+  border-top: 1px solid var(--rule);
+}
