@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Clock, MapPin, RotateCcw, XCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, MapPin, MoreHorizontal, RotateCcw, XCircle } from "lucide-react";
 import { SEMESTER, WEEKS_AHEAD, WEEKS_BACK, addDays, weekInfo } from "@/lib/timetable/range";
 import { istDate } from "@/lib/timetable/updates";
 
@@ -165,8 +165,8 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
                         type="button"
                         className="week-act"
                         onClick={() => onToggle(s.id, s.is_cancelled)}
-                        aria-label={s.is_cancelled ? `Restore ${s.title}` : `Cancel ${s.title}`}
-                        title={s.is_cancelled ? "Restore" : "Mark cancelled"}
+                        aria-label={s.is_cancelled ? `Undo cancelled: ${s.title}` : `Mark ${s.title} as cancelled (only for me)`}
+                        title={s.is_cancelled ? "Undo" : "Mark as cancelled (only for me)"}
                       >
                         {s.is_cancelled ? <RotateCcw /> : <XCircle />}
                       </button>
@@ -213,9 +213,23 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
                     )}
                   </div>
                 </div>
-                <button type="button" className="ghost" onClick={() => onToggle(s.id, s.is_cancelled)}>
-                  {s.is_cancelled ? "Restore" : "Cancel"}
-                </button>
+                {s.is_cancelled ? (
+                  <button type="button" className="ghost" onClick={() => onToggle(s.id, s.is_cancelled)}>
+                    Undo
+                  </button>
+                ) : (
+                  <details className="more">
+                    <summary aria-label={`More options for ${s.title}`}>
+                      <MoreHorizontal aria-hidden width={18} height={18} />
+                    </summary>
+                    <div className="more-menu">
+                      <button type="button" onClick={() => onToggle(s.id, s.is_cancelled)}>
+                        <XCircle aria-hidden />
+                        Mark as cancelled (only for me)
+                      </button>
+                    </div>
+                  </details>
+                )}
               </div>
             ))}
           </div>
