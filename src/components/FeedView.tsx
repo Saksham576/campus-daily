@@ -12,18 +12,20 @@ import { Bookmark, Search, Settings, Sparkles } from "lucide-react";
 
 type Key = "action" | "exams" | "courses" | "events" | "opportunities" | "campus" | "saved" | "all";
 type View = "foryou" | "explore" | "saved";
-type Chip = "everything" | "events" | "opportunities" | "campus";
+type Chip = "everything" | "events" | "opportunities" | "campus" | "deadlines";
 
-const GROUPS: { key: Key; label: string; note: string }[] = [
-  { key: "action", label: "Due soon", note: "Deadlines and registrations, soonest first." },
-  { key: "exams", label: "Exams & quizzes", note: "Soonest first." },
-  { key: "courses", label: "My courses", note: "Notices about the courses you take." },
-];
+const GROUP_META = {
+  action: { label: "Due soon", note: "Deadlines and registrations for you, soonest first." },
+  exams: { label: "Exams & quizzes", note: "Soonest first." },
+  courses: { label: "My courses", note: "Notices about the courses you take." },
+  picked: { label: "Picked for you", note: "Matches your clubs, interests and hostel." },
+} as const;
 const CHIPS: { key: Chip; label: string }[] = [
   { key: "everything", label: "All" },
   { key: "events", label: "Events" },
   { key: "opportunities", label: "Opportunities" },
   { key: "campus", label: "Campus life" },
+  { key: "deadlines", label: "Other deadlines" },
 ];
 
 // Settings you can jump to straight from the search box.
@@ -56,9 +58,34 @@ export function FeedView({
   const input = useRef<HTMLInputElement>(null);
   const params = useSearchParams();
 
-  const foryouCount = sections.action.length + sections.exams.length + sections.courses.length;
+  const rel = (i: FeedItem) => i.relevant !== false;
+  const picked = useMemo(() => {
+    const t = (i: FeedItem) => (i.when ? new Date(i.when).getTime() : Infinity);
+    return [...sections.events, ...sections.opportunities, ...sections.campus]
+      .filter(rel)
+      .sort((a, b) => t(a) - t(b) || new Date(b.received_at || 0).getTime() - new Date(a.received_at || 0).getTime());
+  }, [sections]);
+  const groups = useMemo(
+    () =>
+      (
+        [
+          { key: "action", items: sections.action.filter(rel) },
+          { key: "exams", items: sections.exams.filter(rel) },
+          { key: "courses", items: sections.courses.filter(rel) },
+          { key: "picked", items: picked },
+        ] as { key: keyof typeof GROUP_META; items: FeedItem[] }[]
+      ).filter((g) => g.items.length),
+    [sections, picked]
+  );
+  const foryouCount = groups.reduce((n, g) => n + g.items.length, 0);
+  const otherDeadlines = sections.action.filter((i) => !rel(i));
+  const hidden = [...sections.action, ...sections.events, ...sections.opportunities, ...sections.campus].filter((i) => !rel(i)).length;
   const exploreOf = (c: Chip): FeedItem[] =>
-    c === "everything" ? [...sections.events, ...sections.opportunities, ...sections.campus] : sections[c];
+    c === "everything"
+      ? [...sections.events, ...sections.opportunities, ...sections.campus, ...otherDeadlines]
+      : c === "deadlines"
+      ? otherDeadlines
+      : sections[c];
 
   // Remember the last view on this device; open on "For you" unless it is empty and Explore has news.
   useEffect(() => {
@@ -79,7 +106,7 @@ export function FeedView({
     } catch {}
   }
 
-  const dueSoon = sections.action.some((i) => i.when && new Date(i.when).getTime() - Date.now() < 48 * 3600_000);
+  const dueSoon = sections.action.filter(rel).some((i) => i.when && new Date(i.when).getTime() - Date.now() < 48 * 3600_000);
   const needle = q.trim().toLowerCase();
   const found = useMemo(
     () =>
@@ -115,30 +142,45 @@ export function FeedView({
       </>
     );
   } else if (view === "foryou") {
-    const any = foryouCount > 0;
     let n = 0;
-    body = any ? (
-      <div className="groups">
-        {GROUPS.filter((g) => sections[g.key].length).map((g) => (
-          <section key={g.key} className="group" aria-label={g.label}>
-            <h2 className="group-title">
-              {g.label} <span className="count">{sections[g.key].length}</span>
-            </h2>
-            <p className="section-note">{g.note}</p>
-            <div className="tickets">{sections[g.key].map((it) => card(it, n++, true))}</div>
-          </section>
-        ))}
-        {foryouCount <= 2 && sponsored && <SponsoredCard card={sponsored} />}
-      </div>
-    ) : (
-      <div className="empty">Nothing due. You&apos;re all clear. Try Explore for events and opportunities.</div>
+    body = (
+      <>
+        {foryouCount > 0 ? (
+          <div className="groups">
+            {groups.map((g) => (
+              <section key={g.key} className="group" aria-label={GROUP_META[g.key].label}>
+                <h2 className="group-title">
+                  {GROUP_META[g.key].label} <span className="count">{g.items.length}</span>
+                </h2>
+                <p className="section-note">{GROUP_META[g.key].note}</p>
+                <div className="tickets">{g.items.map((it) => card(it, n++, true))}</div>
+              </section>
+            ))}
+            {foryouCount <= 2 && sponsored && <SponsoredCard card={sponsored} />}
+          </div>
+        ) : (
+          <div className="empty">Nothing for you right now. You&apos;re all clear.</div>
+        )}
+        <p className="foryou-foot">
+          {hidden > 0 && (
+            <>
+              {hidden} more notice{hidden === 1 ? "" : "s"} {hidden === 1 ? "is" : "are"} in{" "}
+              <button type="button" className="link" onClick={() => pick("explore")}>
+                Explore
+              </button>
+              .{" "}
+            </>
+          )}
+          <Link href="/settings#interests">Change what you follow</Link>
+        </p>
+      </>
     );
   } else if (view === "explore") {
     const list = exploreOf(chip);
     body = (
       <>
         <div className="chips-row" role="group" aria-label="Filter">
-          {CHIPS.map((c) => (
+          {CHIPS.filter((c) => c.key !== "deadlines" || otherDeadlines.length > 0).map((c) => (
             <button key={c.key} type="button" className={`search-chip ${chip === c.key ? "active" : ""}`} aria-pressed={chip === c.key} onClick={() => setChip(c.key)}>
               {c.label} <span className="count">{exploreOf(c.key).length}</span>
             </button>

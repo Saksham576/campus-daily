@@ -12,6 +12,9 @@ import { CoursePicker } from "@/components/CoursePicker";
 import { ResobinImport } from "@/components/ResobinImport";
 import { MoodleConnect } from "@/components/MoodleConnect";
 import { CalendarLink } from "@/components/CalendarLink";
+import { InterestPicker } from "@/components/InterestPicker";
+import { RequestBox } from "@/components/RequestBox";
+import type { FeedMode } from "@/lib/relevance";
 import { AppBar } from "@/components/AppBar";
 import {
   DEPARTMENTS,
@@ -38,6 +41,8 @@ function SettingsContent() {
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
+  const [feedMode, setFeedMode] = useState<FeedMode>("balanced");
+  const prefsBase = useRef<string | null>(null);
   const [form, setForm] = useState<Profile>({
     department: "",
     year: "1",
@@ -89,6 +94,7 @@ function SettingsContent() {
           delivery_preference: resolvedDelivery,
           moodle_ical_url: "",
         });
+        setFeedMode((sub.feed_mode as FeedMode) || "balanced");
       }
       setLoading(false);
     }
@@ -116,9 +122,10 @@ function SettingsContent() {
   const lastSaved = useRef<string | null>(null);
   useEffect(() => {
     if (loading || isOnboarding) return;
-    const now = JSON.stringify(form);
+    const now = JSON.stringify([form, feedMode]);
     if (lastSaved.current === null) {
       lastSaved.current = now;
+      prefsBase.current = JSON.stringify([form.categories, form.keywords, feedMode]);
       return;
     }
     if (now === lastSaved.current) return;
@@ -128,7 +135,7 @@ function SettingsContent() {
     }, 800);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, loading, isOnboarding]);
+  }, [form, feedMode, loading, isOnboarding]);
 
   async function handleSubmit(e?: React.FormEvent, auto = false) {
     e?.preventDefault();
@@ -156,6 +163,8 @@ function SettingsContent() {
         ...(form.hostel ? { hostel: form.hostel } : {}),
         categories: form.categories,
         keywords: cleanKeywords,
+        feed_mode: feedMode,
+        ...(JSON.stringify([form.categories, form.keywords, feedMode]) !== prefsBase.current || isOnboarding ? { prefs_set_at: new Date().toISOString() } : {}),
         personal_email: cleanPersonalEmail,
         delivery_preference: form.delivery_preference,
         // Legacy columns kept in sync for the old digest script
@@ -328,56 +337,19 @@ function SettingsContent() {
               <MoodleConnect />
             </Panel>
 
-            <Panel id="interests" title="Interests" sub="Topics you care about rank higher. Keywords can be clubs, sports or anything else.">
-              <div className="chips">
-                {CATEGORIES.map((cat) => {
-                  const on = form.categories.includes(cat);
-                  return (
-                    <span
-                      key={cat}
-                      role="checkbox"
-                      aria-checked={on}
-                      tabIndex={0}
-                      onClick={() => toggleCategory(cat)}
-                      onKeyDown={(e) => {
-                        if (e.key === " " || e.key === "Enter") {
-                          e.preventDefault();
-                          toggleCategory(cat);
-                        }
-                      }}
-                      className={`chip ${on ? "on" : ""}`}
-                    >
-                      {cat}
-                    </span>
-                  );
-                })}
-              </div>
-              <h3 className="chips-title">Clubs you follow</h3>
-              <div className="chips">
-                {CLUBS.map((c) => (
-                  <button key={c} type="button" className={`chip ${hasKw(c) ? "on" : ""}`} aria-pressed={hasKw(c)} onClick={() => toggleKw(c)}>
-                    {c}
-                  </button>
-                ))}
-              </div>
-              <h3 className="chips-title">Also tell me about</h3>
-              <div className="chips">
-                {WANTS.map((w) => (
-                  <button key={w.kw} type="button" className={`chip ${hasKw(w.kw) ? "on" : ""}`} aria-pressed={hasKw(w.kw)} onClick={() => toggleKw(w.kw)} title={w.hint}>
-                    {w.label}
-                  </button>
-                ))}
-              </div>
-              <label className="field">
-                Keywords
-                <input
-                  type="text"
-                  placeholder="e.g. robotics, techfest, football, placement"
-                  value={form.keywords}
-                  onChange={(e) => setForm({ ...form, keywords: e.target.value })}
+            <Panel id="interests" title="What you follow" sub="Home shows what matters to you first. Everything else waits in Explore.">
+              <div data-nosubmit>
+                <InterestPicker
+                  value={{ categories: form.categories, keywords: form.keywords || "", feed_mode: feedMode }}
+                  onChange={(v) => {
+                    setForm((f) => ({ ...f, categories: v.categories, keywords: v.keywords }));
+                    setFeedMode(v.feed_mode);
+                  }}
                 />
-                <span className="help">Comma-separated.</span>
-              </label>
+                <h3 className="chips-title">Something we don&apos;t cover yet?</h3>
+                <p className="help">Tell us a group, page or service you wish was here. We read every one.</p>
+                <RequestBox context="settings" />
+              </div>
             </Panel>
 
             <Panel id="alerts" title="Alerts & calendar" sub="Phone alerts for cancellations and top-priority notices, the morning digest, and a live calendar link.">

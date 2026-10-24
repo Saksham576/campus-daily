@@ -56,6 +56,9 @@ export type FeedItem = {
   seat?: string | null;
   /** Set when several sources reported the same event (see lib/linking). */
   linked?: Linked;
+  /** Set on Home: does this clear the bar for what the student follows, and why. */
+  relevant?: boolean;
+  why?: string | null;
 };
 
 const SOURCE_NAME: Record<string, string> = { moodle: "Moodle", email: "Email", whatsapp: "WhatsApp", bodhitree: "Bodhitree" };
@@ -386,6 +389,7 @@ export function ItemCard({
         )}
         {item.is_verified && <span className="tag verified">Instructor</span>}
         {item.score >= 8 && <span className="tag high">Priority</span>}
+        {item.why && !item.myCourse && <span className="tag why" title="Why you are seeing this">{item.why}</span>}
         {event?.is_cancelled && <span className="tag event high">Class cancelled</span>}
       </div>
 

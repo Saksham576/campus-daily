@@ -10,6 +10,9 @@ import { CoursePicker } from "@/components/CoursePicker";
 import { ResobinImport } from "@/components/ResobinImport";
 import { MoodleConnect } from "@/components/MoodleConnect";
 import { PushToggle } from "@/components/PushToggle";
+import { InterestPicker } from "@/components/InterestPicker";
+import { RequestBox } from "@/components/RequestBox";
+import type { FeedMode } from "@/lib/relevance";
 import { DigestPicker } from "@/components/DigestPicker";
 import { coursesForDivision } from "@/lib/timetable/catalog";
 import { CATEGORIES, CLUBS, DEPARTMENTS, DIVISIONS, HASMED, HOSTELS, PROGRAM_YEARS, WANTS } from "@/lib/constants";
@@ -42,8 +45,9 @@ export function WelcomeWizard({ demo = false }: { demo?: boolean }) {
     division: "",
     hostel: "",
     hasmed: HASMED[0] as string,
-    categories: [...CATEGORIES] as string[],
+    categories: [] as string[],
     keywords: "",
+    feed_mode: "balanced" as FeedMode,
   });
 
   useEffect(() => {
@@ -64,8 +68,9 @@ export function WelcomeWizard({ demo = false }: { demo?: boolean }) {
           year: sub.year ? String(sub.year) : yearFromRoll(user.email) || f.year,
           division: sub.division || "",
           hostel: sub.hostel || "",
-          categories: Array.isArray(sub.categories) && sub.categories.length ? sub.categories : f.categories,
+          categories: Array.isArray(sub.categories) && sub.categories.length && sub.categories.length < CATEGORIES.length ? sub.categories : f.categories,
           keywords: sub.keywords || "",
+          feed_mode: (sub.feed_mode as FeedMode) || f.feed_mode,
         }));
       } else {
         const y = yearFromRoll(user.email);
@@ -112,9 +117,13 @@ export function WelcomeWizard({ demo = false }: { demo?: boolean }) {
         category: form.categories.join(", "),
         keywords,
         interests: keywords,
+        feed_mode: form.feed_mode,
         updated_at: new Date().toISOString(),
       };
-      if (finish) payload.onboarded_at = new Date().toISOString();
+      if (finish) {
+        payload.onboarded_at = new Date().toISOString();
+        payload.prefs_set_at = new Date().toISOString();
+      }
       const { error: e } = await supabase.from("subscribers").upsert(payload, { onConflict: "email" });
       if (e) throw new Error(e.message);
       if (finish) {
@@ -280,39 +289,16 @@ export function WelcomeWizard({ demo = false }: { demo?: boolean }) {
 
       {step === 2 && (
         <section className="welcome-card">
-          <h1>What do you care about?</h1>
-          <p className="muted">Notices on ticked topics rank higher. All are on to start: tap the ones you don&apos;t care about to turn them off.</p>
-          <div className="chips" style={{ marginTop: 16 }}>
-            {CATEGORIES.map((c) => (
-              <button key={c} type="button" className={`chip ${form.categories.includes(c) ? "on" : ""}`} aria-pressed={form.categories.includes(c)} onClick={() => toggle(c)}>
-                {form.categories.includes(c) && <Check aria-hidden className="chip-tick" />}
-                {c}
-              </button>
-            ))}
-          </div>
-          <h2 className="chips-title">Clubs you follow</h2>
-          <div className="chips">
-            {CLUBS.map((c) => (
-              <button key={c} type="button" className={`chip ${hasKw(c) ? "on" : ""}`} aria-pressed={hasKw(c)} onClick={() => toggleKw(c)}>
-                {hasKw(c) && <Check aria-hidden className="chip-tick" />}
-                {c}
-              </button>
-            ))}
-          </div>
-          <h2 className="chips-title">Also tell me about</h2>
-          <div className="chips">
-            {WANTS.map((w) => (
-              <button key={w.kw} type="button" className={`chip ${hasKw(w.kw) ? "on" : ""}`} aria-pressed={hasKw(w.kw)} onClick={() => toggleKw(w.kw)} title={w.hint}>
-                {hasKw(w.kw) && <Check aria-hidden className="chip-tick" />}
-                {w.label}
-              </button>
-            ))}
-          </div>
-          <label className="field" style={{ marginTop: 18 }}>
-            Keywords (optional)
-            <input type="text" placeholder="robotics, football, placement…" value={form.keywords} onChange={(e) => setForm({ ...form, keywords: e.target.value })} />
-            <span className="help">Comma-separated: clubs, sports, anything.</span>
-          </label>
+          <h1>What do you want to hear about?</h1>
+          <p className="muted">Home shows what matters to you first. Pick your clubs and interests; anything else waits in Explore. You can change this any time.</p>
+          <InterestPicker value={{ categories: form.categories, keywords: form.keywords, feed_mode: form.feed_mode }} onChange={(v) => setForm((f) => ({ ...f, ...v }))} />
+          <details className="welcome-block welcome-more" style={{ marginTop: 18 }}>
+            <summary>
+              <b>Something we don&apos;t cover yet?</b>
+              <span className="help">A group, page or service you wish was here. We read every one.</span>
+            </summary>
+            <RequestBox context="onboarding" />
+          </details>
         </section>
       )}
 

@@ -198,3 +198,38 @@ export type Profile = {
   moodle_ical_url?: string;
 };
 
+
+/** What students can follow. Each chip's label is stored as a keyword; src/lib/relevance.ts knows its nicknames. */
+export const INTEREST_GROUPS: { title: string; hint: string; chips: string[] }[] = [
+  {
+    title: "Careers",
+    hint: "Talks, deadlines and openings",
+    chips: ["Placements & internships", "Quant & finance", "Consulting", "Product & tech roles", "Core engineering", "Research & higher studies", "Startups & E-Cell"],
+  },
+  {
+    title: "Tech clubs and teams",
+    hint: "Recruitments, workshops, contests",
+    chips: ["Web & Coding Club", "Robotics", "Quant Club", "Analytics Club", "Aeromodelling", "Mars Rover", "Hyperloop", "Astronomy", "Insight", "Hackathons & coding contests"],
+  },
+  {
+    title: "Culture and arts",
+    hint: "Fests, auditions, shows",
+    chips: ["Mood Indigo", "Techfest", "Music", "Dance", "Dramatics", "Photography", "Films", "Literary", "Quizzing", "Debating"],
+  },
+  {
+    title: "Sports and fitness",
+    hint: "Trials, matches, camps",
+    chips: ["Sports trials & NSO", "Cricket", "Football", "Basketball", "Badminton", "Table Tennis", "Chess", "Swimming", "Athletics", "Fitness & gym"],
+  },
+  {
+    title: "Campus life",
+    hint: "Your day-to-day",
+    chips: ["Orientation & freshie events", "Mess & hostel updates", "Scholarships & fee notices", "Wellness & counselling", "NSS", "Lost & found"],
+  },
+];
+
+export const FEED_MODES: { key: "focused" | "balanced" | "everything"; label: string; hint: string }[] = [
+  { key: "focused", label: "Only what I follow", hint: "Your courses, your hostel and the things you ticked. Quietest." },
+  { key: "balanced", label: "Balanced", hint: "Plus notices that concern every student, like registration and fees." },
+  { key: "everything", label: "Show me everything", hint: "All notices on Home. Nothing is hidden." },
+];
