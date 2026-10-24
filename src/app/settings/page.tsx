@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -112,8 +112,26 @@ function SettingsContent() {
     });
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  // Saves by itself a moment after you stop changing things (not during first-time setup, which ends with a button).
+  const lastSaved = useRef<string | null>(null);
+  useEffect(() => {
+    if (loading || isOnboarding) return;
+    const now = JSON.stringify(form);
+    if (lastSaved.current === null) {
+      lastSaved.current = now;
+      return;
+    }
+    if (now === lastSaved.current) return;
+    const t = setTimeout(() => {
+      lastSaved.current = now;
+      handleSubmit(undefined, true);
+    }, 800);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, loading, isOnboarding]);
+
+  async function handleSubmit(e?: React.FormEvent, auto = false) {
+    e?.preventDefault();
     setSaving(true);
     setErrorMsg("");
     setSuccessMsg("");
@@ -145,7 +163,7 @@ function SettingsContent() {
         interests: cleanKeywords,
         delivery_email: cleanPersonalEmail,
         delivery: form.delivery_preference === "both" ? "app_email" : form.delivery_preference,
-        onboarded_at: new Date().toISOString(),
+        ...(auto ? {} : { onboarded_at: new Date().toISOString() }),
         updated_at: new Date().toISOString(),
       };
       if (user?.id) payload.user_id = user.id;
@@ -411,12 +429,18 @@ function SettingsContent() {
               </div>
             </Panel>
 
-            <div className="save-bar">
-              <span>{successMsg || "Profile, interests and email save together."}</span>
-              <button type="submit" disabled={saving} className="primary">
-                {saving ? "Saving…" : isOnboarding ? "Save and finish" : "Save"}
-              </button>
-            </div>
+            {isOnboarding ? (
+              <div className="save-bar">
+                <span>{successMsg || "Profile, interests and email save together."}</span>
+                <button type="submit" disabled={saving} className="primary">
+                  {saving ? "Saving…" : "Save and finish"}
+                </button>
+              </div>
+            ) : (
+              <p className="help" role="status" style={{ textAlign: "center", margin: "12px 0 0" }}>
+                {saving ? "Saving…" : errorMsg ? errorMsg : successMsg ? "Saved ✓" : "Changes save automatically."}
+              </p>
+            )}
           </form>
         </div>
       </main>
