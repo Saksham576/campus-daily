@@ -76,7 +76,7 @@ export default async function AdminPage() {
         </div>
         <div className="board-row" style={{ gridTemplateColumns: "140px 1fr auto" }}>
           <span className="c">MOODLE</span>
-          <span className="n">{moodleConns ?? 0} student(s) connected · read every 30 min</span>
+          <span className="n">{moodleConns ?? 0} student(s) connected · read every 15 min</span>
           <span className={`status ${moodleConns ? "go" : "done"}`}>{moodleConns ? "On" : "None yet"}</span>
         </div>
         <div className="board-row" style={{ gridTemplateColumns: "140px 1fr auto" }}>

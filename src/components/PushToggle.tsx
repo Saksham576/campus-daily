@@ -71,7 +71,11 @@ export function PushToggle() {
         </span>
         <div className="push-text">
           <b>Notifications aren&apos;t available in this browser</b>
-          <span className="help">On iPhone, first tap Share → Add to Home Screen, then open Campus Daily from there.</span>
+          <span className="help">
+            {typeof navigator !== "undefined" && /iPhone|iPad|iPod/.test(navigator.userAgent) && !window.matchMedia("(display-mode: standalone)").matches
+              ? "On iPhone, first tap Share → Add to Home Screen, then open Campus Daily from there."
+              : "This browser doesn't support alerts. Try Chrome on your phone or laptop."}
+          </span>
         </div>
       </div>
     );

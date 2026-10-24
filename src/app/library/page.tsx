@@ -25,7 +25,7 @@ export default async function LibraryPage() {
       <main className="wrap">
         <div className="page-head">
           <div>
-            <p className="eyebrow">From Moodle · updated every 30 min</p>
+            <p className="eyebrow">From Moodle · updated every 15 min</p>
             <h1>Course library</h1>
           </div>
         </div>

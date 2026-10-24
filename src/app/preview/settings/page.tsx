@@ -90,7 +90,7 @@ export default function PreviewSettings() {
                 <button type="button">Turn off</button>
               </div>
             </Panel>
-            <Panel id="appearance" title="Appearance" sub="Light or dark. You can also switch from the sidebar.">
+            <Panel id="appearance" title="Appearance" sub="Light or dark. You can also use the sun / moon button at the top.">
               <ThemePicker />
             </Panel>
             <Panel id="privacy" title="Data & privacy" sub="Download everything we store about you, or delete your account.">

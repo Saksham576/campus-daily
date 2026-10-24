@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUp, Check, Sparkles, X } from "lucide-react";
 
-const SUGGESTIONS = ["When is my next quiz?", "What's due this week?", "Send my digest by email"];
+const SUGGESTIONS = ["When is my next quiz?", "What's due this week?", "Get my morning digest by email"];
 
 /** Plain answer text; lines starting with "- " become a list. */
 function AnswerText({ text }: { text: string }) {

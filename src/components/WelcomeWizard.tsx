@@ -363,7 +363,7 @@ export function WelcomeWizard({ demo = false }: { demo?: boolean }) {
           ) : (
             <button type="button" className="primary" onClick={() => save(true)} disabled={saving}>
               <Check aria-hidden />
-              {saving ? "Finishing…" : "Open my board"}
+              {saving ? "Finishing…" : "Go to Campus Daily"}
             </button>
           )}
         </span>
