@@ -22,7 +22,7 @@ const MIN_SCORE = 4;
 const IST = 5.5 * 3600_000;
 
 /** Today's classes (or the next class day's) for the departure board. */
-function boardFor(courses: UserCourse[], updates: CourseUpdate[], saved: any[], now: Date): { title: string; rows: BoardRow[] } {
+function boardFor(courses: UserCourse[], updates: CourseUpdate[], saved: any[], now: Date): { title: string; rows: BoardRow[]; holiday?: boolean } {
   for (let offset = 0; offset < 8; offset++) {
     const day = new Date(now.getTime() + offset * 86400_000);
     const date = istDate(day.toISOString());
@@ -54,6 +54,9 @@ function boardFor(courses: UserCourse[], updates: CourseUpdate[], saved: any[], 
           moved: Boolean(s.notice_id) && !s.is_cancelled,
         };
       });
+      // An institute holiday cancels every class: say so once instead of listing struck-out rows.
+      const holiday = updates.some((u) => u.course_code === "*" && u.kind === "cancelled" && u.on_date <= date && (u.until_date || u.on_date) >= date);
+      if (holiday && rows.every((r) => r.cancelled)) return { title: label, rows: [], holiday: true };
       return { title: label, rows };
     }
   }
@@ -213,7 +216,7 @@ export default async function HomePage() {
             <DayBoard
               title={board.title}
               rows={board.rows}
-              emptyText={courses.length ? "No classes scheduled." : noTimetableText(profile?.year, profile?.division)}
+              emptyText={board.holiday ? "No classes. Institute holiday." : courses.length ? "No classes scheduled." : noTimetableText(profile?.year, profile?.division)}
               note={moodleRes.count ? null : "From the official slot chart. Connect Moodle (Settings) so last-minute changes show here."}
             />
             <AskBox />
