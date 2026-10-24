@@ -227,3 +227,27 @@ export function buildSections<T extends SectionItem>(items: T[], myCourses: Set<
     all: [...placed].sort(newest),
   } satisfies Record<SectionKey, Placed<T>[]>;
 }
+
+export type PackedSections<T> = { items: Record<string, T>; ids: Record<SectionKey, string[]> };
+
+/**
+ * Send each notice to the browser once (not once per section), with a long body cut short.
+ * Cuts the page payload several times over for students with many notices.
+ */
+export function packSections<T extends { id: string; body?: string | null }>(sections: Record<SectionKey, T[]>, maxBody = 1500): PackedSections<T> {
+  const items: Record<string, T> = {};
+  const ids = {} as Record<SectionKey, string[]>;
+  for (const key of Object.keys(sections) as SectionKey[]) {
+    ids[key] = sections[key].map((i) => {
+      if (!items[i.id]) items[i.id] = i.body && i.body.length > maxBody ? { ...i, body: i.body.slice(0, maxBody) } : i;
+      return i.id;
+    });
+  }
+  return { items, ids };
+}
+
+export function unpackSections<T>(p: PackedSections<T>): Record<SectionKey, T[]> {
+  const out = {} as Record<SectionKey, T[]>;
+  for (const key of Object.keys(p.ids) as SectionKey[]) out[key] = p.ids[key].map((id) => p.items[id]);
+  return out;
+}

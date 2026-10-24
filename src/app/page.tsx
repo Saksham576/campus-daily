@@ -12,7 +12,7 @@ import { FeedView } from "@/components/FeedView";
 import { HomeHead } from "@/components/HomeHead";
 import { SetupNudges, type Nudge } from "@/components/SetupNudge";
 import { isLabSlotCode } from "@/lib/timetable/slots";
-import { buildSections } from "@/lib/sections";
+import { buildSections, packSections } from "@/lib/sections";
 import { coursesForDivision } from "@/lib/timetable/catalog";
 import { groupByEvent } from "@/lib/linking";
 import { buildWeek, formatCourseCode, type UserCourse } from "@/lib/timetable/slots";
@@ -228,7 +228,7 @@ export default async function HomePage() {
             />
           </aside>
           <div className="home-main">
-            <Suspense><FeedView sections={sections as any} sponsored={sponsored || null} /></Suspense>
+            <Suspense><FeedView data={packSections(sections as any) as any} sponsored={sponsored || null} /></Suspense>
           </div>
         </div>
       </main>
