@@ -20,7 +20,7 @@ export default function PreviewTimetable() {
   return (
     <>
       <AppBar />
-      <main className="wrap">
+      <main id="main" className="wrap">
         <div className="page-head">
           <div>
             <p className="eyebrow">This week · updates itself from notices</p>

@@ -27,7 +27,17 @@ export function SettingsRail() {
       { rootMargin: "-20% 0px -60% 0px" }
     );
     els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
+    // On phones one section shows at a time (CSS :target), so follow the link you tapped.
+    const fromHash = () => {
+      const h = location.hash.slice(1);
+      if (h && SETTINGS_SECTIONS.some((s) => s.id === h)) setActive(h);
+    };
+    fromHash();
+    window.addEventListener("hashchange", fromHash);
+    return () => {
+      io.disconnect();
+      window.removeEventListener("hashchange", fromHash);
+    };
   }, []);
   return (
     <nav className="rail" aria-label="Settings sections">

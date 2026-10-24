@@ -13,17 +13,29 @@ const istClock = () =>
 const NAV = [
   { href: "/", label: "Home", Icon: House },
   { href: "/schedule", label: "Timetable", Icon: CalendarDays },
-  { href: "/library", label: "Library", Icon: LibraryBig },
+  { href: "/library", label: "Files", Icon: LibraryBig },
   { href: "/settings", label: "Settings", Icon: Settings },
 ];
 
 export function AppBar() {
   const path = usePathname();
   const [clock, setClock] = useState("");
+  const [badges, setBadges] = useState<{ due: number; changed: number }>({ due: 0, changed: 0 });
   useEffect(() => {
     setClock(istClock());
     const t = setInterval(() => setClock(istClock()), 15_000);
-    return () => clearInterval(t);
+    const read = () => {
+      try {
+        const b = JSON.parse(localStorage.getItem("cd_badges") || "null");
+        if (b) setBadges({ due: Number(b.due) || 0, changed: Number(b.changed) || 0 });
+      } catch {}
+    };
+    read();
+    window.addEventListener("cd-badges", read);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("cd-badges", read);
+    };
   }, []);
 
   return (
@@ -43,6 +55,8 @@ export function AppBar() {
               <Link key={href} href={href} className={active ? "active" : ""} aria-current={active ? "page" : undefined}>
                 <Icon aria-hidden />
                 <span>{label}</span>
+                {href === "/" && badges.due > 0 && !active && <span className="nav-badge" aria-label={`${badges.due} due soon`}>{badges.due}</span>}
+                {href === "/schedule" && badges.changed > 0 && !active && <span className="nav-dot" aria-label="A class changed today" />}
               </Link>
             );
           })}

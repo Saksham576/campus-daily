@@ -21,7 +21,7 @@ export default async function ConfirmPage({
   )}`;
 
   return (
-    <main className="wrap narrow">
+    <main id="main" className="wrap narrow">
       <p className="eyebrow">Campus Daily</p>
       <h1>{valid ? "One tap to sign in" : "This link looks incomplete"}</h1>
       {valid ? (

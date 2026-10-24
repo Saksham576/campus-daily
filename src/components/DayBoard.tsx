@@ -56,6 +56,7 @@ export function DayBoard({ title, rows, emptyText, note }: { title: string; rows
     <section className={`today ${open ? "open" : ""}`} aria-label={title}>
       <div className="today-head">
         <span className="today-title">{title}</span>
+        {!next && rows.length > 0 && <span className="today-next">Done for today</span>}
         {next && nextText && (
           <span className="today-next">
             <b>{next.code}</b> {nextText}

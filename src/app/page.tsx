@@ -1,15 +1,17 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { type FeedItem } from "@/components/ItemCard";
 import { type Sponsored } from "@/components/SponsoredCard";
 import { AppBar } from "@/components/AppBar";
+import { BadgeSync } from "@/components/BadgeSync";
+import { InstallCard } from "@/components/InstallCard";
 import { DayBoard, type BoardRow } from "@/components/DayBoard";
 import { FeedView } from "@/components/FeedView";
 import { HomeHead } from "@/components/HomeHead";
 import { SetupNudges, type Nudge } from "@/components/SetupNudge";
 import { isLabSlotCode } from "@/lib/timetable/slots";
-import { AskBox } from "@/components/AskBox";
 import { buildSections } from "@/lib/sections";
 import { coursesForDivision } from "@/lib/timetable/catalog";
 import { groupByEvent } from "@/lib/linking";
@@ -205,9 +207,14 @@ export default async function HomePage() {
   return (
     <>
       <AppBar />
-      <main className="wrap">
+      <main id="main" className="wrap">
         <HomeHead name={profile?.name} now={now} action={sections.action} exams={sections.exams} />
+        <InstallCard />
         <SetupNudges nudges={nudges} />
+        <BadgeSync
+          due={sections.action.filter((i: any) => i.when && new Date(i.when).getTime() - now.getTime() < 48 * 3600_000).length}
+          changed={board.title === "Today" ? board.rows.filter((r) => r.cancelled || r.moved).length : 0}
+        />
 
         {feedRes.error && <p className="err">Could not load notices: {feedRes.error.message}</p>}
 
@@ -219,10 +226,9 @@ export default async function HomePage() {
               emptyText={board.holiday ? "No classes. Institute holiday." : courses.length ? "No classes scheduled." : noTimetableText(profile?.year, profile?.division)}
               note={moodleRes.count ? null : "From the official slot chart. Connect Moodle (Settings) so last-minute changes show here."}
             />
-            <AskBox />
           </aside>
           <div className="home-main">
-            <FeedView sections={sections as any} sponsored={sponsored || null} />
+            <Suspense><FeedView sections={sections as any} sponsored={sponsored || null} /></Suspense>
           </div>
         </div>
       </main>

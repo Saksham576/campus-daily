@@ -177,7 +177,7 @@ export default function ScheduleClient({ initialSchedules, moodleOn }: { initial
   return (
     <>
       <AppBar />
-      <main className="wrap">
+      <main id="main" className="wrap">
         <div className="page-head">
           <div>
             <p className="eyebrow">{SEMESTER.name}</p>
