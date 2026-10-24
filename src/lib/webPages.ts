@@ -94,6 +94,20 @@ export function istWords(iso: string): string {
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}${time}`;
 }
 
+const TITLE_FILLER = new Set("a an the are is was be for of to in on at and with by from".split(" "));
+
+/** A headline reduced to what identifies it, so a reworded copy of it matches: "Applications are invited for UCEED (2027)" = "Applications invited for UCEED". */
+export function normTitle(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\b(19|20)\d{2}([-–/]\d{2,4})?\b/g, " ")
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .split(/\s+/)
+    .filter((w) => w && !TITLE_FILLER.has(w))
+    .join(" ");
+}
+
 export function webItemToEmail(sourceName: string, pageUrl: string, it: WebItem, now = new Date()): InboundEmail {
   const lines = [it.title, "", it.summary];
   if (it.when) lines.push("", `When: ${istWords(it.when)}`);

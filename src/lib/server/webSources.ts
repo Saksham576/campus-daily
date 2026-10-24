@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { geminiJson } from "@/lib/server/gemini";
 import { processInbound } from "@/lib/server/ingestPipeline";
-import { buildExtractPrompt, htmlToText, pageHash, parseWebItems, webItemToEmail } from "@/lib/webPages";
+import { buildExtractPrompt, htmlToText, normTitle, pageHash, parseWebItems, webItemToEmail } from "@/lib/webPages";
 
 type Source = { id: number; name: string; url: string; last_hash: string | null };
 
@@ -33,11 +33,23 @@ export async function runWebSources(admin: SupabaseClient, deadline: number, bat
       if (!g.ok) throw new Error(`reading failed (${g.detail.slice(0, 80)})`);
       const items = parseWebItems(g.text);
       let filed = 0;
+      let known: Set<string> | null = null;
       for (const it of items) {
         const email = webItemToEmail(s.name, s.url, it);
-        // Already filed in an earlier run (same page, same headline).
+        // Already filed in an earlier run: same item link, or the same headline in other words.
         const { count } = await admin.from("items").select("id", { count: "exact", head: true }).eq("sender", email.from).eq("subject", email.subject.slice(0, 500));
         if (count) continue;
+        if (it.url) {
+          const { count: byUrl } = await admin.from("items").select("id", { count: "exact", head: true }).eq("sender", email.from).contains("links", [it.url]);
+          if (byUrl) continue;
+        }
+        if (!known) {
+          const { data: prior } = await admin.from("items").select("subject").eq("sender", email.from).order("received_at", { ascending: false }).limit(400);
+          known = new Set((prior || []).map((r: { subject: string }) => normTitle(r.subject)));
+        }
+        const key = normTitle(it.title);
+        if (key && known.has(key)) continue;
+        if (key) known.add(key);
         const r = await processInbound(email);
         if (r.status === 200 && r.body.id) filed++;
       }
