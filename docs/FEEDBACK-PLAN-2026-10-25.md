@@ -444,3 +444,16 @@ Tutorial *rooms* depend on the tutorial batch (the PDF lists several LTs per div
 - [ ] New sign-up as an Electrical first-year: division auto-set to D4, EE103 pre-ticked, no "Core" option; programme list includes Dual Degree.
 - [ ] Settings → Interests has "Hide these", and hiding "Dance" removes dance notices.
 - [ ] `npm test`, `tsc` and `build` all pass, and each PR's deploy shows `success`.
+
+---
+
+## Status (25 Oct 2026)
+
+| Batch | Tasks | State |
+|---|---|---|
+| A | T1, T2, T3, T4, T20 | Done (PR #110) |
+| B | T5, T6, T8 (T7 dropped) | Done (PR #111) |
+| C | T9, T10, T11 | Done (PR #112). Timetable on/off switches (weekends, mess) not built; weekends are always shown. |
+| Big events | Insti Nite was missed | Done (PR #113): shared detector, "On campus" Home card, one phone alert per event, big-event Instagram accounts read every run. |
+| D | T12 | Done: Files grouped by type (By type / By week). |
+| Not started | T13 (Mess section), T14 (wellness sessions), T15 (quizzes in the timetable with seat and material), T16, T17 (branch decides division), T18 (first-year defaults, EE103 one tick), T19 (Dual Degree) | Next batches: E (T15, T16), F (T17, T18, T19), G (T13), F2 (T14). |
