@@ -3,21 +3,22 @@
 import { useEffect, useState } from "react";
 import { Bell, BookOpen, GraduationCap, Heart, Mail, Palette, Shield, User, type LucideIcon } from "lucide-react";
 
-export const SETTINGS_SECTIONS: { id: string; label: string; Icon: LucideIcon }[] = [
-  { id: "profile", label: "Profile", Icon: User },
-  { id: "courses", label: "My courses", Icon: BookOpen },
-  { id: "moodle", label: "Moodle", Icon: GraduationCap },
+/** `rail: false` entries keep their icon for the panel but are not separate menu items (they sit inside another section). */
+export const SETTINGS_SECTIONS: { id: string; label: string; Icon: LucideIcon; rail?: boolean }[] = [
+  { id: "profile", label: "You", Icon: User },
+  { id: "courses", label: "Courses", Icon: BookOpen },
+  { id: "moodle", label: "Moodle", Icon: GraduationCap, rail: false },
   { id: "interests", label: "Interests", Icon: Heart },
-  { id: "alerts", label: "Alerts & calendar", Icon: Bell },
-  { id: "appearance", label: "Appearance", Icon: Palette },
-  { id: "privacy", label: "Data & privacy", Icon: Shield },
+  { id: "alerts", label: "Notifications", Icon: Bell },
+  { id: "appearance", label: "Appearance", Icon: Palette, rail: false },
+  { id: "privacy", label: "Account", Icon: Shield },
 ];
 
 /** Left menu that follows the section you're reading. */
 export function SettingsRail() {
   const [active, setActive] = useState("profile");
   useEffect(() => {
-    const els = SETTINGS_SECTIONS.map((s) => document.getElementById(s.id)).filter(Boolean) as HTMLElement[];
+    const els = SETTINGS_SECTIONS.filter((s) => s.rail !== false).map((s) => document.getElementById(s.id)).filter(Boolean) as HTMLElement[];
     const io = new IntersectionObserver(
       (entries) => {
         const vis = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
@@ -30,7 +31,7 @@ export function SettingsRail() {
   }, []);
   return (
     <nav className="rail" aria-label="Settings sections">
-      {SETTINGS_SECTIONS.map(({ id, label, Icon }) => (
+      {SETTINGS_SECTIONS.filter((s) => s.rail !== false).map(({ id, label, Icon }) => (
         <a key={id} href={`#${id}`} className={active === id ? "active" : ""} aria-current={active === id ? "true" : undefined}>
           <Icon aria-hidden />
           {label}
