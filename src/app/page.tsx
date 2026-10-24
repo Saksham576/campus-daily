@@ -10,6 +10,8 @@ import { InstallCard } from "@/components/InstallCard";
 import { DayBoard, type BoardRow } from "@/components/DayBoard";
 import { FeedView } from "@/components/FeedView";
 import { HomeHead } from "@/components/HomeHead";
+import { BigEvents } from "@/components/BigEvents";
+import { bigEventsSoon } from "@/lib/majorEvents";
 import { SetupNudges, type Nudge } from "@/components/SetupNudge";
 import { isLabSlotCode } from "@/lib/timetable/slots";
 import { buildSections, packSections } from "@/lib/sections";
@@ -209,6 +211,8 @@ export default async function HomePage() {
       it.relevant = r.relevant;
       it.why = r.why;
     }
+  // Insti Nite, Mood Indigo, Techfest…: shown to everyone while they are on or close, whatever they follow.
+  const bigNow = bigEventsSoon([...new Map((Object.values(sections) as any[][]).flat().map((i: any) => [i.id, i])).values()] as any[], now);
   const relevantAction = (sections.action as any[]).filter((i) => i.relevant !== false);
   const board = boardFor(courses, (updatesRes.data || []) as CourseUpdate[], savedRes.data || [], now);
   const sponsored = ((cardsRes.data || []) as (Sponsored & { ends_on: string | null })[]).find(
@@ -229,6 +233,7 @@ export default async function HomePage() {
       <main id="main" className="wrap">
         <HomeHead name={profile?.name} now={now} action={relevantAction} exams={sections.exams} />
         <InstallCard />
+        <BigEvents events={bigNow as any} now={now} />
         <SetupNudges nudges={nudges} />
         <BadgeSync
           due={relevantAction.filter((i: any) => i.when && new Date(i.when).getTime() - now.getTime() < 48 * 3600_000).length}

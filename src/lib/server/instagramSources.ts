@@ -30,7 +30,10 @@ export async function readSource(admin: SupabaseClient, s: IgSource, token: stri
     await touch({ last_error: null, last_filed: filed, last_posted_at: newest });
     return { filed };
   } catch (e) {
-    await touch({ last_error: (e instanceof Error ? e.message : "failed").slice(0, 200) });
+    const msg = (e instanceof Error ? e.message : "failed").slice(0, 200);
+    // Throttled by Meta: keep its place in the queue so it is first in line next run instead of waiting its whole turn again.
+    if (/blocked|rate limit|too many calls|request limit/i.test(msg)) await admin.from("instagram_sources").update({ last_error: msg }).eq("id", s.id);
+    else await touch({ last_error: msg });
     throw e;
   }
 }
@@ -40,26 +43,32 @@ export async function readSource(admin: SupabaseClient, s: IgSource, token: stri
  * Needs a Campus Daily Instagram Business or Creator account (INSTAGRAM_USER_ID) and its long-lived
  * access token (INSTAGRAM_TOKEN). Only accounts that are themselves Business or Creator profiles can be read.
  */
-export async function runInstagram(admin: SupabaseClient, deadline: number, batch = 12) {
+/** The institute's own big-event accounts: read on every run so Insti Nite or a convocation is never hours late. */
+const PRIORITY_HANDLES = ["iitbombay.moodi", "techfest_iitbombay", "culturals.iitb", "tech.iitb", "pro.iitbombay", "iitbombaysports"];
+
+export async function runInstagram(admin: SupabaseClient, deadline: number, batch = 8) {
   const token = process.env.INSTAGRAM_TOKEN;
   const me = process.env.INSTAGRAM_USER_ID;
   if (!token || !me) return { skipped: "INSTAGRAM_TOKEN / INSTAGRAM_USER_ID not set" };
 
-  const { data } = await admin
-    .from("instagram_sources")
-    .select("id, handle, last_posted_at, owner_email")
-    .eq("enabled", true)
-    .order("last_fetched_at", { ascending: true, nullsFirst: true })
-    .limit(batch);
-  const stats = { checked: 0, filed: 0, errors: 0 };
-  for (const s of (data || []) as IgSource[]) {
+  const cols = "id, handle, last_posted_at, owner_email";
+  const [priority, rotation] = await Promise.all([
+    admin.from("instagram_sources").select(cols).eq("enabled", true).in("handle", PRIORITY_HANDLES).is("owner_email", null),
+    admin.from("instagram_sources").select(cols).eq("enabled", true).not("handle", "in", "(" + PRIORITY_HANDLES.join(",") + ")").order("last_fetched_at", { ascending: true, nullsFirst: true }).limit(batch),
+  ]);
+  const queue = [...((priority.data || []) as IgSource[]), ...((rotation.data || []) as IgSource[])];
+  const stats = { checked: 0, filed: 0, errors: 0, blocked: 0 };
+  for (const s of queue) {
     if (Date.now() > deadline) break;
     stats.checked++;
     try {
       const r = await readSource(admin, s, token, me);
       stats.filed += r.filed;
-    } catch {
+      stats.blocked = 0;
+    } catch (e) {
       stats.errors++;
+      // "API access blocked" means Meta is throttling the app: more calls only make it worse, so wait for the next run.
+      if (/blocked|rate limit|too many calls|request limit/i.test(e instanceof Error ? e.message : "") && ++stats.blocked >= 3) break;
     }
   }
   return stats;
