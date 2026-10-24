@@ -28,9 +28,13 @@ export function SettingsRail() {
     );
     els.forEach((el) => io.observe(el));
     // On phones one section shows at a time (CSS :target), so follow the link you tapped.
+    // In-app links (Link to /settings#courses) don't set :target, so the page remembers the section itself.
     const fromHash = () => {
       const h = location.hash.slice(1);
-      if (h && SETTINGS_SECTIONS.some((s) => s.id === h)) setActive(h);
+      const known = h && SETTINGS_SECTIONS.some((s) => s.id === h);
+      if (known) setActive(h);
+      document.querySelector(".settings")?.setAttribute("data-panel", known ? h : "profile");
+      if (known && window.matchMedia("(max-width: 640px)").matches) window.scrollTo({ top: 0 });
     };
     fromHash();
     window.addEventListener("hashchange", fromHash);
