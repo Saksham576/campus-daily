@@ -6,6 +6,7 @@ import { useState } from "react";
 import { CoursePicker } from "@/components/CoursePicker";
 import { InterestPicker, type Prefs } from "@/components/InterestPicker";
 import { RequestBox } from "@/components/RequestBox";
+import { MyInstagram } from "@/components/MyInstagram";
 import { CATEGORIES } from "@/lib/constants";
 
 /** Dev-only: the Settings layout with sample values. */
@@ -42,7 +43,7 @@ export default function PreviewSettings() {
               </div>
             </Panel>
             <Panel id="courses" title="My courses" sub="Your timetable is built from these.">
-              <CoursePicker division="D3" department="MEMS" year="1" />
+              <div data-nosubmit><CoursePicker division="D3" department="MEMS" year="1" /></div>
             </Panel>
             <Panel id="moodle" title="Moodle" sub="Announcements, slides and seating plans from your courses.">
               <div className="list-row">
@@ -57,6 +58,8 @@ export default function PreviewSettings() {
             <Panel id="interests" title="What you follow" sub="Home shows what matters to you first. Everything else waits in Explore.">
               <div data-nosubmit>
                 <InterestPicker value={prefs} onChange={setPrefs} />
+                <h3 className="chips-title">Instagram pages you follow</h3>
+                <MyInstagram />
                 <h3 className="chips-title">Something we don&apos;t cover yet?</h3>
                 <RequestBox context="preview" />
               </div>

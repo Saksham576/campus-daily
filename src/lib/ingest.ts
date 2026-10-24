@@ -18,6 +18,8 @@ export type InboundEmail = {
   cc?: string;
   listId?: string;
   deliveredTo?: string;
+  /** A page one student follows for themselves: the notice is shown to that student only. */
+  owner?: string;
 };
 
 /** Upload paths we hand out: "2026-10/<16 hex>/<file name>". Anything else is ignored. */
