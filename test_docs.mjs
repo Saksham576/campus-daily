@@ -119,3 +119,11 @@ console.log("✓ Passed: seat answers in words, old roll formats kept out of sha
   assert.strictEqual(s.date, "2026-10-27");
 }
 console.log("✓ Passed: each exam-list row uses the division and date block above it");
+
+// CH 111 tutorial list: batch and classroom in words
+{
+  const s = summarizeRow({ line: "5\t26B2477\tSaksham Tiwari\tD3\tT3\tLT 101", context: null, columns: "Sr. no.\tRoll\tName\tSection\tTUTORIAL BATCH\tCLASSROOM", docName: "CH 111_2026 D3.xlsx" });
+  assert.strictEqual(s.headline, "CH 111 class list: division D3, tutorial batch T3");
+  assert.deepStrictEqual(s.details, ["Tutorial classroom LT 101"]);
+}
+console.log("✓ Passed: tutorial batch lists give the classroom");
