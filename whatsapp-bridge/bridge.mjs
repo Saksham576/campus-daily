@@ -34,7 +34,10 @@ const ADMINS_ONLY = (process.env.ADMINS_ONLY || "true").toLowerCase() !== "false
 const DATA_DIR = process.env.DATA_DIR || ".";
 const STATE_FILE = `${DATA_DIR}/state.json`;
 const FIRST_RUN_LOOKBACK_S = 12 * 3600;
-const PAIR_PHONE = (process.env.PAIR_PHONE || "").replace(/\D/g, "");
+const WA_WEB_VERSION = process.env.WA_WEB_VERSION || "2.3000.1048680055-alpha";
+// A failed side task (e.g. requesting a pairing code) must be logged, not kill the bridge in a restart loop.
+process.on("unhandledRejection", (e) => console.error("Unhandled error:", e?.message || e));
+const PAIR_PHONE =(process.env.PAIR_PHONE || "").replace(/\D/g, "");
 
 if (!SECRET) {
   console.error("Set INGEST_SECRET_KEY in whatsapp-bridge/.env first.");
@@ -77,6 +80,14 @@ const client = new Client({
   // After a restart WhatsApp may think the old session is still open elsewhere; take over quietly.
   // PAIR_PHONE (digits with country code, e.g. 919876543210) links with an 8-character code instead of a QR.
   ...(PAIR_PHONE ? { pairWithPhoneNumber: { phoneNumber: PAIR_PHONE, showNotification: true } } : {}),
+  // The newest WhatsApp Web can break the library (login never completes / pairing crashes), so run the
+  // version the library was last tested with. Override with WA_WEB_VERSION; set it to "latest" to follow WhatsApp.
+  ...(WA_WEB_VERSION !== "latest"
+    ? {
+        webVersion: WA_WEB_VERSION,
+        webVersionCache: { type: "remote", remotePath: "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/{version}.html", strict: false },
+      }
+    : {}),
   takeoverOnConflict: true,
   takeoverTimeoutMs: 0,
   puppeteer: { headless: true, executablePath, timeout: 120000, args: ["--no-first-run", "--disable-extensions", ...(LINUX ? ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--disable-software-rasterizer", "--disable-background-networking", "--disable-features=Translate,site-per-process", "--mute-audio", "--js-flags=--max-old-space-size=384"] : [])] },
