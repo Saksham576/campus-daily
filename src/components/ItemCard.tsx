@@ -415,7 +415,7 @@ export function ItemCard({
 
       <div className="actions ticket-actions">
         {sec === "action" && (
-          <button className="accent" onClick={() => updateItemStatus("done")}>
+          <button className={when?.hot ? "accent" : "ghost"} onClick={() => updateItemStatus("done")}>
             <Check aria-hidden />
             Done
           </button>
