@@ -14,6 +14,7 @@ export type Sub = {
   hasmed: string | null;
   keywords: string | null;
   categories?: string[] | null;
+  non_interests?: string | null;
   user_id?: string | null;
   courses?: string[];
 };
@@ -38,7 +39,7 @@ export async function publishNotice(
 
   const { data, error: subErr } = await admin
     .from("subscribers")
-    .select("email, department, year, hostel, division, hasmed, keywords, categories, user_id")
+    .select("email, department, year, hostel, division, hasmed, keywords, categories, non_interests, user_id")
     .is("merged_into", null);
   if (subErr) console.error("publish: subscribers read failed", subErr.message);
   // Personal notices go to their owner only.

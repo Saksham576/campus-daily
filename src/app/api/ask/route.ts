@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { buildAskPrompt, parseAskReply, ASK_DAILY_LIMIT, type AskNotice } from "@/lib/ask";
+import { buildAskPrompt, parseAskReply, ASK_DAILY_LIMIT, courseSet, isOtherCourse, namesOnlyOtherCourses, type AskNotice } from "@/lib/ask";
 import { buildWeek, type UserCourse } from "@/lib/timetable/slots";
 import { cleanSubject } from "@/lib/display";
 import { summarizeRow } from "@/lib/docs/rows";
@@ -36,15 +36,21 @@ export async function POST(req: NextRequest) {
   };
 
   const now = new Date();
-  const [feed, courses, deadlines, files, profile, evs] = await Promise.all([
+  const [feed, courses, deadlines, files, profile, evs, enrols] = await Promise.all([
     supabase.rpc("me_feed", { p_since: new Date(now.getTime() - 30 * 86400_000).toISOString(), p_min_score: 3 }),
     supabase.from("user_courses").select("course_code, title, division, lecture_slots, tutorial_slots, venue"),
     supabase.from("moodle_deadlines").select("course_code, name, kind, due_at").gte("due_at", now.toISOString()).order("due_at").limit(40),
     supabase.from("course_files").select("course_code, name, module").order("modified_at", { ascending: false }).limit(150),
     supabase.from("subscribers").select("digest, muted_senders, keywords, categories").eq("email", (user.email || "").toLowerCase()).maybeSingle(),
     supabase.from("events").select("title, course_code, start_at, venue, cancelled, resolved").gte("on_date", new Date(now.getTime() + 5.5 * 3600_000).toISOString().slice(0, 10)).order("on_date").limit(40),
+    supabase.from("moodle_enrolments").select("course_code"),
   ]);
-  const events = ((evs.data || []) as any[]).map((e) => ({
+  // Answers use only the courses this student takes (their saved courses and their Moodle enrolments).
+  const mine = courseSet([...(courses.data || []).map((c) => c.course_code), ...(enrols.data || []).map((e) => e.course_code)]);
+  const myCourseList = [...mine];
+  const events = ((evs.data || []) as any[])
+    .filter((e) => !isOtherCourse(e.course_code, mine))
+    .map((e) => ({
     title: cleanSubject(e.title),
     course_code: e.course_code,
     start: e.start_at,
@@ -61,7 +67,7 @@ export async function POST(req: NextRequest) {
   };
 
   const notices: AskNotice[] = ((feed.data || []) as any[])
-    .filter((i) => i.status !== "removed")
+    .filter((i) => i.status !== "removed" && !namesOnlyOtherCourses(String(i.subject || ""), mine))
     .sort((a, b) => String(b.received_at).localeCompare(String(a.received_at)))
     .slice(0, 80)
     .map((i) => ({ id: i.id, subject: i.subject, summary: i.summary, body: i.body, sender: i.from_address, received_at: i.received_at, deadline_at: i.deadline_at }));
@@ -70,10 +76,10 @@ export async function POST(req: NextRequest) {
   // Inside documents: best-matching passages from files the student can see, and their own rows in
   // class lists (mess dues, marks, seating). Added as extra numbered entries so answers can cite them.
   const [docHits, ownRows] = await Promise.all([
-    supabase.rpc("search_docs", { q: question, lim: 6, mode: "any" }),
+    supabase.rpc("search_docs", { q: question, lim: 16, mode: "any" }),
     supabase.from("personal_rows").select("doc_id, page, line, context, columns").limit(40),
   ]);
-  for (const h of (docHits.data || []) as any[]) {
+  for (const h of ((docHits.data || []) as any[]).filter((h) => !isOtherCourse(h.course_code, mine)).slice(0, 6)) {
     notices.push({ id: `doc:${h.doc_id}:${h.page}`, subject: `File: ${h.name}${h.course_code ? ` (${h.course_code})` : ""}, page ${h.page}`, body: String(h.content).slice(0, 1500) });
   }
   if (ownRows.data?.length) {
@@ -87,7 +93,7 @@ export async function POST(req: NextRequest) {
 
   const classes = buildWeek((courses.data || []) as UserCourse[], now).map((s) => ({ when: s.start_time, title: s.title, venue: s.location }));
 
-  const prompt = buildAskPrompt(question, { now, notices, classes, deadlines: deadlines.data || [], files: files.data || [], settings, events });
+  const prompt = buildAskPrompt(question, { now, notices, classes, deadlines: deadlines.data || [], files: (files.data || []).filter((f) => !isOtherCourse(f.course_code, mine)), settings, events, myCourses: myCourseList });
   const g = await geminiJson(prompt);
   if (!g.ok) {
     await logTurn(`ERROR ${g.status}: ${g.detail}`, false);
