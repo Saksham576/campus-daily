@@ -15,7 +15,7 @@ export type Slot = {
   is_cancelled?: boolean;
 };
 
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 // One steady colour per course, so a week reads at a glance.
 const HUES = ["#4f6ef7", "#0f9f9a", "#8b5cf6", "#e8590c", "#d6336c", "#2f9e44", "#c08a00", "#0b7bc1"];
 const hueOf = (title: string) => {
@@ -58,7 +58,7 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
 
   // On the phone: today's tab, or the first day this week that still has classes.
   const firstBusyDay = (from: number) => {
-    for (let i = from; i < 5; i++) if (inWeek.some((s) => dayIndex(s.start_time) === i)) return i;
+    for (let i = from; i < 7; i++) if (inWeek.some((s) => dayIndex(s.start_time) === i)) return i;
     return Math.min(from, 4);
   };
   const [pickedDay, setPickedDay] = useState<number | null>(null);
@@ -69,7 +69,9 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
   };
   const label = `${dates[0].getUTCDate()} ${dates[0].toLocaleString("en-IN", { month: "short", timeZone: "UTC" })} – ${dates[4].getUTCDate()} ${dates[4].toLocaleString("en-IN", { month: "short", timeZone: "UTC" })}`;
 
-  const weekday = inWeek.filter((s) => dayIndex(s.start_time) < 5);
+  // Mon–Fri always; Saturday / Sunday only in weeks where something is scheduled on them.
+  const ncols = inWeek.some((s) => dayIndex(s.start_time) === 6) ? 7 : inWeek.some((s) => dayIndex(s.start_time) === 5) ? 6 : 5;
+  const weekday = inWeek.filter((s) => dayIndex(s.start_time) < ncols);
   // Fit the grid to the hours that actually have classes (an all-afternoon week starts at 14:00), at least 6 hours tall.
   const firstH = weekday.length ? Math.min(...weekday.map((s) => Math.floor(minutesOf(s.start_time) / 60))) : 8;
   const lastH = weekday.length ? Math.max(...weekday.map((s) => Math.ceil(minutesOf(s.end_time || s.start_time) / 60))) : 18;
@@ -118,9 +120,9 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
       )}
       {/* Week calendar (desktop) */}
       <div className="week" role="grid" aria-label="Week calendar">
-        <div className="week-head">
+        <div className="week-head" style={{ gridTemplateColumns: `56px repeat(${ncols}, minmax(0, 1fr))` }}>
           <span />
-          {dates.map((d, i) => {
+          {dates.slice(0, ncols).map((d, i) => {
             const isToday = d.toISOString().slice(0, 10) === todayKey;
             return (
               <span key={i} className={`week-day ${isToday ? "today" : ""}`}>
@@ -129,7 +131,7 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
             );
           })}
         </div>
-        <div className="week-body" style={{ height: hours.length * HOUR_PX }}>
+        <div className="week-body" style={{ height: hours.length * HOUR_PX, gridTemplateColumns: `56px repeat(${ncols}, minmax(0, 1fr))` }}>
           <div className="week-hours" aria-hidden>
             {hours.map((h) => (
               <span key={h} style={{ top: (h - startH) * HOUR_PX }}>
@@ -137,7 +139,7 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
               </span>
             ))}
           </div>
-          {DAYS.map((_, i) => (
+          {DAYS.slice(0, ncols).map((_, i) => (
             <div key={i} className={`week-col ${dates[i].toISOString().slice(0, 10) === todayKey ? "today" : ""}`}>
               {hours.map((h) => (
                 <span key={h} className="week-line" style={{ top: (h - startH) * HOUR_PX }} />
@@ -181,7 +183,7 @@ export function TimetableView({ slots, onToggle }: { slots: Slot[]; onToggle: (i
       {/* Day list (phones) */}
       <div className="dayview">
         <div className="schedule-tabs" role="tablist">
-          {DAYS.map((d, i) => (
+          {DAYS.slice(0, ncols).map((d, i) => (
             <button key={d} role="tab" aria-selected={day === i} className={`schedule-tab ${day === i ? "active" : ""}`} onClick={() => setPickedDay(i)}>
               {d} <span className="muted">{dates[i].getUTCDate()}</span>
             </button>
