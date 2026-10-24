@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Campus Daily check</title>
+<style>
+  body { font: 16px/1.5 -apple-system, system-ui, sans-serif; margin: 0; padding: 20px; background: #fff; color: #111; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p { margin: 0 0 14px; color: #555; }
+  ul { list-style: none; padding: 0; margin: 0; }
+  li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid #ddd; font-size: 15px; }
+  b.ok { color: #0a7d32; } b.no { color: #c0262d; }
+  pre { white-space: pre-wrap; word-break: break-all; font-size: 12px; background: #f3f3f3; padding: 10px; border-radius: 8px; }
+</style>
+</head>
+<body>
+<h1>Campus Daily check</h1>
+<p>Take a screenshot of this page and send it. It only tests your browser; nothing is sent anywhere.</p>
+<ul id="out"></ul>
+<pre id="ua"></pre>
+<script>
+(function () {
+  var out = document.getElementById("out");
+  function row(name, ok, extra) {
+    var li = document.createElement("li");
+    li.innerHTML = "<span>" + name + "</span><b class='" + (ok ? "ok" : "no") + "'>" + (ok ? "OK" : "MISSING") + (extra ? " " + extra : "") + "</b>";
+    out.appendChild(li);
+  }
+  function t(name, fn, extra) { var ok = false; try { ok = !!fn(); } catch (e) {} row(name, ok, extra); }
+  document.getElementById("ua").textContent = navigator.userAgent;
+  t("Array.at", function () { return [1].at(0) === 1; });
+  t("Object.hasOwn", function () { return Object.hasOwn({ a: 1 }, "a"); });
+  t("structuredClone", function () { return typeof structuredClone === "function"; });
+  t("Promise.allSettled", function () { return typeof Promise.allSettled === "function"; });
+  t("String.replaceAll", function () { return "aa".replaceAll("a", "b") === "bb"; });
+  t("CSS :has()", function () { return CSS.supports("selector(:has(a))"); });
+  t("CSS color-mix", function () { return CSS.supports("color", "color-mix(in srgb, red, blue)"); });
+  t("CSS grid minmax", function () { return CSS.supports("display", "grid"); });
+  t("localStorage", function () { localStorage.setItem("cd_t", "1"); localStorage.removeItem("cd_t"); return true; });
+  t("Cookies", function () { document.cookie = "cd_t=1; path=/"; var ok = document.cookie.indexOf("cd_t=1") >= 0; document.cookie = "cd_t=; path=/; max-age=0"; return ok; });
+  t("Service worker", function () { return "serviceWorker" in navigator; });
+  t("IntersectionObserver", function () { return typeof IntersectionObserver === "function"; });
+  t("fetch + AbortController", function () { return typeof fetch === "function" && typeof AbortController === "function"; });
+  var start = Date.now();
+  fetch("/login", { cache: "no-store" }).then(function (r) {
+    row("Reach the site (/login)", r.ok, r.status + " in " + (Date.now() - start) + " ms");
+  }).catch(function (e) { row("Reach the site (/login)", false, String(e)); });
+  window.addEventListener("error", function (e) { row("Script error", false, e.message); });
+})();
+</script>
+</body>
+</html>

@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { ItemCard, type FeedItem } from "@/components/ItemCard";
 import { SponsoredCard, type Sponsored } from "@/components/SponsoredCard";
 import { AskBox } from "@/components/AskBox";
+import { unpackSections, type PackedSections } from "@/lib/sections";
 import { DocHits } from "@/components/DocSearch";
 import { Bookmark, Search, Settings, Sparkles } from "lucide-react";
 
@@ -40,12 +41,13 @@ const SETTING_LINKS = [
 const SUGGESTIONS = ["When is my next quiz?", "What's due this week?", "Get my morning digest by email"];
 
 export function FeedView({
-  sections,
+  data,
   sponsored,
 }: {
-  sections: Record<Key, FeedItem[]>;
+  data: PackedSections<FeedItem>;
   sponsored?: Sponsored | null;
 }) {
+  const sections = useMemo(() => unpackSections(data) as Record<Key, FeedItem[]>, [data]);
   const [view, setView] = useState<View>("foryou");
   const [chip, setChip] = useState<Chip>("everything");
   const [q, setQ] = useState("");

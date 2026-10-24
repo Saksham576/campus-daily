@@ -4,7 +4,7 @@ import { AppBar } from "@/components/AppBar";
 import { DayBoard, type BoardRow } from "@/components/DayBoard";
 import { FeedView } from "@/components/FeedView";
 import { HomeHead } from "@/components/HomeHead";
-import { buildSections } from "@/lib/sections";
+import { buildSections, packSections } from "@/lib/sections";
 
 /** Dev-only: the Home screen with realistic sample data, for design work without signing in. */
 export default function Preview() {
@@ -47,7 +47,7 @@ export default function Preview() {
             <DayBoard title={late ? "Tomorrow" : "Today"} rows={rows} emptyText="No classes scheduled." />
           </aside>
           <div className="home-main">
-            <Suspense><FeedView sections={sections as any} sponsored={null} /></Suspense>
+            <Suspense><FeedView data={packSections(sections as any) as any} sponsored={null} /></Suspense>
           </div>
         </div>
       </main>
