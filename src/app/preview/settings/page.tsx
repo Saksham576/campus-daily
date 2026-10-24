@@ -2,11 +2,15 @@
 
 import { AppBar } from "@/components/AppBar";
 import { Panel, SettingsRail, ThemePicker } from "@/components/SettingsLayout";
+import { useState } from "react";
 import { CoursePicker } from "@/components/CoursePicker";
+import { InterestPicker, type Prefs } from "@/components/InterestPicker";
+import { RequestBox } from "@/components/RequestBox";
 import { CATEGORIES } from "@/lib/constants";
 
 /** Dev-only: the Settings layout with sample values. */
 export default function PreviewSettings() {
+  const [prefs, setPrefs] = useState<Prefs>({ categories: [], keywords: "Robotics, Chess", feed_mode: "balanced" });
   if (process.env.NODE_ENV === "production") return null;
   return (
     <>
@@ -50,19 +54,12 @@ export default function PreviewSettings() {
                 <button type="button">Disconnect</button>
               </div>
             </Panel>
-            <Panel id="interests" title="Interests" sub="Topics you care about rank higher.">
-              <div className="chips">
-                {CATEGORIES.map((c, i) => (
-                  <span key={c} className={`chip ${i < 3 ? "on" : ""}`}>
-                    {c}
-                  </span>
-                ))}
+            <Panel id="interests" title="What you follow" sub="Home shows what matters to you first. Everything else waits in Explore.">
+              <div data-nosubmit>
+                <InterestPicker value={prefs} onChange={setPrefs} />
+                <h3 className="chips-title">Something we don&apos;t cover yet?</h3>
+                <RequestBox context="preview" />
               </div>
-              <label className="field">
-                Keywords
-                <input type="text" defaultValue="AI/ML, robotics, techfest" />
-                <span className="help">Comma-separated.</span>
-              </label>
             </Panel>
             <Panel id="delivery" title="Delivery" sub="Where you want your notices.">
               <label className="choice">

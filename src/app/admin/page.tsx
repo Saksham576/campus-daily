@@ -34,6 +34,14 @@ export default async function AdminPage() {
     .not("question", "is", null)
     .order("asked_at", { ascending: false })
     .limit(15);
+  // What students want next: their requests, and which clubs and interests they follow.
+  const { data: wants } = await admin.from("feature_requests").select("id, email, kind, text, context, status, created_at").order("created_at", { ascending: false }).limit(60);
+  const { data: follows } = await admin.from("subscribers").select("keywords, prefs_set_at").is("merged_into", null);
+  const followCount = new Map<string, number>();
+  for (const f of follows || [])
+    for (const k of String(f.keywords || "").split(",").map((x) => x.trim()).filter(Boolean)) followCount.set(k, (followCount.get(k) || 0) + 1);
+  const topFollows = [...followCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 25);
+  const prefsDone = (follows || []).filter((f) => f.prefs_set_at).length;
   const wa = (bridge?.data || {}) as { groups?: string[]; seenToday?: number; forwardedToday?: number; caughtUp?: number; qr?: string | null; code?: string | null };
   const waAgeMin = bridge?.updated_at ? Math.round((Date.now() - new Date(bridge.updated_at).getTime()) / 60000) : null;
   // The bridge is logged out and waiting: show its login QR (codes rotate every ~20 s; reload for a fresh one).
@@ -103,6 +111,32 @@ export default async function AdminPage() {
               scan this. This code refreshes itself every few seconds; scan it right after it appears.
             </span>
           </div>
+        )}
+      </section>
+      <section className="board" aria-label="What students want next">
+        <div className="board-head">
+          <div className="board-title">What students want next <span>▸</span></div>
+          <span className="muted">{wants?.length ?? 0} requests · {prefsDone} of {follows?.length ?? 0} students chose what they follow</span>
+        </div>
+        {(wants || []).length === 0 ? (
+          <p className="muted">No requests yet. Students send them from Settings → What you follow.</p>
+        ) : (
+          (wants || []).map((w) => (
+            <div key={w.id} className="board-row">
+              <span>
+                <b>{w.kind === "group" ? "Add a group/page" : w.kind === "service" ? "Service" : "Idea"}</b> · {w.text}
+                <br />
+                <small className="muted">
+                  {w.email} · {new Date(w.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" })} · {w.status}
+                </small>
+              </span>
+            </div>
+          ))
+        )}
+        {topFollows.length > 0 && (
+          <p className="muted" style={{ marginTop: 12 }}>
+            Most followed: {topFollows.map(([k, n]) => k + " (" + n + ")").join(", ")}
+          </p>
         )}
       </section>
       <section className="board" aria-label="Ask conversations">

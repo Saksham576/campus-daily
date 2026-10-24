@@ -13,6 +13,7 @@ import { HomeHead } from "@/components/HomeHead";
 import { SetupNudges, type Nudge } from "@/components/SetupNudge";
 import { isLabSlotCode } from "@/lib/timetable/slots";
 import { buildSections, packSections } from "@/lib/sections";
+import { parseKeywords, relevanceOf, type FeedMode } from "@/lib/relevance";
 import { coursesForDivision } from "@/lib/timetable/catalog";
 import { groupByEvent } from "@/lib/linking";
 import { buildWeek, formatCourseCode, type UserCourse } from "@/lib/timetable/slots";
@@ -116,7 +117,7 @@ export default async function HomePage() {
 
   // Everything in one parallel round trip (the profile is only needed to decide where to send you).
   const [profileRes, itemsCountRes, feedFirst, coursesFirst, updatesRes, cardsRes, savedRes, enrolRes, dueRes, moodleRes, pushRes] = await Promise.all([
-    supabase.from("subscribers").select("onboarded_at, name, last_seen_at, muted_senders, year, division, keywords").eq("email", user.email).single(),
+    supabase.from("subscribers").select("onboarded_at, name, last_seen_at, muted_senders, year, division, keywords, categories, hostel, department, feed_mode, prefs_set_at").eq("email", user.email).single(),
     supabase.from("user_items").select("item_id", { count: "exact", head: true }).eq("email", emailLower),
     supabase.rpc("me_feed", { p_since: since, p_min_score: MIN_SCORE }),
     supabase.from("user_courses").select("course_code, title, division, lecture_slots, tutorial_slots, venue"),
@@ -164,6 +165,15 @@ export default async function HomePage() {
     nudges.push({ id: "moodle-2026-10", title: "Connect Moodle on a laptop", body: "Exact class times, slides and deadlines, plus your seat and room in exam PDFs.", href: "/settings#moodle", cta: "See how" });
   nudges.push({ id: "whatsnew-2026-10-23", title: "New: a month of timetable", body: "See the next five weeks, with holidays, buffer weeks and doubt sessions added from notices. Seat PDFs now show your room and seat in plain words.", href: "/schedule", cta: "Open timetable" });
 
+  if (!profile?.prefs_set_at)
+    nudges.unshift({
+      id: "prefs-2026-10-24",
+      title: "Tell us what you care about",
+      body: "Home now leads with what matters to you: your clubs, interests and hostel. Pick them in a minute, and tell us anything that is missing.",
+      href: "/settings#interests",
+      cta: "Choose what I follow",
+    });
+
   const muted = new Set<string>(profile?.muted_senders || []);
   let items = ((feedRes.data || []) as FeedItem[]).filter((i) => !i.from_address || !muted.has(i.from_address));
 
@@ -191,6 +201,22 @@ export default async function HomePage() {
   ]);
   const sections = buildSections(items, myCourses, now);
   addMoodleDeadlines(sections as any, dueRes.data || []);
+  // What you told us you follow decides what leads Home; the rest waits in Explore.
+  const follows = {
+    categories: Array.isArray(profile?.categories) ? (profile.categories as string[]) : [],
+    keywords: parseKeywords(profile?.keywords),
+    hostel: profile?.hostel,
+    department: profile?.department,
+    year: profile?.year ? String(profile.year) : null,
+    mode: ((profile?.feed_mode as FeedMode) || "balanced") as FeedMode,
+  };
+  for (const list of Object.values(sections) as any[][])
+    for (const it of list) {
+      const r = relevanceOf(it, follows);
+      it.relevant = r.relevant;
+      it.why = r.why;
+    }
+  const relevantAction = (sections.action as any[]).filter((i) => i.relevant !== false);
   const board = boardFor(courses, (updatesRes.data || []) as CourseUpdate[], savedRes.data || [], now);
   const sponsored = ((cardsRes.data || []) as (Sponsored & { ends_on: string | null })[]).find(
     (c) => !c.ends_on || c.ends_on >= today
@@ -208,11 +234,11 @@ export default async function HomePage() {
     <>
       <AppBar />
       <main id="main" className="wrap">
-        <HomeHead name={profile?.name} now={now} action={sections.action} exams={sections.exams} />
+        <HomeHead name={profile?.name} now={now} action={relevantAction} exams={sections.exams} />
         <InstallCard />
         <SetupNudges nudges={nudges} />
         <BadgeSync
-          due={sections.action.filter((i: any) => i.when && new Date(i.when).getTime() - now.getTime() < 48 * 3600_000).length}
+          due={relevantAction.filter((i: any) => i.when && new Date(i.when).getTime() - now.getTime() < 48 * 3600_000).length}
           changed={board.title === "Today" ? board.rows.filter((r) => r.cancelled || r.moved).length : 0}
         />
 
