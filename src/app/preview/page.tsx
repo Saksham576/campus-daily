@@ -4,6 +4,7 @@ import { AppBar } from "@/components/AppBar";
 import { DayBoard, type BoardRow } from "@/components/DayBoard";
 import { FeedView } from "@/components/FeedView";
 import { HomeHead } from "@/components/HomeHead";
+import { BigEvents } from "@/components/BigEvents";
 import { buildSections, packSections } from "@/lib/sections";
 
 /** Dev-only: the Home screen with realistic sample data, for design work without signing in. */
@@ -42,6 +43,7 @@ export default function Preview() {
       <AppBar />
       <main id="main" className="wrap">
         <HomeHead name={"Saksham Tiwari"} now={now} action={sections.action} exams={sections.exams} />
+        <BigEvents now={now} events={[{ id: "mi", subject: "[S.Events] Mood Indigo 2026 Insti Nite | Karan Kanchan & Friends Live at OAT!", summary: "Mood Indigo 2026 is kicking off with an Insti Nite concert featuring Karan Kanchan & Friends at the OAT on 24th October 2026 at 5:00 PM.", when: new Date(now.getTime() + 3 * 3600_000).toISOString(), links: ["https://www.instagram.com/p/Det9sgyOedZ/"] }]} />
         <div className="home-grid">
           <aside className="home-rail">
             <DayBoard title={late ? "Tomorrow" : "Today"} rows={rows} emptyText="No classes scheduled." />

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CourseUpdate } from "@/lib/timetable/updates";
 import { takesCourse } from "@/lib/timetable/courses";
 import { worthAnAlert } from "@/lib/relevance";
+import { majorAlert } from "@/lib/majorAlert";
 import { pushToEmails } from "@/lib/server/push";
 import { linkNotice, type LinkResult } from "@/lib/server/linkEvents";
 
@@ -81,9 +82,14 @@ export async function publishNotice(
   // Another source repeating what we already knew: no second buzz.
   const repeat = Boolean(link?.joined && !link.changed);
 
+  // The institute's own big events (Insti Nite, Mood Indigo, Techfest…) buzz everyone once they are close, whatever they follow.
+  const big = repeat || only || update ? null : majorAlert(row.subject, typeof row.body === "string" ? row.body : null);
+
   // Push: timetable changes go to students taking the course; other notices only if urgent.
   const recipients = repeat
     ? []
+    : big
+    ? subs.map((s) => s.email)
     : update && update.kind !== "added"
       ? subs.filter((s) => (update.course_code === "*" || takesCourse(s, update.course_code)) && (!update.division || !s.division || s.division.toUpperCase() === update.division.toUpperCase())).map((s) => s.email)
       : scores
@@ -111,12 +117,14 @@ export async function publishNotice(
       ? update.course_code === "*" ? "No classes" : `${update.course_code} cancelled`
       : update?.kind === "moved"
       ? `${update.course_code} changed`
+      : big
+      ? "Campus Daily: big event"
       : "Campus Daily: important notice";
   const pushed = await pushToEmails(admin, recipients, {
     title,
     body: (row.summary || row.subject).slice(0, 180),
     url: update ? "/schedule" : "/",
-    tag: row.id,
+    tag: big?.key ?? row.id,
   }).catch(() => 0);
 
   return { students: subs.length, pushed };

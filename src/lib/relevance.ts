@@ -4,6 +4,8 @@
  * set by the student's own focus choice; everything else stays one tap away in "Explore".
  */
 
+import { isMajorEvent } from "./majorEvents.ts";
+
 export type FeedMode = "focused" | "balanced" | "everything";
 
 export type Profile = {
@@ -112,9 +114,6 @@ const myHostelNumber = (hostel?: string | null) => {
 const GC_RE = /\b(general championship|inter[- ]?hostel|hostel points|support your hostel|freshiezza|\d+ GC points|GC 20\d\d)\b/i;
 const HOSTEL_UPDATE_CHIP = "mess & hostel updates";
 
-/** The institute's own big events: everyone hears about them. Auditions, trials and registrations *for* them are not the event. */
-const MAJOR_RE = /\b(mood indigo|techfest|inter[- ]?iit (?:cult|cultural|tech|sports)? ?meet|convocation|institute lecture|foundation day|independence day|republic day|e-summit|annual sports meet|institute holiday)\b/i;
-const MAJOR_NOT_RE = /\b(audition|auditions|trials?|selection|contingent|registrations?|recruitment|applications?)\b/i;
 
 const tagsOf = (t: unknown): string[] => (Array.isArray(t) ? t.map(String) : []);
 
@@ -132,7 +131,7 @@ export function relevanceOf(item: RelItem, p: Profile): Relevance {
   // Clubs, interests and topics the student chose.
   const isGC = GC_RE.test(`${subject}
 ${(item.summary || "").slice(0, 400)}`);
-  const major = MAJOR_RE.test(subject) && !MAJOR_NOT_RE.test(subject);
+  const major = isMajorEvent(subject);
   if (major) {
     points += 4;
     reasons.push("Big campus event");
