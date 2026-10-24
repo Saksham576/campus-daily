@@ -8,13 +8,13 @@ import { Bookmark, Search } from "lucide-react";
 type Key = "action" | "exams" | "courses" | "events" | "opportunities" | "campus" | "saved" | "all";
 
 const PLATFORMS: { key: Key; code: string; label: string; note: string }[] = [
-  { key: "action", code: "1", label: "Action needed", note: "Deadlines & registrations — pinned until you tick Done or the date passes. Soonest first." },
-  { key: "exams", code: "2", label: "Exams & quizzes", note: "Upcoming quizzes, exams and tests — soonest first. They leave once they're over." },
-  { key: "courses", code: "3", label: "My courses", note: "Anything about the courses you take, plus verified instructor posts." },
-  { key: "events", code: "4", label: "Events", note: "Upcoming talks, workshops and fests — ordered by start time. Past events leave by themselves." },
+  { key: "action", code: "1", label: "Action needed", note: "Deadlines and registrations, soonest first." },
+  { key: "exams", code: "2", label: "Exams & quizzes", note: "Upcoming quizzes and exams, soonest first." },
+  { key: "courses", code: "3", label: "My courses", note: "Notices about the courses you take." },
+  { key: "events", code: "4", label: "Events", note: "Talks, workshops and fests, by start time." },
   { key: "opportunities", code: "5", label: "Opportunities", note: "Internships, competitions, scholarships." },
-  { key: "campus", code: "6", label: "Campus life", note: "Hostel, mess, sports and WhatsApp group announcements." },
-  { key: "saved", code: "7", label: "Saved", note: "Everything you starred. Stays here even after it expires." },
+  { key: "campus", code: "6", label: "Campus life", note: "Hostel, mess, sports and group announcements." },
+  { key: "saved", code: "7", label: "Saved", note: "Everything you saved." },
   { key: "all", code: "8", label: "Everything", note: "Every notice, newest first." },
 ];
 
@@ -77,19 +77,7 @@ export function FeedView({
             <span className="count">{sections[p.key].length}</span>
           </button>
         ))}
-      </nav>
-
-      <div className="search">
-        <span className="search-ico" aria-hidden>
-          <Search width={16} height={16} />
-        </span>
-        <input
-          type="search"
-          placeholder="Search notices"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          aria-label="Search notices"
-        />
+        <span className="platform-sep" aria-hidden />
         {(["saved", "all"] as Key[]).map((k) => (
           <button
             key={k}
@@ -103,6 +91,19 @@ export function FeedView({
             {k === "saved" ? <><Bookmark aria-hidden /> Saved</> : "All"} <span className="count">{sections[k].length}</span>
           </button>
         ))}
+      </nav>
+
+      <div className="search">
+        <span className="search-ico" aria-hidden>
+          <Search width={16} height={16} />
+        </span>
+        <input
+          type="search"
+          placeholder="Search notices"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          aria-label="Search notices"
+        />
       </div>
 
       <p className="section-note">

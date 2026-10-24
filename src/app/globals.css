@@ -2680,3 +2680,11 @@ button.chip.on:hover:not(:disabled) {
 .nudge .navlink { justify-self: start; margin-top: 4px; }
 .nudge .ghost { flex: 0 0 auto; width: 28px; height: 28px; padding: 0; display: grid; place-items: center; }
 .nudge .ghost .lucide { width: 14px; height: 14px; }
+
+/* Saved / All sit after the section tabs, set apart by a thin divider. */
+.platform-sep {
+  flex: 0 0 1px;
+  align-self: stretch;
+  margin: 6px 4px;
+  background: var(--line, rgba(128, 128, 128, 0.3));
+}
