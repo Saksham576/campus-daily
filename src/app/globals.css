@@ -3484,3 +3484,6 @@ html {
 .big-what span{color:var(--muted);font-size:13px}
 .big-link{font-size:13px;white-space:nowrap}
 @media (max-width:640px){.big-events li{grid-template-columns:minmax(0,1fr) auto}.big-when{grid-column:1/-1}}
+
+/* Files: group by type or by week */
+.lib-view{margin:0 0 14px}

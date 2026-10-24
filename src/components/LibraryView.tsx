@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { DocHits, MyRows } from "@/components/DocSearch";
+import { FILE_KINDS, fileKind } from "@/lib/docs/kind";
 
 export type LibFile = {
   course_id: number;
@@ -43,6 +44,8 @@ export function LibraryView({ files }: { files: LibFile[] }) {
 
   const [course, setCourse] = useState<string>("recent");
   const [q, setQ] = useState("");
+  // One course can be read by what a file is (quiz papers, slides…) or by week, as on Moodle.
+  const [view, setView] = useState<"type" | "week">("type");
 
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -51,16 +54,24 @@ export function LibraryView({ files }: { files: LibFile[] }) {
     return files.filter((f) => codeOf(f) === course);
   }, [files, course, q]);
 
-  // One course: grouped by its Moodle section.
+  // One course: grouped by kind of file, or by its Moodle section.
   const groups = useMemo(() => {
     if (q.trim() || course === "recent") return [{ title: "", items: shown }];
+    if (view === "type") {
+      const byKind = new Map<string, LibFile[]>();
+      for (const f of shown) {
+        const k = fileKind(f);
+        byKind.set(k, [...(byKind.get(k) || []), f]);
+      }
+      return FILE_KINDS.filter((k) => byKind.has(k)).map((k) => ({ title: `${k} · ${byKind.get(k)!.length}`, items: byKind.get(k)! }));
+    }
     const g = new Map<string, LibFile[]>();
     for (const f of shown) {
       const k = f.section || "General";
       g.set(k, [...(g.get(k) || []), f]);
     }
     return [...g.entries()].map(([title, items]) => ({ title, items }));
-  }, [shown, course, q]);
+  }, [shown, course, q, view]);
 
   if (files.length === 0) {
     return (
@@ -108,6 +119,17 @@ export function LibraryView({ files }: { files: LibFile[] }) {
         {q ? `${shown.length} file${shown.length === 1 ? "" : "s"} match "${q}"` : course === "recent" ? "Newest files across your courses." : `${shown.length} files`}
         {" · "}Files open on Moodle.
       </p>
+
+      {!q.trim() && course !== "recent" && (
+        <div className="chips lib-view" role="group" aria-label="How to group files">
+          <button type="button" className={`chip ${view === "type" ? "on" : ""}`} aria-pressed={view === "type"} onClick={() => setView("type")}>
+            By type
+          </button>
+          <button type="button" className={`chip ${view === "week" ? "on" : ""}`} aria-pressed={view === "week"} onClick={() => setView("week")}>
+            By week, as on Moodle
+          </button>
+        </div>
+      )}
 
       {q.trim() ? <DocHits q={q} /> : course === "recent" ? <MyRows /> : null}
 
