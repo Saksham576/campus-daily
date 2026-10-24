@@ -9,3 +9,15 @@ assert.ok(by.PH117 && by.PH117.division === "P16" && by.PH117.lecture_slots.incl
 assert.strictEqual(by.MA105, undefined, "an -ALL page alone doesn't say the division");
 assert.strictEqual(by.XX999, undefined, "unknown courses skipped");
 console.log("✓ Passed: courses filled from Moodle divisions");
+
+// Sign-in: IITB addresses, plus the owners with their personal address; nobody else.
+{
+  const { isAllowedEmail } = await import("./src/lib/auth.ts");
+  assert.strictEqual(isAllowedEmail("26b2477@iitb.ac.in"), true);
+  assert.strictEqual(isAllowedEmail("someone@cse.iitb.ac.in"), true);
+  assert.strictEqual(isAllowedEmail("virajtiwari52@gmail.com"), true);
+  assert.strictEqual(isAllowedEmail("VirajTiwari52@Gmail.com "), true);
+  assert.strictEqual(isAllowedEmail("random@gmail.com"), false);
+  assert.strictEqual(isAllowedEmail("virajtiwari52@gmail.com.evil.com"), false);
+  console.log("✓ Passed: only IITB addresses and the owners can sign in");
+}

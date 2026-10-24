@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 import {
   SESSION_MAX_AGE,
-  isValidIitbEmail,
+  isAllowedEmail,
   sanitizeRedirectUrl,
   isPersistentSession,
   HAS_ACCOUNT_COOKIE,
@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
   if (code) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error && data?.user) {
-      if (!isValidIitbEmail(data.user.email)) {
+      if (!isAllowedEmail(data.user.email)) {
         await supabase.auth.signOut();
         return redirectWithCookies(new URL("/login?e=iitb", origin));
       }
@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
       token_hash,
     });
     if (!error && data?.user) {
-      if (!isValidIitbEmail(data.user.email)) {
+      if (!isAllowedEmail(data.user.email)) {
         await supabase.auth.signOut();
         return redirectWithCookies(new URL("/login?e=iitb", origin));
       }

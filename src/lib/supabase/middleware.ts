@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import {
   SESSION_MAX_AGE,
-  isValidIitbEmail,
+  isAllowedEmail,
   sanitizeRedirectUrl,
   isPersistentSession,
 } from "@/lib/auth";
@@ -93,7 +93,7 @@ export async function updateSession(req: NextRequest) {
   }
 
   // 1. If user is already authenticated with a valid IITB email and visits /login, auto-redirect to / or ?next=
-  if (user && isValidIitbEmail(user.email) && path.startsWith("/login")) {
+  if (user && isAllowedEmail(user.email) && path.startsWith("/login")) {
     const nextParam = req.nextUrl.searchParams.get("next");
     const safeNext = sanitizeRedirectUrl(nextParam);
     const targetUrl = new URL(safeNext, req.url);
@@ -101,7 +101,7 @@ export async function updateSession(req: NextRequest) {
   }
 
   // 2. Campus Daily is currently for IITB students: other addresses are logged out
-  if (user && !isValidIitbEmail(user.email)) {
+  if (user && !isAllowedEmail(user.email)) {
     await supabase.auth.signOut();
     return redirectWithCookies(new URL("/login?e=iitb", req.url));
   }

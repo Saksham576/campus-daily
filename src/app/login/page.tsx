@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { StationSign } from "@/components/StationSign";
 import {
-  isValidIitbEmail,
+  isAllowedEmail,
   sanitizeRedirectUrl,
   sanitizeOtpCode,
   isPersistentSession,
@@ -78,7 +78,7 @@ function LoginForm() {
           data: { session },
         } = await supabase.auth.getSession();
 
-        if (session?.user && isValidIitbEmail(session.user.email)) {
+        if (session?.user && isAllowedEmail(session.user.email)) {
           setStatus("verified");
           window.location.href = safeNext;
           return;
@@ -128,7 +128,7 @@ function LoginForm() {
     if (e) e.preventDefault();
     const cleanEmail = email.trim().toLowerCase();
 
-    if (!isValidIitbEmail(cleanEmail)) {
+    if (!isAllowedEmail(cleanEmail)) {
       setStatus("error");
       setErrorMsg(
         "Use your IITB email (…@iitb.ac.in). You can add your personal Gmail for digests after signing in."

@@ -3,6 +3,8 @@
  * for IIT Bombay Campus Daily.
  */
 
+import { isAdminEmail } from "./adminEmails.ts";
+
 // 1 year persistent session in seconds (365 days = 31,536,000s)
 export const SESSION_MAX_AGE = 365 * 24 * 60 * 60;
 
@@ -93,4 +95,9 @@ export function initialAuthMode(cookieHeader: string | null | undefined): AuthMo
 export function isNoAccountError(error: { message?: string; code?: string } | null | undefined): boolean {
   if (!error) return false;
   return error.code === "otp_disabled" || /signups? not allowed|user not found/i.test(error.message || "");
+}
+
+/** May sign in: an IITB address, or one of the owners (admins) with another address. */
+export function isAllowedEmail(email: string | null | undefined): boolean {
+  return isValidIitbEmail(email) || isAdminEmail(email);
 }
