@@ -1,4 +1,4 @@
-import { extractEventDetails, extractTimeFromText } from "../events.ts";
+import { DATE_RANGE_RE, extractEventDetails, extractTimeFromText } from "../events.ts";
 import { ALL_COURSES, holidayFromNotice } from "./holiday.ts";
 import { sessionUpdates } from "./sessions.ts";
 
@@ -136,6 +136,9 @@ export function updateFromNotice(
       ? /\b(deadline|due|submission|submit|last date)\b/i.test(subject)
       : /\b(quiz(?:zes)?|exams?|tests?|viva|mid-?sems?|end-?sems?|re-?exam)\b/i.test(subject);
   if ((ev.slot_type === "quiz" || ev.slot_type === "exam" || ev.slot_type === "deadline") && namesIt) {
+    // A quiz or exam goes on the timetable only with one clear day and a written time. "During the week of 26–30 October"
+    // names no day, and a missing time would otherwise become a made-up 10:00.
+    if (ev.slot_type !== "deadline" && (!hasTime || DATE_RANGE_RE.test(text))) return null;
     return {
       ...base,
       kind: "added",

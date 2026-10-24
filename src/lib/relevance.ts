@@ -47,14 +47,14 @@ const ALIASES: Record<string, string[]> = {
   aeromodelling: ["aeromodelling", "aero modelling", "aeromodeling", "aero club"],
   "mars rover": ["mars rover", "mars-rover"],
   "hyperloop": ["hyperloop"],
-  astronomy: ["astronomy", "astro club", "telescope"],
+  astronomy: ["astronomy", "astro club", "telescope", "krittika"],
   "analytics club": ["analytics", "data science", "kaggle"],
   insight: ["insight"],
   music: ["music", "band", "singing", "jam"],
   dramatics: ["dramatics", "drama", "theatre", "theater", "play"],
   dance: ["dance", "choreo"],
   photography: ["photography", "photo club", "pfc", "film and media"],
-  films: ["film", "cinema", "screening", "movie"],
+  films: ["film", "cinema", "screening", "movie", "silverscreen"],
   literary: ["literary", "litsoc", "poetry", "writing", "creative writing"],
   quizzing: ["quiz club", "quizzing", "quizzes", "q-club"],
   debating: ["debate", "debating", "parliamentary", "mun"],
@@ -68,7 +68,8 @@ const ALIASES: Record<string, string[]> = {
   "hackathons & coding contests": ["hackathon", "coding contest", "codeforces", "competitive programming", "cp "],
   "sports trials & nso": ["trials", "selection", "nso", "pre-camp", "inter-hostel", "inter hostel"],
   "scholarships & fee notices": ["scholarship", "fee waiver", "fee support"],
-  "mess & hostel updates": ["mess", "hostel"],
+  // Specific on purpose: every inter-hostel championship says "hostel", and none of them is a hostel update.
+  "mess & hostel updates": ["mess menu", "mess rebate", "mess timing", "mess closed", "mess council", "mess fee", "mess secretary", "hostel council", "hostel maintenance", "hostel office", "hostel gate", "room allotment", "water supply", "hostel warden", "hostel secretary"],
   cricket: ["cricket"],
   football: ["football", "soccer"],
   basketball: ["basketball"],
@@ -104,6 +105,10 @@ const myHostelNumber = (hostel?: string | null) => {
   return m ? String(Number(m[1])) : null;
 };
 
+/** Inter-hostel championships (GC): they are about winning points for a hostel, so the word "hostel" says nothing about the student. */
+const GC_RE = /\b(general championship|inter[- ]?hostel|hostel points|support your hostel|freshiezza|\d+ GC points|GC 20\d\d)\b/i;
+const HOSTEL_UPDATE_CHIP = "mess & hostel updates";
+
 const tagsOf = (t: unknown): string[] => (Array.isArray(t) ? t.map(String) : []);
 
 export function relevanceOf(item: RelItem, p: Profile): Relevance {
@@ -118,8 +123,11 @@ export function relevanceOf(item: RelItem, p: Profile): Relevance {
   if (item.myCourse) points += 6;
 
   // Clubs, interests and topics the student chose.
+  const isGC = GC_RE.test(`${subject}
+${(item.summary || "").slice(0, 400)}`);
   let hits = 0;
   for (const kw of p.keywords) {
+    if (isGC && kw.trim().toLowerCase() === HOSTEL_UPDATE_CHIP) continue;
     const pats = patternsFor(kw);
     const inSubject = pats.some((r) => r.test(subject));
     const inRest = !inSubject && pats.some((r) => r.test(rest));
@@ -169,6 +177,40 @@ export function relevanceOf(item: RelItem, p: Profile): Relevance {
   if ((item.score ?? 0) >= 9) points += 1;
 
   return { points, relevant: points >= BAR[p.mode], why: reasons.length ? reasons.slice(0, 2).join(" · ") : null };
+}
+
+const squash = (s: string) => s.toUpperCase().replace(/[\s-]/g, "");
+
+/**
+ * Should a phone buzz for this notice? Only urgent notices are considered (the caller checks that), and then only
+ * what is theirs: their own mail, their Moodle courses, or what clears the strictest filter on what they follow.
+ * Notices whose deadline has already passed never buzz.
+ */
+export function worthAnAlert(
+  item: RelItem & { deadline_at?: string | null },
+  sub: Parameters<typeof profileFromSubscriber>[0] & { courses?: string[] | null },
+  now = new Date()
+): boolean {
+  if (item.deadline_at && new Date(item.deadline_at).getTime() < now.getTime() - 3600_000) return false;
+  if (item.is_personal || item.source === "moodle") return true;
+  const subject = squash(item.subject || "");
+  if ((sub.courses || []).some((c) => c && subject.includes(squash(c)))) return true;
+  return relevanceOf(item, profileFromSubscriber(sub, "focused")).relevant;
+}
+
+/** The profile a student's saved settings describe. `mode` overrides their own focus choice (phone alerts are always the strictest). */
+export function profileFromSubscriber(
+  sub: { categories?: unknown; keywords?: string | null; hostel?: string | null; department?: string | null; year?: string | number | null; feed_mode?: string | null },
+  mode?: FeedMode
+): Profile {
+  return {
+    categories: Array.isArray(sub.categories) ? (sub.categories as string[]) : [],
+    keywords: parseKeywords(sub.keywords),
+    hostel: sub.hostel,
+    department: sub.department,
+    year: sub.year ? String(sub.year) : null,
+    mode: mode || ((sub.feed_mode as FeedMode) || "balanced"),
+  };
 }
 
 export function parseKeywords(raw: string | null | undefined): string[] {

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CourseUpdate } from "@/lib/timetable/updates";
 import { takesCourse } from "@/lib/timetable/courses";
+import { worthAnAlert } from "@/lib/relevance";
 import { pushToEmails } from "@/lib/server/push";
 import { linkNotice, type LinkResult } from "@/lib/server/linkEvents";
 
@@ -12,6 +13,7 @@ export type Sub = {
   division: string | null;
   hasmed: string | null;
   keywords: string | null;
+  categories?: string[] | null;
   user_id?: string | null;
   courses?: string[];
 };
@@ -36,7 +38,7 @@ export async function publishNotice(
 
   const { data, error: subErr } = await admin
     .from("subscribers")
-    .select("email, department, year, hostel, division, hasmed, keywords, user_id")
+    .select("email, department, year, hostel, division, hasmed, keywords, categories, user_id")
     .is("merged_into", null);
   if (subErr) console.error("publish: subscribers read failed", subErr.message);
   // Personal notices go to their owner only.
@@ -83,7 +85,26 @@ export async function publishNotice(
     ? []
     : update && update.kind !== "added"
       ? subs.filter((s) => (update.course_code === "*" || takesCourse(s, update.course_code)) && (!update.division || !s.division || s.division.toUpperCase() === update.division.toUpperCase())).map((s) => s.email)
-      : scores.filter((x) => x.score >= URGENT_SCORE).map((x) => x.sub.email);
+      : scores
+          .filter((x) => x.score >= URGENT_SCORE)
+          // A buzz is the strictest filter: urgent AND about something this student follows or takes.
+          .filter((x) =>
+            worthAnAlert(
+              {
+                subject: row.subject,
+                summary: row.summary,
+                body: typeof row.body === "string" ? row.body : null,
+                tags: row.tags,
+                from_address: typeof row.sender === "string" ? row.sender : null,
+                source: typeof row.source === "string" ? row.source : null,
+                is_personal: Boolean(row.is_personal),
+                is_verified: Boolean(row.is_verified),
+                deadline_at: typeof row.deadline_at === "string" ? row.deadline_at : null,
+              },
+              x.sub
+            )
+          )
+          .map((x) => x.sub.email);
   const title =
     update?.kind === "cancelled"
       ? update.course_code === "*" ? "No classes" : `${update.course_code} cancelled`
