@@ -15,6 +15,7 @@ import { CalendarLink } from "@/components/CalendarLink";
 import { InterestPicker } from "@/components/InterestPicker";
 import { RequestBox } from "@/components/RequestBox";
 import { MyInstagram } from "@/components/MyInstagram";
+import { HideTopics } from "@/components/HideTopics";
 import type { FeedMode } from "@/lib/relevance";
 import { AppBar } from "@/components/AppBar";
 import {
@@ -347,6 +348,7 @@ function SettingsContent() {
                     setFeedMode(v.feed_mode);
                   }}
                 />
+                <HideTopics />
                 <h3 className="chips-title">Instagram pages you follow</h3>
                 <MyInstagram />
                 <h3 className="chips-title">Something we don&apos;t cover yet?</h3>

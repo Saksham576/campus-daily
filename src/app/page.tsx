@@ -117,7 +117,7 @@ export default async function HomePage() {
 
   // Everything in one parallel round trip (the profile is only needed to decide where to send you).
   const [profileRes, itemsCountRes, feedFirst, coursesFirst, updatesRes, cardsRes, savedRes, enrolRes, dueRes, moodleRes, pushRes] = await Promise.all([
-    supabase.from("subscribers").select("onboarded_at, name, last_seen_at, muted_senders, year, division, keywords, categories, hostel, department, feed_mode, prefs_set_at").eq("email", user.email).single(),
+    supabase.from("subscribers").select("onboarded_at, name, last_seen_at, muted_senders, year, division, keywords, categories, hostel, department, feed_mode, prefs_set_at, non_interests").eq("email", user.email).single(),
     supabase.from("user_items").select("item_id", { count: "exact", head: true }).eq("email", emailLower),
     supabase.rpc("me_feed", { p_since: since, p_min_score: MIN_SCORE }),
     supabase.from("user_courses").select("course_code, title, division, lecture_slots, tutorial_slots, venue"),

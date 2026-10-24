@@ -13,6 +13,8 @@ export type Profile = {
   department?: string | null;
   year?: string | null;
   mode: FeedMode;
+  /** Topics the student asked never to see (Settings > Hide these). Chip labels, like keywords. */
+  avoid?: string[];
 };
 
 export type RelItem = {
@@ -81,6 +83,7 @@ const ALIASES: Record<string, string[]> = {
   "fitness & gym": ["gym", "fitness", "yoga"],
   "wellness & counselling": ["wellness", "counselling", "counseling", "mental health", "swc", "student wellness"],
   "lost & found": ["lost", "found"],
+  "general championships (gc)": ["general championship", "inter-hostel", "inter hostel", "hostel points", "gc points", "freshiezza"],
 };
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -109,6 +112,10 @@ const myHostelNumber = (hostel?: string | null) => {
 const GC_RE = /\b(general championship|inter[- ]?hostel|hostel points|support your hostel|freshiezza|\d+ GC points|GC 20\d\d)\b/i;
 const HOSTEL_UPDATE_CHIP = "mess & hostel updates";
 
+/** The institute's own big events: everyone hears about them. Auditions, trials and registrations *for* them are not the event. */
+const MAJOR_RE = /\b(mood indigo|techfest|inter[- ]?iit (?:cult|cultural|tech|sports)? ?meet|convocation|institute lecture|foundation day|independence day|republic day|e-summit|annual sports meet|institute holiday)\b/i;
+const MAJOR_NOT_RE = /\b(audition|auditions|trials?|selection|contingent|registrations?|recruitment|applications?)\b/i;
+
 const tagsOf = (t: unknown): string[] => (Array.isArray(t) ? t.map(String) : []);
 
 export function relevanceOf(item: RelItem, p: Profile): Relevance {
@@ -125,6 +132,11 @@ export function relevanceOf(item: RelItem, p: Profile): Relevance {
   // Clubs, interests and topics the student chose.
   const isGC = GC_RE.test(`${subject}
 ${(item.summary || "").slice(0, 400)}`);
+  const major = MAJOR_RE.test(subject) && !MAJOR_NOT_RE.test(subject);
+  if (major) {
+    points += 4;
+    reasons.push("Big campus event");
+  }
   let hits = 0;
   for (const kw of p.keywords) {
     if (isGC && kw.trim().toLowerCase() === HOSTEL_UPDATE_CHIP) continue;
@@ -152,7 +164,7 @@ ${(item.summary || "").slice(0, 400)}`);
     if (seen.has(hn)) {
       points += 4;
       reasons.push("Your hostel");
-    } else points -= 5;
+    } else if (!major) points -= 5;
   }
 
   // Year: "second year" notices are not for a fresher.
@@ -161,7 +173,7 @@ ${(item.summary || "").slice(0, 400)}`);
     const years = new Set([...text.matchAll(YEAR_RE)].map((m) => ORDINAL[m[1].toLowerCase()]));
     if (years.size) {
       if (years.has(String(p.year))) points += 2;
-      else points -= 4;
+      else if (!major) points -= 4;
     } else if (FRESHER_RE.test(text)) {
       if (String(p.year) === "1") {
         points += 3;
@@ -175,6 +187,19 @@ ${(item.summary || "").slice(0, 400)}`);
     if (!reasons.length) reasons.push("Affects all students");
   }
   if ((item.score ?? 0) >= 9) points += 1;
+
+  // Topics the student asked to hide win over everything except their own mail and courses.
+  const hidden =
+    !item.is_personal &&
+    item.source !== "moodle" &&
+    !item.myCourse &&
+    (p.avoid || []).some((kw) => {
+      const k = kw.trim().toLowerCase();
+      if (!k) return false;
+      if (k === "instagram posts") return item.source === "instagram";
+      return patternsFor(kw).some((r) => r.test(subject) || r.test(item.summary || ""));
+    });
+  if (hidden) return { points: points - 8, relevant: false, why: null };
 
   return { points, relevant: points >= BAR[p.mode], why: reasons.length ? reasons.slice(0, 2).join(" · ") : null };
 }
@@ -200,12 +225,13 @@ export function worthAnAlert(
 
 /** The profile a student's saved settings describe. `mode` overrides their own focus choice (phone alerts are always the strictest). */
 export function profileFromSubscriber(
-  sub: { categories?: unknown; keywords?: string | null; hostel?: string | null; department?: string | null; year?: string | number | null; feed_mode?: string | null },
+  sub: { categories?: unknown; keywords?: string | null; non_interests?: string | null; hostel?: string | null; department?: string | null; year?: string | number | null; feed_mode?: string | null },
   mode?: FeedMode
 ): Profile {
   return {
     categories: Array.isArray(sub.categories) ? (sub.categories as string[]) : [],
     keywords: parseKeywords(sub.keywords),
+    avoid: parseKeywords(sub.non_interests),
     hostel: sub.hostel,
     department: sub.department,
     year: sub.year ? String(sub.year) : null,
