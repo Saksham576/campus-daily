@@ -148,7 +148,7 @@ function LoginForm() {
       const res = await fetch("/api/auth/send-code", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: cleanEmail, mode, next: safeNext }),
+        body: JSON.stringify({ email: cleanEmail, mode: "signup", next: safeNext }),
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
@@ -224,7 +224,6 @@ function LoginForm() {
     return (
       <main className="wrap narrow">
         <StationSign />
-        <h1>Welcome to Campus Daily</h1>
         <div className="login-redirect-card">
           <p className="muted">
             {status === "verified"
@@ -240,30 +239,8 @@ function LoginForm() {
   return (
     <main className="wrap narrow">
       <StationSign />
-      <div className="auth-tabs" role="tablist" aria-label="Log in or sign up">
-        {(["login", "signup"] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            role="tab"
-            aria-selected={mode === m}
-            className={`auth-tab ${mode === m ? "active" : ""}`}
-            onClick={() => {
-              setMode(m);
-              setStep("email");
-              setStatus("idle");
-              setErrorMsg("");
-            }}
-          >
-            {m === "login" ? "Log in" : "Sign up"}
-          </button>
-        ))}
-      </div>
-
       <p className="muted small" style={{ marginBottom: 4 }}>
-        {mode === "login"
-          ? "Enter your IITB email. We’ll send a 6-digit code and a one-tap sign-in link."
-          : "Create your account with your @iitb.ac.in email. We’ll send a 6-digit code and a one-tap sign-in link."}
+        Continue with your @iitb.ac.in email. We’ll send a 6-digit code and a one-tap sign-in link. New here? Your account is created for you.
       </p>
 
       {step === "email" ? (
