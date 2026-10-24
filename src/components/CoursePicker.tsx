@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { COURSE_CATALOG, coursesForDivision } from "@/lib/timetable/catalog";
-import { formatCourseCode, isLabSlotCode, labSlotOptions, tutorialSlotOptions } from "@/lib/timetable/slots";
+import { cs101LabOptions, formatCourseCode, isLabSlotCode, tutorialSlotOptions } from "@/lib/timetable/slots";
 
 // Department name → course-code prefixes (IITB)
 const DEPT_PREFIX: [RegExp, string[]][] = [
@@ -24,7 +24,7 @@ const DEPT_PREFIX: [RegExp, string[]][] = [
 
 // Courses whose lab runs in a slot of each student's own (allotted in the first lab), not by division.
 const OWN_LAB = ["CS101"];
-const LAB_OPTIONS = labSlotOptions();
+const LAB_OPTIONS = cs101LabOptions();
 const TUT_OPTIONS = tutorialSlotOptions();
 
 type Pick = Record<string, string>; // course key → division / batch / section ("" = not taking)
