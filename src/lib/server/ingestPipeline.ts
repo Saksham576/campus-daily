@@ -57,13 +57,13 @@ async function processNotice(email: InboundEmail): Promise<{ status: number; bod
 
   // Whose inbox is this from? (campusdaily.inbox+<token>@gmail.com — see Settings → IITB mail)
   const token = forwardToken(email);
-  let owner: string | null = null;
-  if (token) {
+  let owner: string | null = email.owner ? email.owner.toLowerCase() : null;
+  if (!owner && token) {
     const { data } = await admin.from("subscribers").select("email").eq("forward_token", token).maybeSingle();
     owner = data?.email || null;
     if (owner) await admin.from("subscribers").update({ last_forward_at: new Date().toISOString() }).eq("email", owner);
   }
-  const listMail = !owner || !isPersonalMail(email, owner);
+  const listMail = !owner || (!email.owner && !isPersonalMail(email, owner));
 
   // The same list mail arrives once per forwarding student: process it only the first time.
   if (listMail) {
@@ -84,7 +84,7 @@ async function processNotice(email: InboundEmail): Promise<{ status: number; bod
   if (!owner && scored.is_personal && !email.from.startsWith("WhatsApp:")) return { status: 200, body: { ok: true, skipped: "personal mail without owner" } };
 
   // Personal mail (sent to this student, not a list) is shown to them alone, under its own id.
-  const personal = Boolean(owner) && isPersonalMail(email, owner!, scored.is_personal);
+  const personal = Boolean(owner) && (Boolean(email.owner) || isPersonalMail(email, owner!, scored.is_personal));
   const ev = extractEventDetails(email.subject, email.body);
   const base = buildItemRow(email, scored, {
     source: email.from.startsWith("WhatsApp:") ? "whatsapp" : email.from.startsWith("Web:") ? "web" : email.from.startsWith("Instagram:") ? "instagram" : "ingest-mail",

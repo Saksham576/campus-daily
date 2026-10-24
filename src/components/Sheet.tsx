@@ -8,13 +8,17 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
-    ref.current?.focus();
+    ref.current?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     document.addEventListener("keydown", onKey);
+    // Hide page scrolling without letting the page jump when the scrollbar disappears.
+    const gap = window.innerWidth - document.documentElement.clientWidth;
     document.body.style.overflow = "hidden";
+    if (gap > 0 && !CSS.supports("scrollbar-gutter", "stable")) document.body.style.paddingRight = `${gap}px`;
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
+      document.body.style.paddingRight = "";
       prev?.focus?.();
     };
   }, [onClose]);

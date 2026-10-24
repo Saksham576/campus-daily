@@ -3349,3 +3349,98 @@ kbd {
   padding-top: 4px;
   border-top: 1px solid var(--rule);
 }
+
+/* ---------- Courses picker: text above the select, never squeezed or wider than the card ---------- */
+.panel-body {
+  grid-template-columns: minmax(0, 1fr);
+}
+.panel-body > * {
+  min-width: 0;
+}
+.pick-lab {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin-left: 0;
+}
+.pick-lab select {
+  width: 100%;
+  max-width: 440px;
+}
+@media (max-width: 560px) {
+  .pick-lab select {
+    max-width: none;
+  }
+}
+
+/* Opening a sheet must not nudge the page behind it (the scrollbar disappearing shifted everything). */
+html {
+  scrollbar-gutter: stable;
+}
+
+/* ---------- Calmer palette: red is only for cancelled, errors and delete ---------- */
+.meta .src .lucide,
+.meta .src-whatsapp .lucide,
+.meta .src-moodle .lucide,
+.meta .src-instagram .lucide {
+  color: var(--faint);
+}
+.when-chip.hot {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+.tag.high,
+.tag.event.high {
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+.tag.verified,
+.tag.wa {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.platform.urgent .count,
+.nav-badge {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.brief-due {
+  color: var(--ink-2);
+}
+.brief-due::before {
+  background: var(--accent);
+}
+.status.soon {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.week-block.t-quiz,
+.week-block.t-exam {
+  background: var(--amber-soft);
+  border-left-color: var(--amber);
+}
+.slot-card.quiz::before,
+.slot-card.exam::before {
+  background: var(--amber);
+}
+.week-block.t-lab {
+  background: var(--surface-2);
+  border-left-color: var(--faint);
+}
+.slot-card.lab::before {
+  background: var(--faint);
+}
+.status.go {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+/* ---------- Instagram pages you follow ---------- */
+.ig-add {
+  display: flex;
+  gap: 8px;
+}
+.ig-add input {
+  flex: 1;
+  min-width: 0;
+}

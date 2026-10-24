@@ -14,6 +14,7 @@ import { MoodleConnect } from "@/components/MoodleConnect";
 import { CalendarLink } from "@/components/CalendarLink";
 import { InterestPicker } from "@/components/InterestPicker";
 import { RequestBox } from "@/components/RequestBox";
+import { MyInstagram } from "@/components/MyInstagram";
 import type { FeedMode } from "@/lib/relevance";
 import { AppBar } from "@/components/AppBar";
 import {
@@ -346,6 +347,8 @@ function SettingsContent() {
                     setFeedMode(v.feed_mode);
                   }}
                 />
+                <h3 className="chips-title">Instagram pages you follow</h3>
+                <MyInstagram />
                 <h3 className="chips-title">Something we don&apos;t cover yet?</h3>
                 <p className="help">Tell us a group, page or service you wish was here. We read every one.</p>
                 <RequestBox context="settings" />
