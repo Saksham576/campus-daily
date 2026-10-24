@@ -12,9 +12,10 @@ export const MAX_DOC_BYTES = 25 * 1024 * 1024;
 export function docKind(name: string, mime?: string | null): string | null {
   const n = name.toLowerCase();
   if (n.endsWith(".pdf") || mime === "application/pdf") return "pdf";
-  if (n.endsWith(".docx")) return "docx";
-  if (n.endsWith(".pptx")) return "pptx";
-  if (n.endsWith(".xlsx")) return "xlsx";
+  // Some Moodle files have no extension in their name ("CH 111 D3 tutorial batches"); the mime type still says what they are.
+  if (n.endsWith(".docx") || mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") return "docx";
+  if (n.endsWith(".pptx") || mime === "application/vnd.openxmlformats-officedocument.presentationml.presentation") return "pptx";
+  if (n.endsWith(".xlsx") || mime === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") return "xlsx";
   if (/\.(txt|csv|md|tsv)$/.test(n) || mime?.startsWith("text/")) return "text";
   return null;
 }
